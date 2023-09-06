@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "17.0.0-next.1+sha-74935f8",
+  "version": "17.0.0-next.1+sha-cb66c3d",
   "description": "Angular server side rendering utilities",
   "license": "MIT",
   "homepage": "https://github.com/angular/angular-cli",
@@ -18,6 +18,10 @@
     "@angular/core": "^17.0.0 || ^17.0.0-next.0"
   },
   "schematics": "./schematics/collection.json",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/angular/angular-cli.git"
+  },
   "module": "./fesm2022/ssr.mjs",
   "typings": "./index.d.ts",
   "type": "module",

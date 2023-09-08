@@ -34,6 +34,13 @@ const LINK_LOAD_SCRIPT_CONTENT = [
     `})();`,
 ].join('\n');
 class CrittersExtended extends Critters {
+    optionsExtended;
+    resourceCache;
+    warnings = [];
+    errors = [];
+    initialEmbedLinkedStylesheet;
+    addedCspScriptsDocuments = new WeakSet();
+    documentNonces = new WeakMap();
     constructor(optionsExtended, resourceCache) {
         super({
             logger: {
@@ -56,50 +63,6 @@ class CrittersExtended extends Critters {
         });
         this.optionsExtended = optionsExtended;
         this.resourceCache = resourceCache;
-        this.warnings = [];
-        this.errors = [];
-        this.addedCspScriptsDocuments = new WeakSet();
-        this.documentNonces = new WeakMap();
-        /**
-         * Override of the Critters `embedLinkedStylesheet` method
-         * that makes it work with Angular's CSP APIs.
-         */
-        this.embedLinkedStylesheetOverride = async (link, document) => {
-            if (link.getAttribute('media') === 'print' && link.next?.name === 'noscript') {
-                // Workaround for https://github.com/GoogleChromeLabs/critters/issues/64
-                // NB: this is only needed for the webpack based builders.
-                const media = link.getAttribute('onload')?.match(MEDIA_SET_HANDLER_PATTERN);
-                if (media) {
-                    link.removeAttribute('onload');
-                    link.setAttribute('media', media[1]);
-                    link?.next?.remove();
-                }
-            }
-            const returnValue = await this.initialEmbedLinkedStylesheet(link, document);
-            const cspNonce = this.findCspNonce(document);
-            if (cspNonce) {
-                const crittersMedia = link.getAttribute('onload')?.match(MEDIA_SET_HANDLER_PATTERN);
-                if (crittersMedia) {
-                    // If there's a Critters-generated `onload` handler and the file has an Angular CSP nonce,
-                    // we have to remove the handler, because it's incompatible with CSP. We save the value
-                    // in a different attribute and we generate a script tag with the nonce that uses
-                    // `addEventListener` to apply the media query instead.
-                    link.removeAttribute('onload');
-                    link.setAttribute(CSP_MEDIA_ATTR, crittersMedia[1]);
-                    this.conditionallyInsertCspLoadingScript(document, cspNonce);
-                }
-                // Ideally we would hook in at the time Critters inserts the `style` tags, but there isn't
-                // a way of doing that at the moment so we fall back to doing it any time a `link` tag is
-                // inserted. We mitigate it by only iterating the direct children of the `<head>` which
-                // should be pretty shallow.
-                document.head.children.forEach((child) => {
-                    if (child.tagName === 'style' && !child.hasAttribute('nonce')) {
-                        child.setAttribute('nonce', cspNonce);
-                    }
-                });
-            }
-            return returnValue;
-        };
         // We can't use inheritance to override `embedLinkedStylesheet`, because it's not declared in
         // the `Critters` .d.ts which means that we can't call the `super` implementation. TS doesn't
         // allow for `super` to be cast to a different type.
@@ -114,6 +77,46 @@ class CrittersExtended extends Critters {
         }
         return resourceContent;
     }
+    /**
+     * Override of the Critters `embedLinkedStylesheet` method
+     * that makes it work with Angular's CSP APIs.
+     */
+    embedLinkedStylesheetOverride = async (link, document) => {
+        if (link.getAttribute('media') === 'print' && link.next?.name === 'noscript') {
+            // Workaround for https://github.com/GoogleChromeLabs/critters/issues/64
+            // NB: this is only needed for the webpack based builders.
+            const media = link.getAttribute('onload')?.match(MEDIA_SET_HANDLER_PATTERN);
+            if (media) {
+                link.removeAttribute('onload');
+                link.setAttribute('media', media[1]);
+                link?.next?.remove();
+            }
+        }
+        const returnValue = await this.initialEmbedLinkedStylesheet(link, document);
+        const cspNonce = this.findCspNonce(document);
+        if (cspNonce) {
+            const crittersMedia = link.getAttribute('onload')?.match(MEDIA_SET_HANDLER_PATTERN);
+            if (crittersMedia) {
+                // If there's a Critters-generated `onload` handler and the file has an Angular CSP nonce,
+                // we have to remove the handler, because it's incompatible with CSP. We save the value
+                // in a different attribute and we generate a script tag with the nonce that uses
+                // `addEventListener` to apply the media query instead.
+                link.removeAttribute('onload');
+                link.setAttribute(CSP_MEDIA_ATTR, crittersMedia[1]);
+                this.conditionallyInsertCspLoadingScript(document, cspNonce);
+            }
+            // Ideally we would hook in at the time Critters inserts the `style` tags, but there isn't
+            // a way of doing that at the moment so we fall back to doing it any time a `link` tag is
+            // inserted. We mitigate it by only iterating the direct children of the `<head>` which
+            // should be pretty shallow.
+            document.head.children.forEach((child) => {
+                if (child.tagName === 'style' && !child.hasAttribute('nonce')) {
+                    child.setAttribute('nonce', cspNonce);
+                }
+            });
+        }
+        return returnValue;
+    };
     /**
      * Finds the CSP nonce for a specific document.
      */
@@ -151,9 +154,10 @@ class CrittersExtended extends Critters {
     }
 }
 class InlineCriticalCssProcessor {
+    options;
+    resourceCache = new Map();
     constructor(options) {
         this.options = options;
-        this.resourceCache = new Map();
     }
     async process(html, options) {
         const critters = new CrittersExtended({ ...this.options, ...options }, this.resourceCache);
@@ -173,11 +177,14 @@ const SSG_MARKER_REGEXP = /ng-server-context=["']\w*\|?ssg\|?\w*["']/;
  * the document loader
  */
 class CommonEngine {
+    bootstrap;
+    providers;
+    templateCache = new Map();
+    inlineCriticalCssProcessor;
+    pageIsSSG = new Map();
     constructor(bootstrap, providers = []) {
         this.bootstrap = bootstrap;
         this.providers = providers;
-        this.templateCache = new Map();
-        this.pageIsSSG = new Map();
         this.inlineCriticalCssProcessor = new InlineCriticalCssProcessor({
             minify: false,
         });

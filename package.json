@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "17.0.0-next.3+sha-3d3afc7",
+  "version": "17.0.0-next.3+sha-a35ec17",
   "description": "Angular server side rendering utilities",
   "license": "MIT",
   "homepage": "https://github.com/angular/angular-cli",
@@ -9,6 +9,9 @@
     "ssr",
     "universal"
   ],
+  "ng-add": {
+    "save": "dependencies"
+  },
   "dependencies": {
     "critters": "0.0.20",
     "tslib": "^2.3.0"

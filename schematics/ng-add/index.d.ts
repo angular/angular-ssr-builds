@@ -6,5 +6,5 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import { Rule } from '@angular-devkit/schematics';
-import { Schema as AddUniversalOptions } from './schema';
-export default function (options: AddUniversalOptions): Rule;
+import { Schema as AddServerOptions } from './schema';
+export default function (options: AddServerOptions): Rule;

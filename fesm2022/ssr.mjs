@@ -279,7 +279,7 @@ async function exists(path) {
     }
 }
 function isBootstrapFn(value) {
-    // We can differentiate between a module and a bootstrap function by reading `cmp`:
+    // We can differentiate between a module and a bootstrap function by reading compiler-generated `ɵmod` static property:
     return typeof value === 'function' && !('ɵmod' in value);
 }
 // The below can be removed in favor of URL.canParse() when Node.js 18 is dropped

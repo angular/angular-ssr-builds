@@ -1,4 +1,4 @@
-import { ɵSERVER_CONTEXT, INITIAL_CONFIG, renderApplication, renderModule } from '@angular/platform-server';
+import { ɵSERVER_CONTEXT, renderApplication, renderModule } from '@angular/platform-server';
 import * as fs from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { URL } from 'node:url';
@@ -294,6 +294,10 @@ class CommonEngine {
         return undefined;
     }
     async renderApplication(opts) {
+        const moduleOrFactory = this.options?.bootstrap ?? opts.bootstrap;
+        if (!moduleOrFactory) {
+            throw new Error('A module or bootstrap option must be provided.');
+        }
         const extraProviders = [
             { provide: ɵSERVER_CONTEXT, useValue: 'ssr' },
             ...(opts.providers ?? []),
@@ -303,22 +307,16 @@ class CommonEngine {
         if (!document && opts.documentFilePath) {
             document = await this.getDocument(opts.documentFilePath);
         }
-        if (document) {
-            extraProviders.push({
-                provide: INITIAL_CONFIG,
-                useValue: {
-                    document,
-                    url: opts.url,
-                },
-            });
-        }
-        const moduleOrFactory = this.options?.bootstrap ?? opts.bootstrap;
-        if (!moduleOrFactory) {
-            throw new Error('A module or bootstrap option must be provided.');
-        }
+        const commonRenderingOptions = {
+            url: opts.url,
+            document,
+        };
         return isBootstrapFn(moduleOrFactory)
-            ? renderApplication(moduleOrFactory, { platformProviders: extraProviders })
-            : renderModule(moduleOrFactory, { extraProviders });
+            ? renderApplication(moduleOrFactory, {
+                platformProviders: extraProviders,
+                ...commonRenderingOptions,
+            })
+            : renderModule(moduleOrFactory, { extraProviders, ...commonRenderingOptions });
     }
     /** Retrieve the document from the cache or the filesystem */
     async getDocument(filePath) {

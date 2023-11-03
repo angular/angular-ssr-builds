@@ -31,8 +31,8 @@ export class CommonEngine {
      * render options
      */
     async render(opts) {
-        const enablePeformanceProfiler = this.options?.enablePeformanceProfiler;
-        const runMethod = enablePeformanceProfiler
+        const enablePerformanceProfiler = this.options?.enablePerformanceProfiler;
+        const runMethod = enablePerformanceProfiler
             ? runMethodAndMeasurePerf
             : noopRunMethodAndMeasurePerf;
         let html = await runMethod('Retrieve SSG Page', () => this.retrieveSSGPage(opts));
@@ -49,7 +49,7 @@ export class CommonEngine {
                 errors?.forEach((m) => console.error(m));
             }
         }
-        if (enablePeformanceProfiler) {
+        if (enablePerformanceProfiler) {
             printPerformanceLogs();
         }
         return html;

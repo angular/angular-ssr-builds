@@ -29,7 +29,7 @@ export declare interface CommonEngineOptions {
     /** A set of platform level providers for all requests. */
     providers?: StaticProvider[];
     /** Enable request performance profiling data collection and printing the results in the server console. */
-    enablePeformanceProfiler?: boolean;
+    enablePerformanceProfiler?: boolean;
 }
 
 export declare interface CommonEngineRenderOptions {

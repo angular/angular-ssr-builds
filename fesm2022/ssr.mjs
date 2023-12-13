@@ -1,4 +1,4 @@
-import { ɵSERVER_CONTEXT, renderApplication, renderModule } from '@angular/platform-server';
+import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderApplication, renderModule } from '@angular/platform-server';
 import * as fs from 'node:fs';
 import { dirname, join, normalize, resolve } from 'node:path';
 import { URL } from 'node:url';
@@ -296,7 +296,7 @@ class CommonEngine {
             throw new Error('A module or bootstrap option must be provided.');
         }
         const extraProviders = [
-            { provide: ɵSERVER_CONTEXT, useValue: 'ssr' },
+            { provide: _SERVER_CONTEXT, useValue: 'ssr' },
             ...(opts.providers ?? []),
             ...(this.options?.providers ?? []),
         ];

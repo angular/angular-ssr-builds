@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "17.2.0-next.0+sha-ce7eddb",
+  "version": "17.2.0-next.0+sha-6c65730",
   "description": "Angular server side rendering utilities",
   "license": "MIT",
   "homepage": "https://github.com/angular/angular-cli",
@@ -17,8 +17,8 @@
     "tslib": "^2.3.0"
   },
   "peerDependencies": {
-    "@angular/common": "^17.0.0 || ^17.1.0-next.0",
-    "@angular/core": "^17.0.0 || ^17.1.0-next.0"
+    "@angular/common": "^17.0.0 || ^17.2.0-next.0",
+    "@angular/core": "^17.0.0 || ^17.2.0-next.0"
   },
   "schematics": "./schematics/collection.json",
   "repository": {

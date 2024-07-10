@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "18.1.0-rc.1+sha-13d2100",
+  "version": "18.1.0-rc.1+sha-0c52d5f",
   "description": "Angular server side rendering utilities",
   "license": "MIT",
   "homepage": "https://github.com/angular/angular-cli",
@@ -17,8 +17,8 @@
     "tslib": "^2.3.0"
   },
   "peerDependencies": {
-    "@angular/common": "^18.0.0 || ^18.1.0-next.0",
-    "@angular/core": "^18.0.0 || ^18.1.0-next.0"
+    "@angular/common": "^18.0.0",
+    "@angular/core": "^18.0.0"
   },
   "schematics": "./schematics/collection.json",
   "repository": {

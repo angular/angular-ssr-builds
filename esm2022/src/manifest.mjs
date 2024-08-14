@@ -6,13 +6,14 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 /**
- * Angular app manifest object.
+ * The Angular app manifest object.
+ * This is used internally to store the current Angular app manifest.
  */
 let angularAppManifest;
 /**
  * Sets the Angular app manifest.
  *
- * @param manifest - The manifest object to set.
+ * @param manifest - The manifest object to set for the Angular application.
  */
 export function setAngularAppManifest(manifest) {
     angularAppManifest = manifest;
@@ -25,13 +26,14 @@ export function setAngularAppManifest(manifest) {
  */
 export function getAngularAppManifest() {
     if (!angularAppManifest) {
-        throw new Error('Angular app manifest is not set.' +
+        throw new Error('Angular app manifest is not set. ' +
             `Please ensure you are using the '@angular/build:application' builder to build your server application.`);
     }
     return angularAppManifest;
 }
 /**
- * Angular app engine manifest object.
+ * The Angular app engine manifest object.
+ * This is used internally to store the current Angular app engine manifest.
  */
 let angularAppEngineManifest;
 /**
@@ -50,7 +52,7 @@ export function setAngularAppEngineManifest(manifest) {
  */
 export function getAngularAppEngineManifest() {
     if (!angularAppEngineManifest) {
-        throw new Error('Angular app engine manifest is not set.' +
+        throw new Error('Angular app engine manifest is not set. ' +
             `Please ensure you are using the '@angular/build:application' builder to build your server application.`);
     }
     return angularAppEngineManifest;

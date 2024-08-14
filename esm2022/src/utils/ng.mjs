@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 import { renderApplication, renderModule } from '@angular/platform-server';
+import { stripIndexHtmlFromURL } from './url';
 /**
  * Renders an Angular application or module to an HTML string.
  *
@@ -23,10 +24,16 @@ import { renderApplication, renderModule } from '@angular/platform-server';
  * @returns A promise that resolves to a string containing the rendered HTML.
  */
 export function renderAngular(html, bootstrap, url, platformProviders) {
+    // A request to `http://www.example.com/page/index.html` will render the Angular route corresponding to `http://www.example.com/page`.
+    const urlToRender = stripIndexHtmlFromURL(url).toString();
     return isNgModule(bootstrap)
-        ? renderModule(bootstrap, { url, document: html, extraProviders: platformProviders })
+        ? renderModule(bootstrap, {
+            url: urlToRender,
+            document: html,
+            extraProviders: platformProviders,
+        })
         : renderApplication(bootstrap, {
-            url,
+            url: urlToRender,
             document: html,
             platformProviders,
         });

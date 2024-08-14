@@ -9,7 +9,7 @@ import { ɵConsole, ɵresetCompiledComponents } from '@angular/core';
 import { ɵSERVER_CONTEXT as SERVER_CONTEXT } from '@angular/platform-server';
 import { Console } from './console';
 import { REQUEST, REQUEST_CONTEXT, RESPONSE_INIT } from './tokens';
-import { renderAngular } from './utils';
+import { renderAngular } from './utils/ng';
 /**
  * Enum representing the different contexts in which server rendering can occur.
  */
@@ -65,17 +65,10 @@ export async function render(app, request, serverContext, requestContext) {
             useFactory: () => new Console(),
         });
     }
-    let html = await app.getServerAsset('index.server.html');
+    let html = await app.assets.getIndexServerHtml();
     // Skip extra microtask if there are no pre hooks.
     if (hooks.has('html:transform:pre')) {
         html = await hooks.run('html:transform:pre', { html });
     }
-    let url = request.url;
-    // A request to `http://www.example.com/page/index.html` will render the Angular route corresponding to `http://www.example.com/page`.
-    if (url.includes('/index.html')) {
-        const urlToModify = new URL(url);
-        urlToModify.pathname = urlToModify.pathname.replace(/index\.html$/, '');
-        url = urlToModify.toString();
-    }
-    return new Response(await renderAngular(html, manifest.bootstrap(), url, platformProviders), responseInit);
+    return new Response(await renderAngular(html, manifest.bootstrap(), new URL(request.url), platformProviders), responseInit);
 }

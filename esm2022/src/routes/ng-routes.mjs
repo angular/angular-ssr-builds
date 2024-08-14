@@ -125,25 +125,29 @@ export async function getRoutesFromAngularRouterConfig(bootstrap, document, url)
         await whenStable(applicationRef);
         const injector = applicationRef.injector;
         const router = injector.get(Router);
-        const baseHref = injector.get(APP_BASE_HREF, null, { optional: true }) ??
-            injector.get(PlatformLocation).getBaseHrefFromDOM();
-        if (router.config.length === 0) {
-            // No routes found in the configuration.
-            return { baseHref, routes: (async function* () { })() };
-        }
-        else {
+        const routesResults = [];
+        if (router.config.length) {
             const compiler = injector.get(Compiler);
             // Retrieve all routes from the Angular router configuration.
-            return {
-                baseHref,
-                routes: traverseRoutesConfig({
-                    routes: router.config,
-                    compiler,
-                    parentInjector: injector,
-                    parentRoute: '',
-                }),
-            };
+            const traverseRoutes = traverseRoutesConfig({
+                routes: router.config,
+                compiler,
+                parentInjector: injector,
+                parentRoute: '',
+            });
+            for await (const result of traverseRoutes) {
+                routesResults.push(result);
+            }
         }
+        else {
+            routesResults.push({ route: '' });
+        }
+        const baseHref = injector.get(APP_BASE_HREF, null, { optional: true }) ??
+            injector.get(PlatformLocation).getBaseHrefFromDOM();
+        return {
+            baseHref,
+            routes: routesResults,
+        };
     }
     finally {
         platformRef.destroy();

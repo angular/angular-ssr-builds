@@ -1,9 +1,12 @@
-import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderApplication, renderModule } from '@angular/platform-server';
+import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderApplication, renderModule, INITIAL_CONFIG, ɵINTERNAL_SERVER_PLATFORM_PROVIDERS as _INTERNAL_SERVER_PLATFORM_PROVIDERS } from '@angular/platform-server';
 import * as fs from 'node:fs';
 import { dirname, join, normalize, resolve } from 'node:path';
-import { URL } from 'node:url';
+import { URL as URL$1 } from 'node:url';
 import Critters from 'critters';
 import { readFile } from 'node:fs/promises';
+import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
+import { ɵConsole as _Console, ɵresetCompiledComponents as _resetCompiledComponents, createPlatformFactory, platformCore, ApplicationRef, ɵwhenStable as _whenStable, Compiler } from '@angular/core';
+import { ɵloadChildren as _loadChildren, Router } from '@angular/router';
 
 /**
  * Pattern used to extract the media query set by Critters in an `onload` handler.
@@ -275,7 +278,7 @@ class CommonEngine {
         if (!publicPath || !documentFilePath || url === undefined) {
             return undefined;
         }
-        const { pathname } = new URL(url, 'resolve://');
+        const { pathname } = new URL$1(url, 'resolve://');
         // Do not use `resolve` here as otherwise it can lead to path traversal vulnerability.
         // See: https://portswigger.net/web-security/file-path-traversal
         const pagePath = join(publicPath, pathname, 'index.html');
@@ -347,10 +350,296 @@ function isBootstrapFn(value) {
     return typeof value === 'function' && !('ɵmod' in value);
 }
 
-// TODO(alanagius): enable at a later stage
-// export { AngularAppEngine } from './src/app-engine';
-// export { AngularServerApp } from './src/app';
-// export { REQUEST, REQUEST_CONTEXT, RESPONSE_INIT } from './src/tokens';
+/**
+ * Custom implementation of the Angular Console service that filters out specific log messages.
+ *
+ * This class extends the internal Angular `ɵConsole` class to provide customized logging behavior.
+ * It overrides the `log` method to suppress logs that match certain predefined messages.
+ */
+class Console extends _Console {
+    /**
+     * A set of log messages that should be ignored and not printed to the console.
+     */
+    ignoredLogs = new Set(['Angular is running in development mode.']);
+    /**
+     * Logs a message to the console if it is not in the set of ignored messages.
+     *
+     * @param message - The message to log to the console.
+     *
+     * This method overrides the `log` method of the `ɵConsole` class. It checks if the
+     * message is in the `ignoredLogs` set. If it is not, it delegates the logging to
+     * the parent class's `log` method. Otherwise, the message is suppressed.
+     */
+    log(message) {
+        if (!this.ignoredLogs.has(message)) {
+            super.log(message);
+        }
+    }
+}
 
-export { CommonEngine };
+/**
+ * Removes the trailing slash from a URL if it exists.
+ *
+ * @param url - The URL string from which to remove the trailing slash.
+ * @returns The URL string without a trailing slash.
+ *
+ * @example
+ * ```js
+ * stripTrailingSlash('path/'); // 'path'
+ * stripTrailingSlash('/path');  // '/path'
+ * ```
+ */
+function stripTrailingSlash(url) {
+    // Check if the last character of the URL is a slash
+    return url[url.length - 1] === '/' ? url.slice(0, -1) : url;
+}
+/**
+ * Joins URL parts into a single URL string.
+ *
+ * This function takes multiple URL segments, normalizes them by removing leading
+ * and trailing slashes where appropriate, and then joins them into a single URL.
+ *
+ * @param parts - The parts of the URL to join. Each part can be a string with or without slashes.
+ * @returns The joined URL string, with normalized slashes.
+ *
+ * @example
+ * ```js
+ * joinUrlParts('path/', '/to/resource'); // '/path/to/resource'
+ * joinUrlParts('/path/', 'to/resource'); // '/path/to/resource'
+ * ```
+ */
+function joinUrlParts(...parts) {
+    // Initialize an array with an empty string to always add a leading slash
+    const normalizeParts = [''];
+    for (const part of parts) {
+        if (part === '') {
+            // Skip any empty parts
+            continue;
+        }
+        let normalizedPart = part;
+        if (part[0] === '/') {
+            normalizedPart = normalizedPart.slice(1);
+        }
+        if (part[part.length - 1] === '/') {
+            normalizedPart = normalizedPart.slice(0, -1);
+        }
+        if (normalizedPart !== '') {
+            normalizeParts.push(normalizedPart);
+        }
+    }
+    return normalizeParts.join('/');
+}
+/**
+ * Strips `/index.html` from the end of a URL's path, if present.
+ *
+ * This function is used to convert URLs pointing to an `index.html` file into their directory
+ * equivalents. For example, it transforms a URL like `http://www.example.com/page/index.html`
+ * into `http://www.example.com/page`.
+ *
+ * @param url - The URL object to process.
+ * @returns A new URL object with `/index.html` removed from the path, if it was present.
+ *
+ * @example
+ * ```typescript
+ * const originalUrl = new URL('http://www.example.com/page/index.html');
+ * const cleanedUrl = stripIndexHtmlFromURL(originalUrl);
+ * console.log(cleanedUrl.href); // Output: 'http://www.example.com/page'
+ * ```
+ */
+function stripIndexHtmlFromURL(url) {
+    if (url.pathname.endsWith('/index.html')) {
+        const modifiedURL = new URL(url);
+        // Remove '/index.html' from the pathname
+        modifiedURL.pathname = modifiedURL.pathname.slice(0, /** '/index.html'.length */ -11);
+        return modifiedURL;
+    }
+    return url;
+}
+
+/**
+ * Renders an Angular application or module to an HTML string.
+ *
+ * This function determines whether the provided `bootstrap` value is an Angular module
+ * or a bootstrap function and calls the appropriate rendering method (`renderModule` or
+ * `renderApplication`) based on that determination.
+ *
+ * @param html - The HTML string to be used as the initial document content.
+ * @param bootstrap - Either an Angular module type or a function that returns a promise
+ *                    resolving to an `ApplicationRef`.
+ * @param url - The URL of the application. This is used for server-side rendering to
+ *              correctly handle route-based rendering.
+ * @param platformProviders - An array of platform providers to be used during the
+ *                             rendering process.
+ * @returns A promise that resolves to a string containing the rendered HTML.
+ */
+function renderAngular(html, bootstrap, url, platformProviders) {
+    // A request to `http://www.example.com/page/index.html` will render the Angular route corresponding to `http://www.example.com/page`.
+    const urlToRender = stripIndexHtmlFromURL(url).toString();
+    return isNgModule(bootstrap)
+        ? renderModule(bootstrap, {
+            url: urlToRender,
+            document: html,
+            extraProviders: platformProviders,
+        })
+        : renderApplication(bootstrap, {
+            url: urlToRender,
+            document: html,
+            platformProviders,
+        });
+}
+/**
+ * Type guard to determine if a given value is an Angular module.
+ * Angular modules are identified by the presence of the `ɵmod` static property.
+ * This function helps distinguish between Angular modules and bootstrap functions.
+ *
+ * @param value - The value to be checked.
+ * @returns True if the value is an Angular module (i.e., it has the `ɵmod` property), false otherwise.
+ */
+function isNgModule(value) {
+    return 'ɵmod' in value;
+}
+
+/**
+ * Recursively traverses the Angular router configuration to retrieve routes.
+ *
+ * Iterates through the router configuration, yielding each route along with its potential
+ * redirection or error status. Handles nested routes and lazy-loaded child routes.
+ *
+ * @param options - An object containing the parameters for traversing routes.
+ * @returns An async iterator yielding `RouteResult` objects.
+ */
+async function* traverseRoutesConfig(options) {
+    const { routes, compiler, parentInjector, parentRoute } = options;
+    for (const route of routes) {
+        const { path = '', redirectTo, loadChildren, children } = route;
+        const currentRoutePath = joinUrlParts(parentRoute, path);
+        yield {
+            route: currentRoutePath,
+            redirectTo: typeof redirectTo === 'string'
+                ? resolveRedirectTo(currentRoutePath, redirectTo)
+                : undefined,
+        };
+        if (children?.length) {
+            // Recursively process child routes.
+            yield* traverseRoutesConfig({
+                routes: children,
+                compiler,
+                parentInjector,
+                parentRoute: currentRoutePath,
+            });
+        }
+        if (loadChildren) {
+            // Load and process lazy-loaded child routes.
+            const loadedChildRoutes = await _loadChildren(route, compiler, parentInjector).toPromise();
+            if (loadedChildRoutes) {
+                const { routes: childRoutes, injector = parentInjector } = loadedChildRoutes;
+                yield* traverseRoutesConfig({
+                    routes: childRoutes,
+                    compiler,
+                    parentInjector: injector,
+                    parentRoute: currentRoutePath,
+                });
+            }
+        }
+    }
+}
+/**
+ * Resolves the `redirectTo` property for a given route.
+ *
+ * This function processes the `redirectTo` property to ensure that it correctly
+ * resolves relative to the current route path. If `redirectTo` is an absolute path,
+ * it is returned as is. If it is a relative path, it is resolved based on the current route path.
+ *
+ * @param routePath - The current route path.
+ * @param redirectTo - The target path for redirection.
+ * @returns The resolved redirect path as a string.
+ */
+function resolveRedirectTo(routePath, redirectTo) {
+    if (redirectTo[0] === '/') {
+        // If the redirectTo path is absolute, return it as is.
+        return redirectTo;
+    }
+    // Resolve relative redirectTo based on the current route path.
+    const segments = routePath.split('/');
+    segments.pop(); // Remove the last segment to make it relative.
+    return joinUrlParts(...segments, redirectTo);
+}
+/**
+ * Retrieves routes from the given Angular application.
+ *
+ * This function initializes an Angular platform, bootstraps the application or module,
+ * and retrieves routes from the Angular router configuration. It handles both module-based
+ * and function-based bootstrapping. It yields the resulting routes as `RouteResult` objects.
+ *
+ * @param bootstrap - A function that returns a promise resolving to an `ApplicationRef` or an Angular module to bootstrap.
+ * @param document - The initial HTML document used for server-side rendering.
+ * This document is necessary to render the application on the server.
+ * @param url - The URL for server-side rendering. The URL is used to configure `ServerPlatformLocation`. This configuration is crucial
+ * for ensuring that API requests for relative paths succeed, which is essential for accurate route extraction.
+ * See:
+ *  - https://github.com/angular/angular/blob/d608b857c689d17a7ffa33bbb510301014d24a17/packages/platform-server/src/location.ts#L51
+ *  - https://github.com/angular/angular/blob/6882cc7d9eed26d3caeedca027452367ba25f2b9/packages/platform-server/src/http.ts#L44
+ * @returns A promise that resolves to an object of type `AngularRouterConfigResult`.
+ */
+async function getRoutesFromAngularRouterConfig(bootstrap, document, url) {
+    // Need to clean up GENERATED_COMP_IDS map in `@angular/core`.
+    // Otherwise an incorrect component ID generation collision detected warning will be displayed in development.
+    // See: https://github.com/angular/angular-cli/issues/25924
+    _resetCompiledComponents();
+    const { protocol, host } = url;
+    // Create and initialize the Angular platform for server-side rendering.
+    const platformRef = createPlatformFactory(platformCore, 'server', [
+        {
+            provide: INITIAL_CONFIG,
+            useValue: { document, url: `${protocol}//${host}/` },
+        },
+        {
+            provide: _Console,
+            useFactory: () => new Console(),
+        },
+        ..._INTERNAL_SERVER_PLATFORM_PROVIDERS,
+    ])();
+    try {
+        let applicationRef;
+        if (isNgModule(bootstrap)) {
+            const moduleRef = await platformRef.bootstrapModule(bootstrap);
+            applicationRef = moduleRef.injector.get(ApplicationRef);
+        }
+        else {
+            applicationRef = await bootstrap();
+        }
+        // Wait until the application is stable.
+        await _whenStable(applicationRef);
+        const injector = applicationRef.injector;
+        const router = injector.get(Router);
+        const routesResults = [];
+        if (router.config.length) {
+            const compiler = injector.get(Compiler);
+            // Retrieve all routes from the Angular router configuration.
+            const traverseRoutes = traverseRoutesConfig({
+                routes: router.config,
+                compiler,
+                parentInjector: injector,
+                parentRoute: '',
+            });
+            for await (const result of traverseRoutes) {
+                routesResults.push(result);
+            }
+        }
+        else {
+            routesResults.push({ route: '' });
+        }
+        const baseHref = injector.get(APP_BASE_HREF, null, { optional: true }) ??
+            injector.get(PlatformLocation).getBaseHrefFromDOM();
+        return {
+            baseHref,
+            routes: routesResults,
+        };
+    }
+    finally {
+        platformRef.destroy();
+    }
+}
+
+export { CommonEngine, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig };
 //# sourceMappingURL=ssr.mjs.map

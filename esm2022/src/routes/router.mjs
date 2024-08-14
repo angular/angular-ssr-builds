@@ -56,7 +56,7 @@ export class ServerRouter {
                 const routeTree = new RouteTree();
                 const document = await new ServerAssets(manifest).getIndexServerHtml();
                 const { baseHref, routes } = await getRoutesFromAngularRouterConfig(manifest.bootstrap(), document, url);
-                for await (let { route, redirectTo } of routes) {
+                for (let { route, redirectTo } of routes) {
                     route = joinUrlParts(baseHref, route);
                     redirectTo = redirectTo === undefined ? undefined : joinUrlParts(baseHref, redirectTo);
                     routeTree.insert(route, { redirectTo });

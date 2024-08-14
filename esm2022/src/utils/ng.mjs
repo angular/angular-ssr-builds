@@ -47,5 +47,5 @@ export function renderAngular(html, bootstrap, url, platformProviders) {
  * @returns True if the value is an Angular module (i.e., it has the `ɵmod` property), false otherwise.
  */
 export function isNgModule(value) {
-    return typeof value === 'object' && 'ɵmod' in value;
+    return 'ɵmod' in value;
 }

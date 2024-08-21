@@ -4,8 +4,8 @@ import { dirname, join, normalize, resolve } from 'node:path';
 import { URL as URL$1 } from 'node:url';
 import Critters from 'critters';
 import { readFile } from 'node:fs/promises';
+import { ɵConsole as _Console, InjectionToken, ɵresetCompiledComponents as _resetCompiledComponents, createPlatformFactory, platformCore, ApplicationRef, ɵwhenStable as _whenStable, Compiler } from '@angular/core';
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
-import { ɵConsole as _Console, ɵresetCompiledComponents as _resetCompiledComponents, createPlatformFactory, platformCore, ApplicationRef, ɵwhenStable as _whenStable, Compiler } from '@angular/core';
 import { ɵloadChildren as _loadChildren, Router } from '@angular/router';
 
 /**
@@ -378,6 +378,19 @@ class Console extends _Console {
 }
 
 /**
+ * Injection token for the current request.
+ */
+const REQUEST = new InjectionToken('REQUEST');
+/**
+ * Injection token for the response initialization options.
+ */
+const RESPONSE_INIT = new InjectionToken('RESPONSE_INIT');
+/**
+ * Injection token for additional request context.
+ */
+const REQUEST_CONTEXT = new InjectionToken('REQUEST_CONTEXT');
+
+/**
  * Removes the trailing slash from a URL if it exists.
  *
  * @param url - The URL string from which to remove the trailing slash.
@@ -500,6 +513,69 @@ function isNgModule(value) {
 }
 
 /**
+ * Enum representing the different contexts in which server rendering can occur.
+ */
+var ServerRenderContext;
+(function (ServerRenderContext) {
+    ServerRenderContext["SSR"] = "ssr";
+    ServerRenderContext["SSG"] = "ssg";
+    ServerRenderContext["AppShell"] = "app-shell";
+})(ServerRenderContext || (ServerRenderContext = {}));
+/**
+ * Renders an Angular server application to produce a response for the given HTTP request.
+ * Supports server-side rendering (SSR), static site generation (SSG), or app shell rendering.
+ *
+ * @param app - The server application instance to render.
+ * @param request - The incoming HTTP request object.
+ * @param serverContext - Context specifying the rendering mode.
+ * @param requestContext - Optional additional context for the request, such as metadata.
+ * @returns A promise that resolves to a response object representing the rendered content.
+ */
+async function render(app, request, serverContext, requestContext) {
+    const isSsrMode = serverContext === ServerRenderContext.SSR;
+    const responseInit = {};
+    const platformProviders = [
+        {
+            provide: _SERVER_CONTEXT,
+            useValue: serverContext,
+        },
+    ];
+    if (isSsrMode) {
+        platformProviders.push({
+            provide: REQUEST,
+            useValue: request,
+        }, {
+            provide: REQUEST_CONTEXT,
+            useValue: requestContext,
+        }, {
+            provide: RESPONSE_INIT,
+            useValue: responseInit,
+        });
+    }
+    if (typeof ngDevMode === 'undefined' || ngDevMode) {
+        // Need to clean up GENERATED_COMP_IDS map in `@angular/core`.
+        // Otherwise an incorrect component ID generation collision detected warning will be displayed in development.
+        // See: https://github.com/angular/angular-cli/issues/25924
+        _resetCompiledComponents();
+    }
+    // An Angular Console Provider that does not print a set of predefined logs.
+    platformProviders.push({
+        provide: _Console,
+        // Using `useClass` would necessitate decorating `Console` with `@Injectable`,
+        // which would require switching from `ts_library` to `ng_module`. This change
+        // would also necessitate various patches of `@angular/bazel` to support ESM.
+        useFactory: () => new Console(),
+    });
+    const { manifest, hooks, assets } = app;
+    let html = await assets.getIndexServerHtml();
+    // Skip extra microtask if there are no pre hooks.
+    if (hooks.has('html:transform:pre')) {
+        html = await hooks.run('html:transform:pre', { html });
+    }
+    return new Response(await renderAngular(html, manifest.bootstrap(), new URL(request.url), platformProviders), responseInit);
+}
+
+/**
  * Recursively traverses the Angular router configuration to retrieve routes.
  *
  * Iterates through the router configuration, yielding each route along with its potential
@@ -582,10 +658,12 @@ function resolveRedirectTo(routePath, redirectTo) {
  * @returns A promise that resolves to an object of type `AngularRouterConfigResult`.
  */
 async function getRoutesFromAngularRouterConfig(bootstrap, document, url) {
-    // Need to clean up GENERATED_COMP_IDS map in `@angular/core`.
-    // Otherwise an incorrect component ID generation collision detected warning will be displayed in development.
-    // See: https://github.com/angular/angular-cli/issues/25924
-    _resetCompiledComponents();
+    if (typeof ngDevMode === 'undefined' || ngDevMode) {
+        // Need to clean up GENERATED_COMP_IDS map in `@angular/core`.
+        // Otherwise an incorrect component ID generation collision detected warning will be displayed in development.
+        // See: https://github.com/angular/angular-cli/issues/25924
+        _resetCompiledComponents();
+    }
     const { protocol, host } = url;
     // Create and initialize the Angular platform for server-side rendering.
     const platformRef = createPlatformFactory(platformCore, 'server', [
@@ -641,5 +719,516 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url) {
     }
 }
 
-export { CommonEngine, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig };
+/**
+ * Manages server-side assets.
+ */
+class ServerAssets {
+    manifest;
+    /**
+     * Creates an instance of ServerAsset.
+     *
+     * @param manifest - The manifest containing the server assets.
+     */
+    constructor(manifest) {
+        this.manifest = manifest;
+    }
+    /**
+     * Retrieves the content of a server-side asset using its path.
+     *
+     * @param path - The path to the server asset.
+     * @returns A promise that resolves to the asset content as a string.
+     * @throws Error If the asset path is not found in the manifest, an error is thrown.
+     */
+    async getServerAsset(path) {
+        const asset = this.manifest.assets.get(path);
+        if (!asset) {
+            throw new Error(`Server asset '${path}' does not exist.`);
+        }
+        return asset();
+    }
+    /**
+     * Retrieves and caches the content of 'index.server.html'.
+     *
+     * @returns A promise that resolves to the content of 'index.server.html'.
+     * @throws Error If there is an issue retrieving the asset.
+     */
+    getIndexServerHtml() {
+        return this.getServerAsset('index.server.html');
+    }
+}
+
+/**
+ * Manages a collection of hooks and provides methods to register and execute them.
+ * Hooks are functions that can be invoked with specific arguments to allow modifications or enhancements.
+ */
+class Hooks {
+    /**
+     * A map of hook names to arrays of hook functions.
+     * Each hook name can have multiple associated functions, which are executed in sequence.
+     */
+    store = new Map();
+    /**
+     * Executes all hooks associated with the specified name, passing the given argument to each hook function.
+     * The hooks are invoked sequentially, and the argument may be modified by each hook.
+     *
+     * @template Hook - The type of the hook name. It should be one of the keys of `HooksMapping`.
+     * @param name - The name of the hook whose functions will be executed.
+     * @param context - The input value to be passed to each hook function. The value is mutated by each hook function.
+     * @returns A promise that resolves once all hook functions have been executed.
+     *
+     * @example
+     * ```typescript
+     * const hooks = new Hooks();
+     * hooks.on('html:transform:pre', async (ctx) => {
+     *   ctx.html = ctx.html.replace(/foo/g, 'bar');
+     *   return ctx.html;
+     * });
+     * const result = await hooks.run('html:transform:pre', { html: '<div>foo</div>' });
+     * console.log(result); // '<div>bar</div>'
+     * ```
+     * @internal
+     */
+    async run(name, context) {
+        const hooks = this.store.get(name);
+        switch (name) {
+            case 'html:transform:pre': {
+                if (!hooks) {
+                    return context.html;
+                }
+                const ctx = { ...context };
+                for (const hook of hooks) {
+                    ctx.html = await hook(ctx);
+                }
+                return ctx.html;
+            }
+            default:
+                throw new Error(`Running hook "${name}" is not supported.`);
+        }
+    }
+    /**
+     * Registers a new hook function under the specified hook name.
+     * This function should be a function that takes an argument of type `T` and returns a `string` or `Promise<string>`.
+     *
+     * @template Hook - The type of the hook name. It should be one of the keys of `HooksMapping`.
+     * @param name - The name of the hook under which the function will be registered.
+     * @param handler - A function to be executed when the hook is triggered. The handler will be called with an argument
+     *                  that may be modified by the hook functions.
+     *
+     * @remarks
+     * - If there are existing handlers registered under the given hook name, the new handler will be added to the list.
+     * - If no handlers are registered under the given hook name, a new list will be created with the handler as its first element.
+     *
+     * @example
+     * ```typescript
+     * hooks.on('html:transform:pre', async (ctx) => {
+     *   return ctx.html.replace(/foo/g, 'bar');
+     * });
+     * ```
+     */
+    on(name, handler) {
+        const hooks = this.store.get(name);
+        if (hooks) {
+            hooks.push(handler);
+        }
+        else {
+            this.store.set(name, [handler]);
+        }
+    }
+    /**
+     * Checks if there are any hooks registered under the specified name.
+     *
+     * @param name - The name of the hook to check.
+     * @returns `true` if there are hooks registered under the specified name, otherwise `false`.
+     */
+    has(name) {
+        return !!this.store.get(name)?.length;
+    }
+}
+
+/**
+ * The Angular app manifest object.
+ * This is used internally to store the current Angular app manifest.
+ */
+let angularAppManifest;
+/**
+ * Sets the Angular app manifest.
+ *
+ * @param manifest - The manifest object to set for the Angular application.
+ */
+function setAngularAppManifest(manifest) {
+    angularAppManifest = manifest;
+}
+/**
+ * Gets the Angular app manifest.
+ *
+ * @returns The Angular app manifest.
+ * @throws Will throw an error if the Angular app manifest is not set.
+ */
+function getAngularAppManifest() {
+    if (!angularAppManifest) {
+        throw new Error('Angular app manifest is not set. ' +
+            `Please ensure you are using the '@angular/build:application' builder to build your server application.`);
+    }
+    return angularAppManifest;
+}
+/**
+ * The Angular app engine manifest object.
+ * This is used internally to store the current Angular app engine manifest.
+ */
+let angularAppEngineManifest;
+/**
+ * Sets the Angular app engine manifest.
+ *
+ * @param manifest - The engine manifest object to set.
+ */
+function setAngularAppEngineManifest(manifest) {
+    angularAppEngineManifest = manifest;
+}
+/**
+ * Gets the Angular app engine manifest.
+ *
+ * @returns The Angular app engine manifest.
+ * @throws Will throw an error if the Angular app engine manifest is not set.
+ */
+function getAngularAppEngineManifest() {
+    if (!angularAppEngineManifest) {
+        throw new Error('Angular app engine manifest is not set. ' +
+            `Please ensure you are using the '@angular/build:application' builder to build your server application.`);
+    }
+    return angularAppEngineManifest;
+}
+
+/**
+ * A route tree implementation that supports efficient route matching, including support for wildcard routes.
+ * This structure is useful for organizing and retrieving routes in a hierarchical manner,
+ * enabling complex routing scenarios with nested paths.
+ */
+class RouteTree {
+    /**
+     * The root node of the route tree.
+     * All routes are stored and accessed relative to this root node.
+     */
+    root = this.createEmptyRouteTreeNode('');
+    /**
+     * A counter that tracks the order of route insertion.
+     * This ensures that routes are matched in the order they were defined,
+     * with earlier routes taking precedence.
+     */
+    insertionIndexCounter = 0;
+    /**
+     * Inserts a new route into the route tree.
+     * The route is broken down into segments, and each segment is added to the tree.
+     * Parameterized segments (e.g., :id) are normalized to wildcards (*) for matching purposes.
+     *
+     * @param route - The route path to insert into the tree.
+     * @param metadata - Metadata associated with the route, excluding the route path itself.
+     */
+    insert(route, metadata) {
+        let node = this.root;
+        const normalizedRoute = stripTrailingSlash(route);
+        const segments = normalizedRoute.split('/');
+        for (const segment of segments) {
+            // Replace parameterized segments (e.g., :id) with a wildcard (*) for matching
+            const normalizedSegment = segment[0] === ':' ? '*' : segment;
+            let childNode = node.children.get(normalizedSegment);
+            if (!childNode) {
+                childNode = this.createEmptyRouteTreeNode(normalizedSegment);
+                node.children.set(normalizedSegment, childNode);
+            }
+            node = childNode;
+        }
+        // At the leaf node, store the full route and its associated metadata
+        node.metadata = {
+            ...metadata,
+            route: normalizedRoute,
+        };
+        node.insertionIndex = this.insertionIndexCounter++;
+    }
+    /**
+     * Matches a given route against the route tree and returns the best matching route's metadata.
+     * The best match is determined by the lowest insertion index, meaning the earliest defined route
+     * takes precedence.
+     *
+     * @param route - The route path to match against the route tree.
+     * @returns The metadata of the best matching route or `undefined` if no match is found.
+     */
+    match(route) {
+        const segments = stripTrailingSlash(route).split('/');
+        return this.traverseBySegments(segments)?.metadata;
+    }
+    /**
+     * Converts the route tree into a serialized format representation.
+     * This method converts the route tree into an array of metadata objects that describe the structure of the tree.
+     * The array represents the routes in a nested manner where each entry includes the route and its associated metadata.
+     *
+     * @returns An array of `RouteTreeNodeMetadata` objects representing the route tree structure.
+     *          Each object includes the `route` and associated metadata of a route.
+     */
+    toObject() {
+        return Array.from(this.traverse());
+    }
+    /**
+     * Constructs a `RouteTree` from an object representation.
+     * This method is used to recreate a `RouteTree` instance from an array of metadata objects.
+     * The array should be in the format produced by `toObject`, allowing for the reconstruction of the route tree
+     * with the same routes and metadata.
+     *
+     * @param value - An array of `RouteTreeNodeMetadata` objects that represent the serialized format of the route tree.
+     *                Each object should include a `route` and its associated metadata.
+     * @returns A new `RouteTree` instance constructed from the provided metadata objects.
+     */
+    static fromObject(value) {
+        const tree = new RouteTree();
+        for (const { route, ...metadata } of value) {
+            tree.insert(route, metadata);
+        }
+        return tree;
+    }
+    /**
+     * A generator function that recursively traverses the route tree and yields the metadata of each node.
+     * This allows for easy and efficient iteration over all nodes in the tree.
+     *
+     * @param node - The current node to start the traversal from. Defaults to the root node of the tree.
+     */
+    *traverse(node = this.root) {
+        if (node.metadata) {
+            yield node.metadata;
+        }
+        for (const childNode of node.children.values()) {
+            yield* this.traverse(childNode);
+        }
+    }
+    /**
+     * Recursively traverses the route tree from a given node, attempting to match the remaining route segments.
+     * If the node is a leaf node (no more segments to match) and contains metadata, the node is yielded.
+     *
+     * This function prioritizes exact segment matches first, followed by wildcard matches (`*`),
+     * and finally deep wildcard matches (`**`) that consume all segments.
+     *
+     * @param remainingSegments - The remaining segments of the route path to match.
+     * @param node - The current node in the route tree to start traversal from.
+     *
+     * @returns The node that best matches the remaining segments or `undefined` if no match is found.
+     */
+    traverseBySegments(remainingSegments, node = this.root) {
+        const { metadata, children } = node;
+        // If there are no remaining segments and the node has metadata, return this node
+        if (!remainingSegments?.length) {
+            if (metadata) {
+                return node;
+            }
+            return;
+        }
+        // If the node has no children, end the traversal
+        if (!children.size) {
+            return;
+        }
+        const [segment, ...restSegments] = remainingSegments;
+        let currentBestMatchNode;
+        // 1. Exact segment match
+        const exactMatchNode = node.children.get(segment);
+        currentBestMatchNode = this.getHigherPriorityNode(currentBestMatchNode, this.traverseBySegments(restSegments, exactMatchNode));
+        // 2. Wildcard segment match (`*`)
+        const wildcardNode = node.children.get('*');
+        currentBestMatchNode = this.getHigherPriorityNode(currentBestMatchNode, this.traverseBySegments(restSegments, wildcardNode));
+        // 3. Deep wildcard segment match (`**`)
+        const deepWildcardNode = node.children.get('**');
+        currentBestMatchNode = this.getHigherPriorityNode(currentBestMatchNode, deepWildcardNode);
+        return currentBestMatchNode;
+    }
+    /**
+     * Compares two nodes and returns the node with higher priority based on insertion index.
+     * A node with a lower insertion index is prioritized as it was defined earlier.
+     *
+     * @param currentBestMatchNode - The current best match node.
+     * @param candidateNode - The node being evaluated for higher priority based on insertion index.
+     * @returns The node with higher priority (i.e., lower insertion index). If one of the nodes is `undefined`, the other node is returned.
+     */
+    getHigherPriorityNode(currentBestMatchNode, candidateNode) {
+        if (!candidateNode) {
+            return currentBestMatchNode;
+        }
+        if (!currentBestMatchNode) {
+            return candidateNode;
+        }
+        return candidateNode.insertionIndex < currentBestMatchNode.insertionIndex
+            ? candidateNode
+            : currentBestMatchNode;
+    }
+    /**
+     * Creates an empty route tree node with the specified segment.
+     * This helper function is used during the tree construction.
+     *
+     * @param segment - The route segment that this node represents.
+     * @returns A new, empty route tree node.
+     */
+    createEmptyRouteTreeNode(segment) {
+        return {
+            segment,
+            insertionIndex: -1,
+            children: new Map(),
+        };
+    }
+}
+
+/**
+ * Manages the application's server routing logic by building and maintaining a route tree.
+ *
+ * This class is responsible for constructing the route tree from the Angular application
+ * configuration and using it to match incoming requests to the appropriate routes.
+ */
+class ServerRouter {
+    routeTree;
+    /**
+     * Creates an instance of the `ServerRouter`.
+     *
+     * @param routeTree - An instance of `RouteTree` that holds the routing information.
+     * The `RouteTree` is used to match request URLs to the appropriate route metadata.
+     */
+    constructor(routeTree) {
+        this.routeTree = routeTree;
+    }
+    /**
+     * Static property to track the ongoing build promise.
+     */
+    static #extractionPromise;
+    /**
+     * Creates or retrieves a `ServerRouter` instance based on the provided manifest and URL.
+     *
+     * If the manifest contains pre-built routes, a new `ServerRouter` is immediately created.
+     * Otherwise, it builds the router by extracting routes from the Angular configuration
+     * asynchronously. This method ensures that concurrent builds are prevented by re-using
+     * the same promise.
+     *
+     * @param manifest - An instance of `AngularAppManifest` that contains the route information.
+     * @param url - The URL for server-side rendering. The URL is needed to configure `ServerPlatformLocation`.
+     * This is necessary to ensure that API requests for relative paths succeed, which is crucial for correct route extraction.
+     * [Reference](https://github.com/angular/angular/blob/d608b857c689d17a7ffa33bbb510301014d24a17/packages/platform-server/src/location.ts#L51)
+     * @returns A promise resolving to a `ServerRouter` instance.
+     */
+    static from(manifest, url) {
+        if (manifest.routes) {
+            const routeTree = RouteTree.fromObject(manifest.routes);
+            return Promise.resolve(new ServerRouter(routeTree));
+        }
+        // Create and store a new promise for the build process.
+        // This prevents concurrent builds by re-using the same promise.
+        ServerRouter.#extractionPromise ??= (async () => {
+            try {
+                const routeTree = new RouteTree();
+                const document = await new ServerAssets(manifest).getIndexServerHtml();
+                const { baseHref, routes } = await getRoutesFromAngularRouterConfig(manifest.bootstrap(), document, url);
+                for (let { route, redirectTo } of routes) {
+                    route = joinUrlParts(baseHref, route);
+                    redirectTo = redirectTo === undefined ? undefined : joinUrlParts(baseHref, redirectTo);
+                    routeTree.insert(route, { redirectTo });
+                }
+                return new ServerRouter(routeTree);
+            }
+            finally {
+                ServerRouter.#extractionPromise = undefined;
+            }
+        })();
+        return ServerRouter.#extractionPromise;
+    }
+    /**
+     * Matches a request URL against the route tree to retrieve route metadata.
+     *
+     * This method strips 'index.html' from the URL if it is present and then attempts
+     * to find a match in the route tree. If a match is found, it returns the associated
+     * route metadata; otherwise, it returns `undefined`.
+     *
+     * @param url - The URL to be matched against the route tree.
+     * @returns The metadata for the matched route or `undefined` if no match is found.
+     */
+    match(url) {
+        // Strip 'index.html' from URL if present.
+        // A request to `http://www.example.com/page/index.html` will render the Angular route corresponding to `http://www.example.com/page`.
+        const { pathname } = stripIndexHtmlFromURL(url);
+        return this.routeTree.match(decodeURIComponent(pathname));
+    }
+}
+
+/**
+ * Represents a locale-specific Angular server application managed by the server application engine.
+ *
+ * The `AngularServerApp` class handles server-side rendering and asset management for a specific locale.
+ */
+class AngularServerApp {
+    /**
+     * Hooks for extending or modifying the behavior of the server application.
+     * This instance can be used to attach custom functionality to various events in the server application lifecycle.
+     */
+    hooks = new Hooks();
+    /**
+     * The manifest associated with this server application.
+     * @internal
+     */
+    manifest = getAngularAppManifest();
+    /**
+     * An instance of ServerAsset that handles server-side asset.
+     * @internal
+     */
+    assets = new ServerAssets(this.manifest);
+    /**
+     * The router instance used for route matching and handling.
+     */
+    router;
+    /**
+     * Renders a response for the given HTTP request using the server application.
+     *
+     * This method processes the request and returns a response based on the specified rendering context.
+     *
+     * @param request - The incoming HTTP request to be rendered.
+     * @param requestContext - Optional additional context for rendering, such as request metadata.
+     * @param serverContext - The rendering context.
+     *
+     * @returns A promise that resolves to the HTTP response object resulting from the rendering, or null if no match is found.
+     */
+    async render(request, requestContext, serverContext = ServerRenderContext.SSR) {
+        const url = new URL(request.url);
+        this.router ??= await ServerRouter.from(this.manifest, url);
+        const matchedRoute = this.router.match(url);
+        if (!matchedRoute) {
+            // Not a known Angular route.
+            return null;
+        }
+        const { redirectTo } = matchedRoute;
+        if (redirectTo !== undefined) {
+            // 302 Found is used by default for redirections
+            // See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
+            return Response.redirect(new URL(redirectTo, url), 302);
+        }
+        return render(this, request, serverContext, requestContext);
+    }
+}
+let angularServerApp;
+/**
+ * Retrieves or creates an instance of `AngularServerApp`.
+ * - If an instance of `AngularServerApp` already exists, it will return the existing one.
+ * - If no instance exists, it will create a new one with the provided options.
+ * @returns The existing or newly created instance of `AngularServerApp`.
+ */
+function getOrCreateAngularServerApp() {
+    return (angularServerApp ??= new AngularServerApp());
+}
+/**
+ * Resets the instance of `AngularServerApp` to undefined, effectively
+ * clearing the reference. Use this to recreate the instance.
+ */
+function resetAngularServerApp() {
+    angularServerApp = undefined;
+}
+/**
+ * Destroys the existing `AngularServerApp` instance, releasing associated resources and resetting the
+ * reference to `undefined`.
+ *
+ * This function is primarily used to enable the recreation of the `AngularServerApp` instance,
+ * typically when server configuration or application state needs to be refreshed.
+ */
+function destroyAngularServerApp() {
+    angularServerApp = undefined;
+}
+
+export { CommonEngine, ServerRenderContext as ɵServerRenderContext, destroyAngularServerApp as ɵdestroyAngularServerApp, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
 //# sourceMappingURL=ssr.mjs.map

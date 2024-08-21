@@ -16,38 +16,30 @@ import { getAngularAppEngineManifest } from './manifest';
 export class AngularAppEngine {
     /**
      * Hooks for extending or modifying the behavior of the server application.
-     * @internal This property is accessed by the Angular CLI when running the dev-server.
+     * These hooks are used by the Angular CLI when running the development server and
+     * provide extensibility points for the application lifecycle.
+     *
+     * @internal
      */
     static hooks = new Hooks();
     /**
-     * Hooks for extending or modifying the behavior of the server application.
-     * This instance can be used to attach custom functionality to various events in the server application lifecycle.
+     * Provides access to the hooks for extending or modifying the server application's behavior.
+     * This allows attaching custom functionality to various server application lifecycle events.
+     *
      * @internal
      */
     get hooks() {
         return AngularAppEngine.hooks;
     }
     /**
-     * Specifies if the application is operating in development mode.
-     * This property controls the activation of features intended for production, such as caching mechanisms.
-     * @internal
-     */
-    static isDevMode = false;
-    /**
      * The manifest for the server application.
      */
     manifest = getAngularAppEngineManifest();
     /**
-     * Map of locale strings to corresponding `AngularServerApp` instances.
-     * Each instance represents an Angular server application.
-     */
-    appsCache = new Map();
-    /**
-     * Renders an HTTP request using the appropriate Angular server application and returns a response.
+     * Renders a response for the given HTTP request using the server application.
      *
-     * This method determines the entry point for the Angular server application based on the request URL,
-     * and caches the server application instances for reuse. If the application is in development mode,
-     * the cache is bypassed and a new instance is created for each request.
+     * This method processes the request, determines the appropriate route and rendering context,
+     * and returns an HTTP response.
      *
      * If the request URL appears to be for a file (excluding `/index.html`), the method returns `null`.
      * A request to `https://www.example.com/page/index.html` will render the Angular route
@@ -65,18 +57,9 @@ export class AngularAppEngine {
         if (!entryPoint) {
             return null;
         }
-        const [locale, loadModule] = entryPoint;
-        let serverApp = this.appsCache.get(locale);
-        if (!serverApp) {
-            const { AngularServerApp } = await loadModule();
-            serverApp = new AngularServerApp({
-                isDevMode: AngularAppEngine.isDevMode,
-                hooks: this.hooks,
-            });
-            if (!AngularAppEngine.isDevMode) {
-                this.appsCache.set(locale, serverApp);
-            }
-        }
+        const { ɵgetOrCreateAngularServerApp: getOrCreateAngularServerApp } = await entryPoint();
+        const serverApp = getOrCreateAngularServerApp();
+        serverApp.hooks = this.hooks;
         return serverApp.render(request, requestContext);
     }
     /**
@@ -86,21 +69,16 @@ export class AngularAppEngine {
      * If there is only one entry point available, it is returned regardless of the URL.
      * Otherwise, the method extracts a potential locale identifier from the URL and looks up the corresponding entry point.
      *
-     * @param url - The URL used to derive the locale and determine the entry point.
-     * @returns An array containing:
-     * - The first element is the locale extracted from the URL.
-     * - The second element is a function that returns a promise resolving to an object with the `AngularServerApp` type.
-     *
-     * Returns `null` if no matching entry point is found for the extracted locale.
+     * @param url - The URL used to derive the locale and determine the appropriate entry point.
+     * @returns A function that returns a promise resolving to an object with the `EntryPointExports` type,
+     * or `undefined` if no matching entry point is found for the extracted locale.
      */
     getEntryPointFromUrl(url) {
-        // Find bundle for locale
         const { entryPoints, basePath } = this.manifest;
         if (entryPoints.size === 1) {
-            return entryPoints.entries().next().value;
+            return entryPoints.values().next().value;
         }
         const potentialLocale = getPotentialLocaleIdFromUrl(url, basePath);
-        const entryPoint = entryPoints.get(potentialLocale);
-        return entryPoint ? [potentialLocale, entryPoint] : null;
+        return entryPoints.get(potentialLocale);
     }
 }

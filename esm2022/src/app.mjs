@@ -16,24 +16,16 @@ import { ServerRouter } from './routes/router';
  * The `AngularServerApp` class handles server-side rendering and asset management for a specific locale.
  */
 export class AngularServerApp {
-    options;
+    /**
+     * Hooks for extending or modifying the behavior of the server application.
+     * This instance can be used to attach custom functionality to various events in the server application lifecycle.
+     */
+    hooks = new Hooks();
     /**
      * The manifest associated with this server application.
      * @internal
      */
     manifest = getAngularAppManifest();
-    /**
-     * Hooks for extending or modifying the behavior of the server application.
-     * This instance can be used to attach custom functionality to various events in the server application lifecycle.
-     * @internal
-     */
-    hooks;
-    /**
-     * Specifies if the server application is operating in development mode.
-     * This property controls the activation of features intended for production, such as caching mechanisms.
-     * @internal
-     */
-    isDevMode;
     /**
      * An instance of ServerAsset that handles server-side asset.
      * @internal
@@ -43,18 +35,6 @@ export class AngularServerApp {
      * The router instance used for route matching and handling.
      */
     router;
-    /**
-     * Creates a new `AngularServerApp` instance with the provided configuration options.
-     *
-     * @param options - The configuration options for the server application.
-     * - `isDevMode`: Flag indicating if the application is in development mode.
-     * - `hooks`: Optional hooks for customizing application behavior.
-     */
-    constructor(options) {
-        this.options = options;
-        this.isDevMode = options.isDevMode ?? false;
-        this.hooks = options.hooks ?? new Hooks();
-    }
     /**
      * Renders a response for the given HTTP request using the server application.
      *
@@ -82,4 +62,31 @@ export class AngularServerApp {
         }
         return render(this, request, serverContext, requestContext);
     }
+}
+let angularServerApp;
+/**
+ * Retrieves or creates an instance of `AngularServerApp`.
+ * - If an instance of `AngularServerApp` already exists, it will return the existing one.
+ * - If no instance exists, it will create a new one with the provided options.
+ * @returns The existing or newly created instance of `AngularServerApp`.
+ */
+export function getOrCreateAngularServerApp() {
+    return (angularServerApp ??= new AngularServerApp());
+}
+/**
+ * Resets the instance of `AngularServerApp` to undefined, effectively
+ * clearing the reference. Use this to recreate the instance.
+ */
+export function resetAngularServerApp() {
+    angularServerApp = undefined;
+}
+/**
+ * Destroys the existing `AngularServerApp` instance, releasing associated resources and resetting the
+ * reference to `undefined`.
+ *
+ * This function is primarily used to enable the recreation of the `AngularServerApp` instance,
+ * typically when server configuration or application state needs to be refreshed.
+ */
+export function destroyAngularServerApp() {
+    angularServerApp = undefined;
 }

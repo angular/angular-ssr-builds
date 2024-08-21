@@ -6,4 +6,4 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 export { CommonEngine, } from './src/common-engine/common-engine';
-export { getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig } from './src/routes/ng-routes';
+export * from './private_export';

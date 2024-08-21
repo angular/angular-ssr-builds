@@ -95,10 +95,12 @@ function resolveRedirectTo(routePath, redirectTo) {
  * @returns A promise that resolves to an object of type `AngularRouterConfigResult`.
  */
 export async function getRoutesFromAngularRouterConfig(bootstrap, document, url) {
-    // Need to clean up GENERATED_COMP_IDS map in `@angular/core`.
-    // Otherwise an incorrect component ID generation collision detected warning will be displayed in development.
-    // See: https://github.com/angular/angular-cli/issues/25924
-    ɵresetCompiledComponents();
+    if (typeof ngDevMode === 'undefined' || ngDevMode) {
+        // Need to clean up GENERATED_COMP_IDS map in `@angular/core`.
+        // Otherwise an incorrect component ID generation collision detected warning will be displayed in development.
+        // See: https://github.com/angular/angular-cli/issues/25924
+        ɵresetCompiledComponents();
+    }
     const { protocol, host } = url;
     // Create and initialize the Angular platform for server-side rendering.
     const platformRef = createPlatformFactory(platformCore, 'server', [

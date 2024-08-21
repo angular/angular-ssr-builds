@@ -100,6 +100,14 @@ declare class AngularServerApp {
      */
     hooks: Hooks;
     /**
+     * The manifest associated with this server application.
+     */
+    private readonly manifest;
+    /**
+     * An instance of ServerAsset that handles server-side asset.
+     */
+    private readonly assets;
+    /**
      * The router instance used for route matching and handling.
      */
     private router;
@@ -115,6 +123,24 @@ declare class AngularServerApp {
      * @returns A promise that resolves to the HTTP response object resulting from the rendering, or null if no match is found.
      */
     render(request: Request, requestContext?: unknown, serverContext?: ɵServerRenderContext): Promise<Response | null>;
+    /**
+     * Creates a promise that rejects when the request is aborted.
+     *
+     * @param request - The HTTP request to monitor for abortion.
+     * @returns A promise that never resolves but rejects with an `AbortError` if the request is aborted.
+     */
+    private createAbortPromise;
+    /**
+     * Handles the server-side rendering process for the given HTTP request.
+     * This method matches the request URL to a route and performs rendering if a matching route is found.
+     *
+     * @param request - The incoming HTTP request to be processed.
+     * @param requestContext - Optional additional context for rendering, such as request metadata.
+     * @param serverContext - The rendering context. Defaults to server-side rendering (SSR).
+     *
+     * @returns A promise that resolves to the rendered response, or null if no matching route is found.
+     */
+    private handleRendering;
 }
 
 /**

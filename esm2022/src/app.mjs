@@ -5,11 +5,24 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.dev/license
  */
+import { ɵConsole, ɵresetCompiledComponents } from '@angular/core';
+import { ɵSERVER_CONTEXT as SERVER_CONTEXT } from '@angular/platform-server';
 import { ServerAssets } from './assets';
+import { Console } from './console';
 import { Hooks } from './hooks';
 import { getAngularAppManifest } from './manifest';
-import { ServerRenderContext, render } from './render';
 import { ServerRouter } from './routes/router';
+import { REQUEST, REQUEST_CONTEXT, RESPONSE_INIT } from './tokens';
+import { renderAngular } from './utils/ng';
+/**
+ * Enum representing the different contexts in which server rendering can occur.
+ */
+export var ServerRenderContext;
+(function (ServerRenderContext) {
+    ServerRenderContext["SSR"] = "ssr";
+    ServerRenderContext["SSG"] = "ssg";
+    ServerRenderContext["AppShell"] = "app-shell";
+})(ServerRenderContext || (ServerRenderContext = {}));
 /**
  * Represents a locale-specific Angular server application managed by the server application engine.
  *
@@ -23,12 +36,10 @@ export class AngularServerApp {
     hooks = new Hooks();
     /**
      * The manifest associated with this server application.
-     * @internal
      */
     manifest = getAngularAppManifest();
     /**
      * An instance of ServerAsset that handles server-side asset.
-     * @internal
      */
     assets = new ServerAssets(this.manifest);
     /**
@@ -46,7 +57,38 @@ export class AngularServerApp {
      *
      * @returns A promise that resolves to the HTTP response object resulting from the rendering, or null if no match is found.
      */
-    async render(request, requestContext, serverContext = ServerRenderContext.SSR) {
+    render(request, requestContext, serverContext = ServerRenderContext.SSR) {
+        return Promise.race([
+            this.createAbortPromise(request),
+            this.handleRendering(request, requestContext, serverContext),
+        ]);
+    }
+    /**
+     * Creates a promise that rejects when the request is aborted.
+     *
+     * @param request - The HTTP request to monitor for abortion.
+     * @returns A promise that never resolves but rejects with an `AbortError` if the request is aborted.
+     */
+    createAbortPromise(request) {
+        return new Promise((_, reject) => {
+            request.signal.addEventListener('abort', () => {
+                const abortError = new Error(`Request for: ${request.url} was aborted.\n${request.signal.reason}`);
+                abortError.name = 'AbortError';
+                reject(abortError);
+            }, { once: true });
+        });
+    }
+    /**
+     * Handles the server-side rendering process for the given HTTP request.
+     * This method matches the request URL to a route and performs rendering if a matching route is found.
+     *
+     * @param request - The incoming HTTP request to be processed.
+     * @param requestContext - Optional additional context for rendering, such as request metadata.
+     * @param serverContext - The rendering context. Defaults to server-side rendering (SSR).
+     *
+     * @returns A promise that resolves to the rendered response, or null if no matching route is found.
+     */
+    async handleRendering(request, requestContext, serverContext = ServerRenderContext.SSR) {
         const url = new URL(request.url);
         this.router ??= await ServerRouter.from(this.manifest, url);
         const matchedRoute = this.router.match(url);
@@ -60,7 +102,47 @@ export class AngularServerApp {
             // See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
             return Response.redirect(new URL(redirectTo, url), 302);
         }
-        return render(this, request, serverContext, requestContext);
+        const isSsrMode = serverContext === ServerRenderContext.SSR;
+        const responseInit = {};
+        const platformProviders = [
+            {
+                provide: SERVER_CONTEXT,
+                useValue: serverContext,
+            },
+        ];
+        if (isSsrMode) {
+            platformProviders.push({
+                provide: REQUEST,
+                useValue: request,
+            }, {
+                provide: REQUEST_CONTEXT,
+                useValue: requestContext,
+            }, {
+                provide: RESPONSE_INIT,
+                useValue: responseInit,
+            });
+        }
+        if (typeof ngDevMode === 'undefined' || ngDevMode) {
+            // Need to clean up GENERATED_COMP_IDS map in `@angular/core`.
+            // Otherwise an incorrect component ID generation collision detected warning will be displayed in development.
+            // See: https://github.com/angular/angular-cli/issues/25924
+            ɵresetCompiledComponents();
+        }
+        // An Angular Console Provider that does not print a set of predefined logs.
+        platformProviders.push({
+            provide: ɵConsole,
+            // Using `useClass` would necessitate decorating `Console` with `@Injectable`,
+            // which would require switching from `ts_library` to `ng_module`. This change
+            // would also necessitate various patches of `@angular/bazel` to support ESM.
+            useFactory: () => new Console(),
+        });
+        const { manifest, hooks, assets } = this;
+        let html = await assets.getIndexServerHtml();
+        // Skip extra microtask if there are no pre hooks.
+        if (hooks.has('html:transform:pre')) {
+            html = await hooks.run('html:transform:pre', { html });
+        }
+        return new Response(await renderAngular(html, manifest.bootstrap(), new URL(request.url), platformProviders), responseInit);
     }
 }
 let angularServerApp;

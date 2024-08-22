@@ -102,14 +102,22 @@ export class AngularServerApp {
             // See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
             return Response.redirect(new URL(redirectTo, url), 302);
         }
-        const isSsrMode = serverContext === ServerRenderContext.SSR;
-        const responseInit = {};
         const platformProviders = [
             {
                 provide: SERVER_CONTEXT,
                 useValue: serverContext,
             },
+            {
+                // An Angular Console Provider that does not print a set of predefined logs.
+                provide: ɵConsole,
+                // Using `useClass` would necessitate decorating `Console` with `@Injectable`,
+                // which would require switching from `ts_library` to `ng_module`. This change
+                // would also necessitate various patches of `@angular/bazel` to support ESM.
+                useFactory: () => new Console(),
+            },
         ];
+        const isSsrMode = serverContext === ServerRenderContext.SSR;
+        const responseInit = {};
         if (isSsrMode) {
             platformProviders.push({
                 provide: REQUEST,
@@ -128,14 +136,6 @@ export class AngularServerApp {
             // See: https://github.com/angular/angular-cli/issues/25924
             ɵresetCompiledComponents();
         }
-        // An Angular Console Provider that does not print a set of predefined logs.
-        platformProviders.push({
-            provide: ɵConsole,
-            // Using `useClass` would necessitate decorating `Console` with `@Injectable`,
-            // which would require switching from `ts_library` to `ng_module`. This change
-            // would also necessitate various patches of `@angular/bazel` to support ESM.
-            useFactory: () => new Console(),
-        });
         const { manifest, hooks, assets } = this;
         let html = await assets.getIndexServerHtml();
         // Skip extra microtask if there are no pre hooks.

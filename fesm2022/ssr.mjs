@@ -2,8 +2,8 @@ import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderApplication, renderModule, I
 import * as fs from 'node:fs';
 import { dirname, join, normalize, resolve } from 'node:path';
 import { URL as URL$1 } from 'node:url';
-import Critters from 'critters';
 import { readFile } from 'node:fs/promises';
+import Critters from '../third_party/critters/index.js';
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import { ɵConsole as _Console, ɵresetCompiledComponents as _resetCompiledComponents, createPlatformFactory, platformCore, ApplicationRef, ɵwhenStable as _whenStable, Compiler, InjectionToken } from '@angular/core';
 import { ɵloadChildren as _loadChildren, Router } from '@angular/router';
@@ -17,82 +17,84 @@ const MEDIA_SET_HANDLER_PATTERN = /^this\.media=["'](.*)["'];?$/;
  */
 const CSP_MEDIA_ATTR = 'ngCspMedia';
 /**
- * Script text used to change the media value of the link tags.
+ * Script that dynamically updates the `media` attribute of `<link>` tags based on a custom attribute (`CSP_MEDIA_ATTR`).
  *
  * NOTE:
  * We do not use `document.querySelectorAll('link').forEach((s) => s.addEventListener('load', ...)`
- * because this does not always fire on Chome.
+ * because load events are not always triggered reliably on Chrome.
  * See: https://github.com/angular/angular-cli/issues/26932 and https://crbug.com/1521256
+ *
+ * The script:
+ * - Ensures the event target is a `<link>` tag with the `CSP_MEDIA_ATTR` attribute.
+ * - Updates the `media` attribute with the value of `CSP_MEDIA_ATTR` and then removes the attribute.
+ * - Removes the event listener when all relevant `<link>` tags have been processed.
+ * - Uses event capturing (the `true` parameter) since load events do not bubble up the DOM.
  */
-const LINK_LOAD_SCRIPT_CONTENT = [
-    '(() => {',
-    `  const CSP_MEDIA_ATTR = '${CSP_MEDIA_ATTR}';`,
-    '  const documentElement = document.documentElement;',
-    '  const listener = (e) => {',
-    '    const target = e.target;',
-    `    if (!target || target.tagName !== 'LINK' || !target.hasAttribute(CSP_MEDIA_ATTR)) {`,
-    '     return;',
-    '    }',
-    '    target.media = target.getAttribute(CSP_MEDIA_ATTR);',
-    '    target.removeAttribute(CSP_MEDIA_ATTR);',
-    // Remove onload listener when there are no longer styles that need to be loaded.
-    '    if (!document.head.querySelector(`link[${CSP_MEDIA_ATTR}]`)) {',
-    `      documentElement.removeEventListener('load', listener);`,
-    '    }',
-    '  };',
-    //  We use an event with capturing (the true parameter) because load events don't bubble.
-    `  documentElement.addEventListener('load', listener, true);`,
-    '})();',
-].join('\n');
-class CrittersExtended extends Critters {
-    optionsExtended;
-    resourceCache;
-    warnings = [];
-    errors = [];
-    initialEmbedLinkedStylesheet;
+const LINK_LOAD_SCRIPT_CONTENT = `
+(() => {
+  const CSP_MEDIA_ATTR = '${CSP_MEDIA_ATTR}';
+  const documentElement = document.documentElement;
+
+  // Listener for load events on link tags.
+  const listener = (e) => {
+    const target = e.target;
+    if (
+      !target ||
+      target.tagName !== 'LINK' ||
+      !target.hasAttribute(CSP_MEDIA_ATTR)
+    ) {
+      return;
+    }
+
+    target.media = target.getAttribute(CSP_MEDIA_ATTR);
+    target.removeAttribute(CSP_MEDIA_ATTR);
+
+    if (!document.head.querySelector(\`link[\${CSP_MEDIA_ATTR}]\`)) {
+      documentElement.removeEventListener('load', listener);
+    }
+  };
+
+  documentElement.addEventListener('load', listener, true);
+})();
+`.trim();
+class CrittersBase extends Critters {
+}
+/* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
+class InlineCriticalCssProcessor extends CrittersBase {
+    readFile;
+    outputPath;
     addedCspScriptsDocuments = new WeakSet();
     documentNonces = new WeakMap();
-    constructor(optionsExtended, resourceCache) {
+    constructor(readFile, outputPath) {
         super({
             logger: {
-                warn: (s) => this.warnings.push(s),
-                error: (s) => this.errors.push(s),
+                // eslint-disable-next-line no-console
+                warn: (s) => console.warn(s),
+                // eslint-disable-next-line no-console
+                error: (s) => console.error(s),
                 info: () => { },
             },
             logLevel: 'warn',
-            path: optionsExtended.outputPath,
-            publicPath: optionsExtended.deployUrl,
-            compress: !!optionsExtended.minify,
+            path: outputPath,
+            publicPath: undefined,
+            compress: false,
             pruneSource: false,
             reduceInlineStyles: false,
             mergeStylesheets: false,
             // Note: if `preload` changes to anything other than `media`, the logic in
-            // `embedLinkedStylesheetOverride` will have to be updated.
+            // `embedLinkedStylesheet` will have to be updated.
             preload: 'media',
             noscriptFallback: true,
             inlineFonts: true,
         });
-        this.optionsExtended = optionsExtended;
-        this.resourceCache = resourceCache;
-        // We can't use inheritance to override `embedLinkedStylesheet`, because it's not declared in
-        // the `Critters` .d.ts which means that we can't call the `super` implementation. TS doesn't
-        // allow for `super` to be cast to a different type.
-        this.initialEmbedLinkedStylesheet = this.embedLinkedStylesheet;
-        this.embedLinkedStylesheet = this.embedLinkedStylesheetOverride;
-    }
-    async readFile(path) {
-        let resourceContent = this.resourceCache.get(path);
-        if (resourceContent === undefined) {
-            resourceContent = await readFile(path, 'utf-8');
-            this.resourceCache.set(path, resourceContent);
-        }
-        return resourceContent;
+        this.readFile = readFile;
+        this.outputPath = outputPath;
     }
     /**
      * Override of the Critters `embedLinkedStylesheet` method
      * that makes it work with Angular's CSP APIs.
      */
-    embedLinkedStylesheetOverride = async (link, document) => {
+    async embedLinkedStylesheet(link, document) {
         if (link.getAttribute('media') === 'print' && link.next?.name === 'noscript') {
             // Workaround for https://github.com/GoogleChromeLabs/critters/issues/64
             // NB: this is only needed for the webpack based builders.
@@ -103,7 +105,7 @@ class CrittersExtended extends Critters {
                 link?.next?.remove();
             }
         }
-        const returnValue = await this.initialEmbedLinkedStylesheet(link, document);
+        const returnValue = await super.embedLinkedStylesheet(link, document);
         const cspNonce = this.findCspNonce(document);
         if (cspNonce) {
             const crittersMedia = link.getAttribute('onload')?.match(MEDIA_SET_HANDLER_PATTERN);
@@ -127,7 +129,7 @@ class CrittersExtended extends Critters {
             });
         }
         return returnValue;
-    };
+    }
     /**
      * Finds the CSP nonce for a specific document.
      */
@@ -164,20 +166,19 @@ class CrittersExtended extends Critters {
         this.addedCspScriptsDocuments.add(document);
     }
 }
-class InlineCriticalCssProcessor {
-    options;
+
+class CommonEngineInlineCriticalCssProcessor {
     resourceCache = new Map();
-    constructor(options) {
-        this.options = options;
-    }
-    async process(html, options) {
-        const critters = new CrittersExtended({ ...this.options, ...options }, this.resourceCache);
-        const content = await critters.process(html);
-        return {
-            content,
-            errors: critters.errors.length ? critters.errors : undefined,
-            warnings: critters.warnings.length ? critters.warnings : undefined,
-        };
+    async process(html, outputPath) {
+        const critters = new InlineCriticalCssProcessor(async (path) => {
+            let resourceContent = this.resourceCache.get(path);
+            if (resourceContent === undefined) {
+                resourceContent = await readFile(path, 'utf-8');
+                this.resourceCache.set(path, resourceContent);
+            }
+            return resourceContent;
+        }, outputPath);
+        return critters.process(html);
     }
 }
 
@@ -232,13 +233,10 @@ const SSG_MARKER_REGEXP = /ng-server-context=["']\w*\|?ssg\|?\w*["']/;
 class CommonEngine {
     options;
     templateCache = new Map();
-    inlineCriticalCssProcessor;
+    inlineCriticalCssProcessor = new CommonEngineInlineCriticalCssProcessor();
     pageIsSSG = new Map();
     constructor(options) {
         this.options = options;
-        this.inlineCriticalCssProcessor = new InlineCriticalCssProcessor({
-            minify: false,
-        });
     }
     /**
      * Render an HTML document for a specific URL with specified
@@ -253,14 +251,10 @@ class CommonEngine {
         if (html === undefined) {
             html = await runMethod('Render Page', () => this.renderApplication(opts));
             if (opts.inlineCriticalCss !== false) {
-                const { content, errors, warnings } = await runMethod('Inline Critical CSS', () => 
+                const content = await runMethod('Inline Critical CSS', () => 
                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 this.inlineCriticalCss(html, opts));
                 html = content;
-                // eslint-disable-next-line no-console
-                warnings?.forEach((m) => console.warn(m));
-                // eslint-disable-next-line no-console
-                errors?.forEach((m) => console.error(m));
             }
         }
         if (enablePerformanceProfiler) {
@@ -269,9 +263,8 @@ class CommonEngine {
         return html;
     }
     inlineCriticalCss(html, opts) {
-        return this.inlineCriticalCssProcessor.process(html, {
-            outputPath: opts.publicPath ?? (opts.documentFilePath ? dirname(opts.documentFilePath) : ''),
-        });
+        const outputPath = opts.publicPath ?? (opts.documentFilePath ? dirname(opts.documentFilePath) : '');
+        return this.inlineCriticalCssProcessor.process(html, outputPath);
     }
     async retrieveSSGPage(opts) {
         const { publicPath, documentFilePath, url } = opts;
@@ -1119,6 +1112,10 @@ class AngularServerApp {
      */
     router;
     /**
+     * The `inlineCriticalCssProcessor` is responsible for handling critical CSS inlining.
+     */
+    inlineCriticalCssProcessor;
+    /**
      * Renders a response for the given HTTP request using the server application.
      *
      * This method processes the request and returns a response based on the specified rendering context.
@@ -1214,7 +1211,16 @@ class AngularServerApp {
         if (hooks.has('html:transform:pre')) {
             html = await hooks.run('html:transform:pre', { html });
         }
-        return new Response(await renderAngular(html, manifest.bootstrap(), new URL(request.url), platformProviders), responseInit);
+        html = await renderAngular(html, manifest.bootstrap(), new URL(request.url), platformProviders);
+        if (manifest.inlineCriticalCss) {
+            // Optionally inline critical CSS.
+            this.inlineCriticalCssProcessor ??= new InlineCriticalCssProcessor((path) => {
+                const fileName = path.split('/').pop() ?? path;
+                return this.assets.getServerAsset(fileName);
+            });
+            html = await this.inlineCriticalCssProcessor.process(html);
+        }
+        return new Response(html, responseInit);
     }
 }
 let angularServerApp;

@@ -9,7 +9,7 @@ import { renderApplication, renderModule, ɵSERVER_CONTEXT } from '@angular/plat
 import * as fs from 'node:fs';
 import { dirname, join, normalize, resolve } from 'node:path';
 import { URL } from 'node:url';
-import { InlineCriticalCssProcessor } from './inline-css-processor';
+import { CommonEngineInlineCriticalCssProcessor } from './inline-css-processor';
 import { noopRunMethodAndMeasurePerf, printPerformanceLogs, runMethodAndMeasurePerf, } from './peformance-profiler';
 const SSG_MARKER_REGEXP = /ng-server-context=["']\w*\|?ssg\|?\w*["']/;
 /**
@@ -18,13 +18,10 @@ const SSG_MARKER_REGEXP = /ng-server-context=["']\w*\|?ssg\|?\w*["']/;
 export class CommonEngine {
     options;
     templateCache = new Map();
-    inlineCriticalCssProcessor;
+    inlineCriticalCssProcessor = new CommonEngineInlineCriticalCssProcessor();
     pageIsSSG = new Map();
     constructor(options) {
         this.options = options;
-        this.inlineCriticalCssProcessor = new InlineCriticalCssProcessor({
-            minify: false,
-        });
     }
     /**
      * Render an HTML document for a specific URL with specified
@@ -39,14 +36,10 @@ export class CommonEngine {
         if (html === undefined) {
             html = await runMethod('Render Page', () => this.renderApplication(opts));
             if (opts.inlineCriticalCss !== false) {
-                const { content, errors, warnings } = await runMethod('Inline Critical CSS', () => 
+                const content = await runMethod('Inline Critical CSS', () => 
                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 this.inlineCriticalCss(html, opts));
                 html = content;
-                // eslint-disable-next-line no-console
-                warnings?.forEach((m) => console.warn(m));
-                // eslint-disable-next-line no-console
-                errors?.forEach((m) => console.error(m));
             }
         }
         if (enablePerformanceProfiler) {
@@ -55,9 +48,8 @@ export class CommonEngine {
         return html;
     }
     inlineCriticalCss(html, opts) {
-        return this.inlineCriticalCssProcessor.process(html, {
-            outputPath: opts.publicPath ?? (opts.documentFilePath ? dirname(opts.documentFilePath) : ''),
-        });
+        const outputPath = opts.publicPath ?? (opts.documentFilePath ? dirname(opts.documentFilePath) : '');
+        return this.inlineCriticalCssProcessor.process(html, outputPath);
     }
     async retrieveSSGPage(opts) {
         const { publicPath, documentFilePath, url } = opts;

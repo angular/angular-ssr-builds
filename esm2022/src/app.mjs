@@ -13,6 +13,7 @@ import { Hooks } from './hooks';
 import { getAngularAppManifest } from './manifest';
 import { ServerRouter } from './routes/router';
 import { REQUEST, REQUEST_CONTEXT, RESPONSE_INIT } from './tokens';
+import { InlineCriticalCssProcessor } from './utils/inline-critical-css';
 import { renderAngular } from './utils/ng';
 /**
  * Enum representing the different contexts in which server rendering can occur.
@@ -46,6 +47,10 @@ export class AngularServerApp {
      * The router instance used for route matching and handling.
      */
     router;
+    /**
+     * The `inlineCriticalCssProcessor` is responsible for handling critical CSS inlining.
+     */
+    inlineCriticalCssProcessor;
     /**
      * Renders a response for the given HTTP request using the server application.
      *
@@ -142,7 +147,16 @@ export class AngularServerApp {
         if (hooks.has('html:transform:pre')) {
             html = await hooks.run('html:transform:pre', { html });
         }
-        return new Response(await renderAngular(html, manifest.bootstrap(), new URL(request.url), platformProviders), responseInit);
+        html = await renderAngular(html, manifest.bootstrap(), new URL(request.url), platformProviders);
+        if (manifest.inlineCriticalCss) {
+            // Optionally inline critical CSS.
+            this.inlineCriticalCssProcessor ??= new InlineCriticalCssProcessor((path) => {
+                const fileName = path.split('/').pop() ?? path;
+                return this.assets.getServerAsset(fileName);
+            });
+            html = await this.inlineCriticalCssProcessor.process(html);
+        }
+        return new Response(html, responseInit);
     }
 }
 let angularServerApp;

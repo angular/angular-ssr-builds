@@ -112,6 +112,10 @@ declare class AngularServerApp {
      */
     private router;
     /**
+     * The `inlineCriticalCssProcessor` is responsible for handling critical CSS inlining.
+     */
+    private inlineCriticalCssProcessor;
+    /**
      * Renders a response for the given HTTP request using the server application.
      *
      * This method processes the request and returns a response based on the specified rendering context.

@@ -1,6 +1,6 @@
-import { ApplicationRef } from '@angular/core';
-import { StaticProvider } from '@angular/core';
-import { Type } from '@angular/core';
+import type { ApplicationRef } from '@angular/core';
+import { default as default_2 } from 'critters';
+import type { Type } from '@angular/core';
 
 /**
  * Manifest for the Angular server application engine, defining entry points.
@@ -147,54 +147,11 @@ declare class AngularServerApp {
     private handleRendering;
 }
 
-/**
- * A common engine to use to server render an application.
- */
-export declare class CommonEngine {
-    private options?;
-    private readonly templateCache;
-    private readonly inlineCriticalCssProcessor;
-    private readonly pageIsSSG;
-    constructor(options?: CommonEngineOptions | undefined);
-    /**
-     * Render an HTML document for a specific URL with specified
-     * render options
-     */
-    render(opts: CommonEngineRenderOptions): Promise<string>;
-    private inlineCriticalCss;
-    private retrieveSSGPage;
-    private renderApplication;
-    /** Retrieve the document from the cache or the filesystem */
-    private getDocument;
+declare interface CrittersBase {
+    embedLinkedStylesheet(link: PartialHTMLElement, document: PartialDocument): Promise<unknown>;
 }
 
-export declare interface CommonEngineOptions {
-    /** A method that when invoked returns a promise that returns an `ApplicationRef` instance once resolved or an NgModule. */
-    bootstrap?: Type<{}> | (() => Promise<ApplicationRef>);
-    /** A set of platform level providers for all requests. */
-    providers?: StaticProvider[];
-    /** Enable request performance profiling data collection and printing the results in the server console. */
-    enablePerformanceProfiler?: boolean;
-}
-
-export declare interface CommonEngineRenderOptions {
-    /** A method that when invoked returns a promise that returns an `ApplicationRef` instance once resolved or an NgModule. */
-    bootstrap?: Type<{}> | (() => Promise<ApplicationRef>);
-    /** A set of platform level providers for the current request. */
-    providers?: StaticProvider[];
-    url?: string;
-    document?: string;
-    documentFilePath?: string;
-    /**
-     * Reduce render blocking requests by inlining critical CSS.
-     * Defaults to true.
-     */
-    inlineCriticalCss?: boolean;
-    /**
-     * Base path location of index file.
-     * Defaults to the 'documentFilePath' dirname when not provided.
-     */
-    publicPath?: string;
+declare class CrittersBase extends default_2 {
 }
 
 /**
@@ -274,6 +231,30 @@ declare interface HooksMapping {
 declare type HtmlTransformHandler = (ctx: {
     html: string;
 }) => string | Promise<string>;
+
+/** Partial representation of an HTML `Document`. */
+declare interface PartialDocument {
+    head: PartialHTMLElement;
+    createElement(tagName: string): PartialHTMLElement;
+    querySelector(selector: string): PartialHTMLElement | null;
+}
+
+/** Partial representation of an `HTMLElement`. */
+declare interface PartialHTMLElement {
+    getAttribute(name: string): string | null;
+    setAttribute(name: string, value: string): void;
+    hasAttribute(name: string): boolean;
+    removeAttribute(name: string): void;
+    appendChild(child: PartialHTMLElement): void;
+    insertBefore(newNode: PartialHTMLElement, referenceNode?: PartialHTMLElement): void;
+    remove(): void;
+    name: string;
+    textContent: string;
+    tagName: string | null;
+    children: PartialHTMLElement[];
+    next: PartialHTMLElement | null;
+    prev: PartialHTMLElement | null;
+}
 
 /**
  * Represents the result of processing a route.
@@ -368,6 +349,28 @@ export declare function ɵgetOrCreateAngularServerApp(): AngularServerApp;
  * @returns A promise that resolves to an object of type `AngularRouterConfigResult`.
  */
 export declare function ɵgetRoutesFromAngularRouterConfig(bootstrap: AngularBootstrap, document: string, url: URL): Promise<AngularRouterConfigResult>;
+
+export declare class ɵInlineCriticalCssProcessor extends CrittersBase {
+    readFile: (path: string) => Promise<string>;
+    readonly outputPath?: string | undefined;
+    private addedCspScriptsDocuments;
+    private documentNonces;
+    constructor(readFile: (path: string) => Promise<string>, outputPath?: string | undefined);
+    /**
+     * Override of the Critters `embedLinkedStylesheet` method
+     * that makes it work with Angular's CSP APIs.
+     */
+    embedLinkedStylesheet(link: PartialHTMLElement, document: PartialDocument): Promise<unknown>;
+    /**
+     * Finds the CSP nonce for a specific document.
+     */
+    private findCspNonce;
+    /**
+     * Inserts the `script` tag that swaps the critical CSS at runtime,
+     * if one hasn't been inserted into the document already.
+     */
+    private conditionallyInsertCspLoadingScript;
+}
 
 /**
  * Enum representing the different contexts in which server rendering can occur.

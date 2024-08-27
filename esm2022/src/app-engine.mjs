@@ -14,6 +14,12 @@ import { getAngularAppEngineManifest } from './manifest';
  * and optionally transforms index HTML before rendering.
  */
 export class AngularAppEngine {
+    constructor() {
+        /**
+         * The manifest for the server application.
+         */
+        this.manifest = getAngularAppEngineManifest();
+    }
     /**
      * Hooks for extending or modifying the behavior of the server application.
      * These hooks are used by the Angular CLI when running the development server and
@@ -21,7 +27,7 @@ export class AngularAppEngine {
      *
      * @internal
      */
-    static hooks = new Hooks();
+    static { this.hooks = new Hooks(); }
     /**
      * Provides access to the hooks for extending or modifying the server application's behavior.
      * This allows attaching custom functionality to various server application lifecycle events.
@@ -31,10 +37,6 @@ export class AngularAppEngine {
     get hooks() {
         return AngularAppEngine.hooks;
     }
-    /**
-     * The manifest for the server application.
-     */
-    manifest = getAngularAppEngineManifest();
     /**
      * Renders a response for the given HTTP request using the server application.
      *
@@ -82,3 +84,4 @@ export class AngularAppEngine {
         return entryPoints.get(potentialLocale);
     }
 }
+//# sourceMappingURL=app-engine.js.map

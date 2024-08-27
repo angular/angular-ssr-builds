@@ -59,10 +59,6 @@ class CrittersBase extends Critters {
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 export class InlineCriticalCssProcessor extends CrittersBase {
-    readFile;
-    outputPath;
-    addedCspScriptsDocuments = new WeakSet();
-    documentNonces = new WeakMap();
     constructor(readFile, outputPath) {
         super({
             logger: {
@@ -87,6 +83,8 @@ export class InlineCriticalCssProcessor extends CrittersBase {
         });
         this.readFile = readFile;
         this.outputPath = outputPath;
+        this.addedCspScriptsDocuments = new WeakSet();
+        this.documentNonces = new WeakMap();
     }
     /**
      * Override of the Critters `embedLinkedStylesheet` method
@@ -164,3 +162,4 @@ export class InlineCriticalCssProcessor extends CrittersBase {
         this.addedCspScriptsDocuments.add(document);
     }
 }
+//# sourceMappingURL=inline-critical-css.js.map

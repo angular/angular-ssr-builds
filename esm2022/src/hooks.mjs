@@ -10,11 +10,13 @@
  * Hooks are functions that can be invoked with specific arguments to allow modifications or enhancements.
  */
 export class Hooks {
-    /**
-     * A map of hook names to arrays of hook functions.
-     * Each hook name can have multiple associated functions, which are executed in sequence.
-     */
-    store = new Map();
+    constructor() {
+        /**
+         * A map of hook names to arrays of hook functions.
+         * Each hook name can have multiple associated functions, which are executed in sequence.
+         */
+        this.store = new Map();
+    }
     /**
      * Executes all hooks associated with the specified name, passing the given argument to each hook function.
      * The hooks are invoked sequentially, and the argument may be modified by each hook.
@@ -92,3 +94,4 @@ export class Hooks {
         return !!this.store.get(name)?.length;
     }
 }
+//# sourceMappingURL=hooks.js.map

@@ -39,3 +39,4 @@ export function getPotentialLocaleIdFromUrl(url, basePath) {
     // Extract the potential locale id.
     return pathname.slice(start, end);
 }
+//# sourceMappingURL=i18n.js.map

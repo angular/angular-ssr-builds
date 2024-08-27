@@ -16,7 +16,6 @@ import { RouteTree } from './route-tree';
  * configuration and using it to match incoming requests to the appropriate routes.
  */
 export class ServerRouter {
-    routeTree;
     /**
      * Creates an instance of the `ServerRouter`.
      *
@@ -86,3 +85,4 @@ export class ServerRouter {
         return this.routeTree.match(decodeURIComponent(pathname));
     }
 }
+//# sourceMappingURL=router.js.map

@@ -11,10 +11,13 @@ import Critters from '../third_party/critters/index.js';
  * It overrides the `log` method to suppress logs that match certain predefined messages.
  */
 class Console extends _Console {
-    /**
-     * A set of log messages that should be ignored and not printed to the console.
-     */
-    ignoredLogs = new Set(['Angular is running in development mode.']);
+    constructor() {
+        super(...arguments);
+        /**
+         * A set of log messages that should be ignored and not printed to the console.
+         */
+        this.ignoredLogs = new Set(['Angular is running in development mode.']);
+    }
     /**
      * Logs a message to the console if it is not in the set of ignored messages.
      *
@@ -301,7 +304,6 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url) {
  * Manages server-side assets.
  */
 class ServerAssets {
-    manifest;
     /**
      * Creates an instance of ServerAsset.
      *
@@ -340,11 +342,13 @@ class ServerAssets {
  * Hooks are functions that can be invoked with specific arguments to allow modifications or enhancements.
  */
 class Hooks {
-    /**
-     * A map of hook names to arrays of hook functions.
-     * Each hook name can have multiple associated functions, which are executed in sequence.
-     */
-    store = new Map();
+    constructor() {
+        /**
+         * A map of hook names to arrays of hook functions.
+         * Each hook name can have multiple associated functions, which are executed in sequence.
+         */
+        this.store = new Map();
+    }
     /**
      * Executes all hooks associated with the specified name, passing the given argument to each hook function.
      * The hooks are invoked sequentially, and the argument may be modified by each hook.
@@ -482,17 +486,19 @@ function getAngularAppEngineManifest() {
  * enabling complex routing scenarios with nested paths.
  */
 class RouteTree {
-    /**
-     * The root node of the route tree.
-     * All routes are stored and accessed relative to this root node.
-     */
-    root = this.createEmptyRouteTreeNode('');
-    /**
-     * A counter that tracks the order of route insertion.
-     * This ensures that routes are matched in the order they were defined,
-     * with earlier routes taking precedence.
-     */
-    insertionIndexCounter = 0;
+    constructor() {
+        /**
+         * The root node of the route tree.
+         * All routes are stored and accessed relative to this root node.
+         */
+        this.root = this.createEmptyRouteTreeNode('');
+        /**
+         * A counter that tracks the order of route insertion.
+         * This ensures that routes are matched in the order they were defined,
+         * with earlier routes taking precedence.
+         */
+        this.insertionIndexCounter = 0;
+    }
     /**
      * Inserts a new route into the route tree.
      * The route is broken down into segments, and each segment is added to the tree.
@@ -656,7 +662,6 @@ class RouteTree {
  * configuration and using it to match incoming requests to the appropriate routes.
  */
 class ServerRouter {
-    routeTree;
     /**
      * Creates an instance of the `ServerRouter`.
      *
@@ -793,10 +798,6 @@ class CrittersBase extends Critters {
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 class InlineCriticalCssProcessor extends CrittersBase {
-    readFile;
-    outputPath;
-    addedCspScriptsDocuments = new WeakSet();
-    documentNonces = new WeakMap();
     constructor(readFile, outputPath) {
         super({
             logger: {
@@ -821,6 +822,8 @@ class InlineCriticalCssProcessor extends CrittersBase {
         });
         this.readFile = readFile;
         this.outputPath = outputPath;
+        this.addedCspScriptsDocuments = new WeakSet();
+        this.documentNonces = new WeakMap();
     }
     /**
      * Override of the Critters `embedLinkedStylesheet` method
@@ -914,27 +917,21 @@ var ServerRenderContext;
  * The `AngularServerApp` class handles server-side rendering and asset management for a specific locale.
  */
 class AngularServerApp {
-    /**
-     * Hooks for extending or modifying the behavior of the server application.
-     * This instance can be used to attach custom functionality to various events in the server application lifecycle.
-     */
-    hooks = new Hooks();
-    /**
-     * The manifest associated with this server application.
-     */
-    manifest = getAngularAppManifest();
-    /**
-     * An instance of ServerAsset that handles server-side asset.
-     */
-    assets = new ServerAssets(this.manifest);
-    /**
-     * The router instance used for route matching and handling.
-     */
-    router;
-    /**
-     * The `inlineCriticalCssProcessor` is responsible for handling critical CSS inlining.
-     */
-    inlineCriticalCssProcessor;
+    constructor() {
+        /**
+         * Hooks for extending or modifying the behavior of the server application.
+         * This instance can be used to attach custom functionality to various events in the server application lifecycle.
+         */
+        this.hooks = new Hooks();
+        /**
+         * The manifest associated with this server application.
+         */
+        this.manifest = getAngularAppManifest();
+        /**
+         * An instance of ServerAsset that handles server-side asset.
+         */
+        this.assets = new ServerAssets(this.manifest);
+    }
     /**
      * Renders a response for the given HTTP request using the server application.
      *

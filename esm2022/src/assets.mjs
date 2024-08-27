@@ -9,7 +9,6 @@
  * Manages server-side assets.
  */
 export class ServerAssets {
-    manifest;
     /**
      * Creates an instance of ServerAsset.
      *
@@ -42,3 +41,4 @@ export class ServerAssets {
         return this.getServerAsset('index.server.html');
     }
 }
+//# sourceMappingURL=assets.js.map

@@ -30,27 +30,21 @@ export var ServerRenderContext;
  * The `AngularServerApp` class handles server-side rendering and asset management for a specific locale.
  */
 export class AngularServerApp {
-    /**
-     * Hooks for extending or modifying the behavior of the server application.
-     * This instance can be used to attach custom functionality to various events in the server application lifecycle.
-     */
-    hooks = new Hooks();
-    /**
-     * The manifest associated with this server application.
-     */
-    manifest = getAngularAppManifest();
-    /**
-     * An instance of ServerAsset that handles server-side asset.
-     */
-    assets = new ServerAssets(this.manifest);
-    /**
-     * The router instance used for route matching and handling.
-     */
-    router;
-    /**
-     * The `inlineCriticalCssProcessor` is responsible for handling critical CSS inlining.
-     */
-    inlineCriticalCssProcessor;
+    constructor() {
+        /**
+         * Hooks for extending or modifying the behavior of the server application.
+         * This instance can be used to attach custom functionality to various events in the server application lifecycle.
+         */
+        this.hooks = new Hooks();
+        /**
+         * The manifest associated with this server application.
+         */
+        this.manifest = getAngularAppManifest();
+        /**
+         * An instance of ServerAsset that handles server-side asset.
+         */
+        this.assets = new ServerAssets(this.manifest);
+    }
     /**
      * Renders a response for the given HTTP request using the server application.
      *
@@ -179,3 +173,4 @@ export function getOrCreateAngularServerApp() {
 export function destroyAngularServerApp() {
     angularServerApp = undefined;
 }
+//# sourceMappingURL=app.js.map

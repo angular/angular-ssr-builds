@@ -49,3 +49,4 @@ export function renderAngular(html, bootstrap, url, platformProviders) {
 export function isNgModule(value) {
     return 'ɵmod' in value;
 }
+//# sourceMappingURL=ng.js.map

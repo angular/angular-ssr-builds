@@ -13,10 +13,13 @@ import { ɵConsole } from '@angular/core';
  * It overrides the `log` method to suppress logs that match certain predefined messages.
  */
 export class Console extends ɵConsole {
-    /**
-     * A set of log messages that should be ignored and not printed to the console.
-     */
-    ignoredLogs = new Set(['Angular is running in development mode.']);
+    constructor() {
+        super(...arguments);
+        /**
+         * A set of log messages that should be ignored and not printed to the console.
+         */
+        this.ignoredLogs = new Set(['Angular is running in development mode.']);
+    }
     /**
      * Logs a message to the console if it is not in the set of ignored messages.
      *
@@ -32,3 +35,4 @@ export class Console extends ɵConsole {
         }
     }
 }
+//# sourceMappingURL=console.js.map

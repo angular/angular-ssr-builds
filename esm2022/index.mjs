@@ -6,3 +6,4 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 export * from './public_api';
+//# sourceMappingURL=index.js.map

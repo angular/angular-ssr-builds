@@ -57,3 +57,4 @@ export function getAngularAppEngineManifest() {
     }
     return angularAppEngineManifest;
 }
+//# sourceMappingURL=manifest.js.map

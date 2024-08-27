@@ -155,3 +155,4 @@ export async function getRoutesFromAngularRouterConfig(bootstrap, document, url)
         platformRef.destroy();
     }
 }
+//# sourceMappingURL=ng-routes.js.map

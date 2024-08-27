@@ -12,17 +12,19 @@ import { stripTrailingSlash } from '../utils/url';
  * enabling complex routing scenarios with nested paths.
  */
 export class RouteTree {
-    /**
-     * The root node of the route tree.
-     * All routes are stored and accessed relative to this root node.
-     */
-    root = this.createEmptyRouteTreeNode('');
-    /**
-     * A counter that tracks the order of route insertion.
-     * This ensures that routes are matched in the order they were defined,
-     * with earlier routes taking precedence.
-     */
-    insertionIndexCounter = 0;
+    constructor() {
+        /**
+         * The root node of the route tree.
+         * All routes are stored and accessed relative to this root node.
+         */
+        this.root = this.createEmptyRouteTreeNode('');
+        /**
+         * A counter that tracks the order of route insertion.
+         * This ensures that routes are matched in the order they were defined,
+         * with earlier routes taking precedence.
+         */
+        this.insertionIndexCounter = 0;
+    }
     /**
      * Inserts a new route into the route tree.
      * The route is broken down into segments, and each segment is added to the tree.
@@ -178,3 +180,4 @@ export class RouteTree {
         };
     }
 }
+//# sourceMappingURL=route-tree.js.map

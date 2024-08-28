@@ -8,5 +8,6 @@
 export { getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig } from './src/routes/ng-routes';
 export { ServerRenderContext as ɵServerRenderContext, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, destroyAngularServerApp as ɵdestroyAngularServerApp, } from './src/app';
 export { setAngularAppManifest as ɵsetAngularAppManifest, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, } from './src/manifest';
+export { AngularAppEngine as ɵAngularAppEngine } from './src/app-engine';
 export { InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor } from './src/utils/inline-critical-css';
 //# sourceMappingURL=private_export.js.map

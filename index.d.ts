@@ -147,6 +147,31 @@ declare class AngularServerApp {
     private handleRendering;
 }
 
+/**
+ * Angular server application engine.
+ * Manages Angular server applications (including localized ones) and handles rendering requests.
+
+ * @developerPreview
+ */
+export declare interface AngularServerAppManager {
+    /**
+     * Renders a response for the given HTTP request using the server application.
+     *
+     * This method processes the request, determines the appropriate route and rendering context,
+     * and returns an HTTP response.
+     *
+     * If the request URL appears to be for a file (excluding `/index.html`), the method returns `null`.
+     * A request to `https://www.example.com/page/index.html` will render the Angular route
+     * corresponding to `https://www.example.com/page`.
+     *
+     * @param request - The incoming HTTP request object to be rendered.
+     * @param requestContext - Optional additional context for the request, such as metadata.
+     * @returns A promise that resolves to a Response object, or `null` if the request URL represents a file (e.g., `./logo.png`)
+     * rather than an application route.
+     */
+    render(request: Request, requestContext?: unknown): Promise<Response | null>;
+}
+
 declare interface CrittersBase {
     embedLinkedStylesheet(link: PartialHTMLElement, document: PartialDocument): Promise<unknown>;
 }
@@ -155,18 +180,43 @@ declare class CrittersBase extends default_2 {
 }
 
 /**
+ * Destroys the current `AngularAppEngine` instance, releasing any associated resources.
+ *
+ * This method resets the reference to the `AngularAppEngine` instance to `undefined`, allowing
+ * a new instance to be created on the next call to `getOrCreateAngularAppEngine()`. It is typically
+ * used when reinitializing the server environment or refreshing the application state is necessary.
+ *
+ * @developerPreview
+ */
+export declare function destroyAngularAppEngine(): void;
+
+/**
  * Represents the exports of an Angular server application entry point.
  */
 declare interface EntryPointExports {
     /**
      * A reference to the function that creates an Angular server application instance.
+     *
+     * @note The return type is `unknown` to prevent circular dependency issues.
      */
-    ɵgetOrCreateAngularServerApp: typeof ɵgetOrCreateAngularServerApp;
+    ɵgetOrCreateAngularServerApp: () => unknown;
     /**
      * A reference to the function that destroys the `AngularServerApp` instance.
      */
-    ɵdestroyAngularServerApp: typeof ɵdestroyAngularServerApp;
+    ɵdestroyAngularServerApp: () => void;
 }
+
+/**
+ * Retrieves an existing `AngularAppEngine` instance or creates a new one if none exists.
+ *
+ * This method ensures that only a single instance of `AngularAppEngine` is created and reused across
+ * the application lifecycle, providing efficient resource management. If the instance does not exist,
+ * it will be instantiated upon the first call.
+ *
+ * @developerPreview
+ * @returns The existing or newly created instance of `AngularAppEngine`.
+ */
+export declare function getOrCreateAngularAppEngine(): AngularServerAppManager;
 
 /**
  * Defines the names of available hooks for registering and triggering custom logic within the application.
@@ -313,6 +363,54 @@ declare interface RouteTreeNodeMetadata {
  * Each entry in the array corresponds to a specific node's metadata within the route tree.
  */
 declare type SerializableRouteTreeNode = ReadonlyArray<RouteTreeNodeMetadata>;
+
+/**
+ * Angular server application engine.
+ * Manages Angular server applications (including localized ones), handles rendering requests,
+ * and optionally transforms index HTML before rendering.
+ */
+export declare class ɵAngularAppEngine implements AngularServerAppManager {
+    /**
+     * Hooks for extending or modifying the behavior of the server application.
+     * These hooks are used by the Angular CLI when running the development server and
+     * provide extensibility points for the application lifecycle.
+     *
+     * @private
+     */
+    static ɵhooks: Hooks;
+    /**
+     * The manifest for the server application.
+     */
+    private readonly manifest;
+    /**
+     * Renders a response for the given HTTP request using the server application.
+     *
+     * This method processes the request, determines the appropriate route and rendering context,
+     * and returns an HTTP response.
+     *
+     * If the request URL appears to be for a file (excluding `/index.html`), the method returns `null`.
+     * A request to `https://www.example.com/page/index.html` will render the Angular route
+     * corresponding to `https://www.example.com/page`.
+     *
+     * @param request - The incoming HTTP request object to be rendered.
+     * @param requestContext - Optional additional context for the request, such as metadata.
+     * @returns A promise that resolves to a Response object, or `null` if the request URL represents a file (e.g., `./logo.png`)
+     * rather than an application route.
+     */
+    render(request: Request, requestContext?: unknown): Promise<Response | null>;
+    /**
+     * Retrieves the entry point path and locale for the Angular server application based on the provided URL.
+     *
+     * This method determines the appropriate entry point and locale for rendering the application by examining the URL.
+     * If there is only one entry point available, it is returned regardless of the URL.
+     * Otherwise, the method extracts a potential locale identifier from the URL and looks up the corresponding entry point.
+     *
+     * @param url - The URL used to derive the locale and determine the appropriate entry point.
+     * @returns A function that returns a promise resolving to an object with the `EntryPointExports` type,
+     * or `undefined` if no matching entry point is found for the extracted locale.
+     */
+    private getEntryPointFromUrl;
+}
 
 /**
  * Destroys the existing `AngularServerApp` instance, releasing associated resources and resetting the

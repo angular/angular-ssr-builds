@@ -1061,5 +1061,146 @@ function destroyAngularServerApp() {
     angularServerApp = undefined;
 }
 
-export { InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, ServerRenderContext as ɵServerRenderContext, destroyAngularServerApp as ɵdestroyAngularServerApp, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
+/**
+ * Extracts a potential locale ID from a given URL based on the specified base path.
+ *
+ * This function parses the URL to locate a potential locale identifier that immediately
+ * follows the base path segment in the URL's pathname. If the URL does not contain a valid
+ * locale ID, an empty string is returned.
+ *
+ * @param url - The full URL from which to extract the locale ID.
+ * @param basePath - The base path used as the reference point for extracting the locale ID.
+ * @returns The extracted locale ID if present, or an empty string if no valid locale ID is found.
+ *
+ * @example
+ * ```js
+ * const url = new URL('https://example.com/base/en/page');
+ * const basePath = '/base';
+ * const localeId = getPotentialLocaleIdFromUrl(url, basePath);
+ * console.log(localeId); // Output: 'en'
+ * ```
+ */
+function getPotentialLocaleIdFromUrl(url, basePath) {
+    const { pathname } = url;
+    // Move forward of the base path section.
+    let start = basePath.length;
+    if (pathname[start] === '/') {
+        start++;
+    }
+    // Find the next forward slash.
+    let end = pathname.indexOf('/', start);
+    if (end === -1) {
+        end = pathname.length;
+    }
+    // Extract the potential locale id.
+    return pathname.slice(start, end);
+}
+
+/**
+ * Angular server application engine.
+ * Manages Angular server applications (including localized ones), handles rendering requests,
+ * and optionally transforms index HTML before rendering.
+ */
+class AngularAppEngine {
+    constructor() {
+        /**
+         * The manifest for the server application.
+         */
+        this.manifest = getAngularAppEngineManifest();
+    }
+    /**
+     * Hooks for extending or modifying the behavior of the server application.
+     * These hooks are used by the Angular CLI when running the development server and
+     * provide extensibility points for the application lifecycle.
+     *
+     * @private
+     */
+    static { this.ɵhooks = new Hooks(); }
+    /**
+     * Provides access to the hooks for extending or modifying the server application's behavior.
+     * This allows attaching custom functionality to various server application lifecycle events.
+     *
+     * @internal
+     */
+    get hooks() {
+        return AngularAppEngine.ɵhooks;
+    }
+    /**
+     * Renders a response for the given HTTP request using the server application.
+     *
+     * This method processes the request, determines the appropriate route and rendering context,
+     * and returns an HTTP response.
+     *
+     * If the request URL appears to be for a file (excluding `/index.html`), the method returns `null`.
+     * A request to `https://www.example.com/page/index.html` will render the Angular route
+     * corresponding to `https://www.example.com/page`.
+     *
+     * @param request - The incoming HTTP request object to be rendered.
+     * @param requestContext - Optional additional context for the request, such as metadata.
+     * @returns A promise that resolves to a Response object, or `null` if the request URL represents a file (e.g., `./logo.png`)
+     * rather than an application route.
+     */
+    async render(request, requestContext) {
+        // Skip if the request looks like a file but not `/index.html`.
+        const url = new URL(request.url);
+        const entryPoint = this.getEntryPointFromUrl(url);
+        if (!entryPoint) {
+            return null;
+        }
+        const { ɵgetOrCreateAngularServerApp: getOrCreateAngularServerApp } = await entryPoint();
+        // Note: Using `instanceof` is not feasible here because `AngularServerApp` will
+        // be located in separate bundles, making `instanceof` checks unreliable.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+        const serverApp = getOrCreateAngularServerApp();
+        serverApp.hooks = this.hooks;
+        return serverApp.render(request, requestContext);
+    }
+    /**
+     * Retrieves the entry point path and locale for the Angular server application based on the provided URL.
+     *
+     * This method determines the appropriate entry point and locale for rendering the application by examining the URL.
+     * If there is only one entry point available, it is returned regardless of the URL.
+     * Otherwise, the method extracts a potential locale identifier from the URL and looks up the corresponding entry point.
+     *
+     * @param url - The URL used to derive the locale and determine the appropriate entry point.
+     * @returns A function that returns a promise resolving to an object with the `EntryPointExports` type,
+     * or `undefined` if no matching entry point is found for the extracted locale.
+     */
+    getEntryPointFromUrl(url) {
+        const { entryPoints, basePath } = this.manifest;
+        if (entryPoints.size === 1) {
+            return entryPoints.values().next().value;
+        }
+        const potentialLocale = getPotentialLocaleIdFromUrl(url, basePath);
+        return entryPoints.get(potentialLocale);
+    }
+}
+let angularAppEngine;
+/**
+ * Retrieves an existing `AngularAppEngine` instance or creates a new one if none exists.
+ *
+ * This method ensures that only a single instance of `AngularAppEngine` is created and reused across
+ * the application lifecycle, providing efficient resource management. If the instance does not exist,
+ * it will be instantiated upon the first call.
+ *
+ * @developerPreview
+ * @returns The existing or newly created instance of `AngularAppEngine`.
+ */
+function getOrCreateAngularAppEngine() {
+    return (angularAppEngine ??= new AngularAppEngine());
+}
+/**
+ * Destroys the current `AngularAppEngine` instance, releasing any associated resources.
+ *
+ * This method resets the reference to the `AngularAppEngine` instance to `undefined`, allowing
+ * a new instance to be created on the next call to `getOrCreateAngularAppEngine()`. It is typically
+ * used when reinitializing the server environment or refreshing the application state is necessary.
+ *
+ * @developerPreview
+ */
+function destroyAngularAppEngine() {
+    angularAppEngine = undefined;
+}
+
+export { destroyAngularAppEngine, getOrCreateAngularAppEngine, AngularAppEngine as ɵAngularAppEngine, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, ServerRenderContext as ɵServerRenderContext, destroyAngularServerApp as ɵdestroyAngularServerApp, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
 //# sourceMappingURL=ssr.mjs.map

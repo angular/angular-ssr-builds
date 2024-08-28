@@ -25,9 +25,9 @@ export class AngularAppEngine {
      * These hooks are used by the Angular CLI when running the development server and
      * provide extensibility points for the application lifecycle.
      *
-     * @internal
+     * @private
      */
-    static { this.hooks = new Hooks(); }
+    static { this.ɵhooks = new Hooks(); }
     /**
      * Provides access to the hooks for extending or modifying the server application's behavior.
      * This allows attaching custom functionality to various server application lifecycle events.
@@ -35,7 +35,7 @@ export class AngularAppEngine {
      * @internal
      */
     get hooks() {
-        return AngularAppEngine.hooks;
+        return AngularAppEngine.ɵhooks;
     }
     /**
      * Renders a response for the given HTTP request using the server application.
@@ -60,6 +60,9 @@ export class AngularAppEngine {
             return null;
         }
         const { ɵgetOrCreateAngularServerApp: getOrCreateAngularServerApp } = await entryPoint();
+        // Note: Using `instanceof` is not feasible here because `AngularServerApp` will
+        // be located in separate bundles, making `instanceof` checks unreliable.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
         const serverApp = getOrCreateAngularServerApp();
         serverApp.hooks = this.hooks;
         return serverApp.render(request, requestContext);
@@ -83,5 +86,31 @@ export class AngularAppEngine {
         const potentialLocale = getPotentialLocaleIdFromUrl(url, basePath);
         return entryPoints.get(potentialLocale);
     }
+}
+let angularAppEngine;
+/**
+ * Retrieves an existing `AngularAppEngine` instance or creates a new one if none exists.
+ *
+ * This method ensures that only a single instance of `AngularAppEngine` is created and reused across
+ * the application lifecycle, providing efficient resource management. If the instance does not exist,
+ * it will be instantiated upon the first call.
+ *
+ * @developerPreview
+ * @returns The existing or newly created instance of `AngularAppEngine`.
+ */
+export function getOrCreateAngularAppEngine() {
+    return (angularAppEngine ??= new AngularAppEngine());
+}
+/**
+ * Destroys the current `AngularAppEngine` instance, releasing any associated resources.
+ *
+ * This method resets the reference to the `AngularAppEngine` instance to `undefined`, allowing
+ * a new instance to be created on the next call to `getOrCreateAngularAppEngine()`. It is typically
+ * used when reinitializing the server environment or refreshing the application state is necessary.
+ *
+ * @developerPreview
+ */
+export function destroyAngularAppEngine() {
+    angularAppEngine = undefined;
 }
 //# sourceMappingURL=app-engine.js.map

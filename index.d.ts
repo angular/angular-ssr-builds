@@ -327,6 +327,100 @@ declare interface RouteResult {
 }
 
 /**
+ * A route tree implementation that supports efficient route matching, including support for wildcard routes.
+ * This structure is useful for organizing and retrieving routes in a hierarchical manner,
+ * enabling complex routing scenarios with nested paths.
+ */
+declare class RouteTree {
+    /**
+     * The root node of the route tree.
+     * All routes are stored and accessed relative to this root node.
+     */
+    private readonly root;
+    /**
+     * A counter that tracks the order of route insertion.
+     * This ensures that routes are matched in the order they were defined,
+     * with earlier routes taking precedence.
+     */
+    private insertionIndexCounter;
+    /**
+     * Inserts a new route into the route tree.
+     * The route is broken down into segments, and each segment is added to the tree.
+     * Parameterized segments (e.g., :id) are normalized to wildcards (*) for matching purposes.
+     *
+     * @param route - The route path to insert into the tree.
+     * @param metadata - Metadata associated with the route, excluding the route path itself.
+     */
+    insert(route: string, metadata: RouteTreeNodeMetadataWithoutRoute): void;
+    /**
+     * Matches a given route against the route tree and returns the best matching route's metadata.
+     * The best match is determined by the lowest insertion index, meaning the earliest defined route
+     * takes precedence.
+     *
+     * @param route - The route path to match against the route tree.
+     * @returns The metadata of the best matching route or `undefined` if no match is found.
+     */
+    match(route: string): RouteTreeNodeMetadata | undefined;
+    /**
+     * Converts the route tree into a serialized format representation.
+     * This method converts the route tree into an array of metadata objects that describe the structure of the tree.
+     * The array represents the routes in a nested manner where each entry includes the route and its associated metadata.
+     *
+     * @returns An array of `RouteTreeNodeMetadata` objects representing the route tree structure.
+     *          Each object includes the `route` and associated metadata of a route.
+     */
+    toObject(): SerializableRouteTreeNode;
+    /**
+     * Constructs a `RouteTree` from an object representation.
+     * This method is used to recreate a `RouteTree` instance from an array of metadata objects.
+     * The array should be in the format produced by `toObject`, allowing for the reconstruction of the route tree
+     * with the same routes and metadata.
+     *
+     * @param value - An array of `RouteTreeNodeMetadata` objects that represent the serialized format of the route tree.
+     *                Each object should include a `route` and its associated metadata.
+     * @returns A new `RouteTree` instance constructed from the provided metadata objects.
+     */
+    static fromObject(value: SerializableRouteTreeNode): RouteTree;
+    /**
+     * A generator function that recursively traverses the route tree and yields the metadata of each node.
+     * This allows for easy and efficient iteration over all nodes in the tree.
+     *
+     * @param node - The current node to start the traversal from. Defaults to the root node of the tree.
+     */
+    private traverse;
+    /**
+     * Recursively traverses the route tree from a given node, attempting to match the remaining route segments.
+     * If the node is a leaf node (no more segments to match) and contains metadata, the node is yielded.
+     *
+     * This function prioritizes exact segment matches first, followed by wildcard matches (`*`),
+     * and finally deep wildcard matches (`**`) that consume all segments.
+     *
+     * @param remainingSegments - The remaining segments of the route path to match.
+     * @param node - The current node in the route tree to start traversal from.
+     *
+     * @returns The node that best matches the remaining segments or `undefined` if no match is found.
+     */
+    private traverseBySegments;
+    /**
+     * Compares two nodes and returns the node with higher priority based on insertion index.
+     * A node with a lower insertion index is prioritized as it was defined earlier.
+     *
+     * @param currentBestMatchNode - The current best match node.
+     * @param candidateNode - The node being evaluated for higher priority based on insertion index.
+     * @returns The node with higher priority (i.e., lower insertion index). If one of the nodes is `undefined`, the other node is returned.
+     */
+    private getHigherPriorityNode;
+    /**
+     * Creates an empty route tree node with the specified segment.
+     * This helper function is used during the tree construction.
+     *
+     * @param segment - The route segment that this node represents.
+     * @returns A new, empty route tree node.
+     */
+    private createEmptyRouteTreeNode;
+}
+
+/**
  * Describes metadata associated with a node in the route tree.
  * This metadata includes information such as the route path and optional redirect instructions.
  */
@@ -356,6 +450,11 @@ declare interface RouteTreeNodeMetadata {
      */
     route: string;
 }
+
+/**
+ * Represents metadata for a route tree node, excluding the 'route' path segment.
+ */
+declare type RouteTreeNodeMetadataWithoutRoute = Omit<RouteTreeNodeMetadata, 'route'>;
 
 
 /**
@@ -420,6 +519,22 @@ export declare class ɵAngularAppEngine implements AngularServerAppManager {
  * typically when server configuration or application state needs to be refreshed.
  */
 export declare function ɵdestroyAngularServerApp(): void;
+
+/**
+ * Asynchronously extracts routes from the Angular application configuration
+ * and creates a `RouteTree` to manage server-side routing.
+ *
+ * @param url - The URL for server-side rendering. The URL is used to configure `ServerPlatformLocation`. This configuration is crucial
+ * for ensuring that API requests for relative paths succeed, which is essential for accurate route extraction.
+ * See:
+ *  - https://github.com/angular/angular/blob/d608b857c689d17a7ffa33bbb510301014d24a17/packages/platform-server/src/location.ts#L51
+ *  - https://github.com/angular/angular/blob/6882cc7d9eed26d3caeedca027452367ba25f2b9/packages/platform-server/src/http.ts#L44
+ * @param manifest - An optional `AngularAppManifest` that contains the application's routing and configuration details.
+ * If not provided, the default manifest is retrieved using `getAngularAppManifest()`.
+ *
+ * @returns A promise that resolves to a populated `RouteTree` containing all extracted routes from the Angular application.
+ */
+export declare function ɵextractRoutesAndCreateRouteTree(url: URL, manifest?: AngularAppManifest): Promise<RouteTree>;
 
 /**
  * Retrieves or creates an instance of `AngularServerApp`.

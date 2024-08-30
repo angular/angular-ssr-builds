@@ -1,7 +1,7 @@
 import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderApplication, renderModule } from '@angular/platform-server';
 import * as fs from 'node:fs';
 import { dirname, join, normalize, resolve } from 'node:path';
-import { URL } from 'node:url';
+import { URL as URL$1 } from 'node:url';
 import { ɵInlineCriticalCssProcessor as _InlineCriticalCssProcessor } from '@angular/ssr';
 import { readFile } from 'node:fs/promises';
 
@@ -109,7 +109,7 @@ class CommonEngine {
         if (!publicPath || !documentFilePath || url === undefined) {
             return undefined;
         }
-        const { pathname } = new URL(url, 'resolve://');
+        const { pathname } = new URL$1(url, 'resolve://');
         // Do not use `resolve` here as otherwise it can lead to path traversal vulnerability.
         // See: https://portswigger.net/web-security/file-path-traversal
         const pagePath = join(publicPath, pathname, 'index.html');
@@ -181,5 +181,116 @@ function isBootstrapFn(value) {
     return typeof value === 'function' && !('ɵmod' in value);
 }
 
-export { CommonEngine };
+/**
+ * Streams a web-standard `Response` into a Node.js `ServerResponse`.
+ *
+ * @param source - The web-standard `Response` object to stream from.
+ * @param destination - The Node.js `ServerResponse` object to stream into.
+ * @returns A promise that resolves once the streaming operation is complete.
+ * @developerPreview
+ */
+async function writeResponseToNodeResponse(source, destination) {
+    const { status, headers, body } = source;
+    destination.statusCode = status;
+    let cookieHeaderSet = false;
+    for (const [name, value] of headers.entries()) {
+        if (name === 'set-cookie') {
+            if (cookieHeaderSet) {
+                continue;
+            }
+            // Sets the 'set-cookie' header only once to ensure it is correctly applied.
+            // Concatenating 'set-cookie' values can lead to incorrect behavior, so we use a single value from `headers.getSetCookie()`.
+            destination.setHeader(name, headers.getSetCookie());
+            cookieHeaderSet = true;
+        }
+        else {
+            destination.setHeader(name, value);
+        }
+    }
+    if (!body) {
+        destination.end();
+        return;
+    }
+    try {
+        const reader = body.getReader();
+        destination.on('close', () => {
+            reader.cancel().catch((error) => {
+                // eslint-disable-next-line no-console
+                console.error(`An error occurred while writing the response body for: ${destination.req.url}.`, error);
+            });
+        });
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                destination.end();
+                break;
+            }
+            destination.write(value);
+        }
+    }
+    catch {
+        destination.end('Internal server error.');
+    }
+}
+
+/**
+ * Converts a Node.js `IncomingMessage` into a Web Standard `Request`.
+ *
+ * @param nodeRequest - The Node.js `IncomingMessage` object to convert.
+ * @returns A Web Standard `Request` object.
+ * @developerPreview
+ */
+function createWebRequestFromNodeRequest(nodeRequest) {
+    const { headers, method = 'GET' } = nodeRequest;
+    const withBody = method !== 'GET' && method !== 'HEAD';
+    return new Request(createRequestUrl(nodeRequest), {
+        method,
+        headers: createRequestHeaders(headers),
+        body: withBody ? nodeRequest : undefined,
+        duplex: withBody ? 'half' : undefined,
+    });
+}
+/**
+ * Creates a `Headers` object from Node.js `IncomingHttpHeaders`.
+ *
+ * @param nodeHeaders - The Node.js `IncomingHttpHeaders` object to convert.
+ * @returns A `Headers` object containing the converted headers.
+ */
+function createRequestHeaders(nodeHeaders) {
+    const headers = new Headers();
+    for (const [name, value] of Object.entries(nodeHeaders)) {
+        if (typeof value === 'string') {
+            headers.append(name, value);
+        }
+        else if (Array.isArray(value)) {
+            for (const item of value) {
+                headers.append(name, item);
+            }
+        }
+    }
+    return headers;
+}
+/**
+ * Creates a `URL` object from a Node.js `IncomingMessage`, taking into account the protocol, host, and port.
+ *
+ * @param nodeRequest - The Node.js `IncomingMessage` object to extract URL information from.
+ * @returns A `URL` object representing the request URL.
+ */
+function createRequestUrl(nodeRequest) {
+    const { headers, socket, url = '' } = nodeRequest;
+    const protocol = headers['x-forwarded-proto'] ?? ('encrypted' in socket && socket.encrypted ? 'https' : 'http');
+    const hostname = headers['x-forwarded-host'] ?? headers.host ?? headers[':authority'];
+    const port = headers['x-forwarded-port'] ?? socket.localPort;
+    if (Array.isArray(hostname)) {
+        throw new Error('host value cannot be an array.');
+    }
+    let hostnameWithPort = hostname;
+    if (port && !hostname?.includes(':')) {
+        hostnameWithPort += `:${port}`;
+    }
+    return new URL(url, `${protocol}://${hostnameWithPort}`);
+}
+
+export { CommonEngine, createWebRequestFromNodeRequest, writeResponseToNodeResponse };
 //# sourceMappingURL=node.mjs.map

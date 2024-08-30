@@ -1,4 +1,6 @@
 import { ApplicationRef } from '@angular/core';
+import type { IncomingMessage } from 'node:http';
+import type { ServerResponse } from 'node:http';
 import { StaticProvider } from '@angular/core';
 import { Type } from '@angular/core';
 
@@ -51,5 +53,24 @@ export declare interface CommonEngineRenderOptions {
      */
     publicPath?: string;
 }
+
+/**
+ * Converts a Node.js `IncomingMessage` into a Web Standard `Request`.
+ *
+ * @param nodeRequest - The Node.js `IncomingMessage` object to convert.
+ * @returns A Web Standard `Request` object.
+ * @developerPreview
+ */
+export declare function createWebRequestFromNodeRequest(nodeRequest: IncomingMessage): Request;
+
+/**
+ * Streams a web-standard `Response` into a Node.js `ServerResponse`.
+ *
+ * @param source - The web-standard `Response` object to stream from.
+ * @param destination - The Node.js `ServerResponse` object to stream into.
+ * @returns A promise that resolves once the streaming operation is complete.
+ * @developerPreview
+ */
+export declare function writeResponseToNodeResponse(source: Response, destination: ServerResponse): Promise<void>;
 
 export { }

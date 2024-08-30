@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "19.0.0-next.2+sha-fe57583",
+  "version": "19.0.0-next.2+sha-76de1bf",
   "description": "Angular server side rendering utilities",
   "license": "MIT",
   "homepage": "https://github.com/angular/angular-cli",
@@ -28,8 +28,7 @@
     "@angular/platform-browser": "19.0.0-next.2",
     "@angular/platform-server": "19.0.0-next.2",
     "@angular/router": "19.0.0-next.2",
-    "@bazel/runfiles": "^5.8.1",
-    "zone.js": "^0.15.0"
+    "@bazel/runfiles": "^5.8.1"
   },
   "schematics": "./schematics/collection.json",
   "repository": {

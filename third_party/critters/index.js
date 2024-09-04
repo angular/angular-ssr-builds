@@ -6317,22 +6317,22 @@ var require_picocolors_browser = __commonJS({
   "external/npm/node_modules/picocolors/picocolors.browser.js"(exports, module) {
     var x = String;
     var create = function() {
-      return { isColorSupported: false, reset: x, bold: x, dim: x, italic: x, underline: x, inverse: x, hidden: x, strikethrough: x, black: x, red: x, green: x, yellow: x, blue: x, magenta: x, cyan: x, white: x, gray: x, bgBlack: x, bgRed: x, bgGreen: x, bgYellow: x, bgBlue: x, bgMagenta: x, bgCyan: x, bgWhite: x };
+      return { isColorSupported: false, reset: x, bold: x, dim: x, italic: x, underline: x, inverse: x, hidden: x, strikethrough: x, black: x, red: x, green: x, yellow: x, blue: x, magenta: x, cyan: x, white: x, gray: x, bgBlack: x, bgRed: x, bgGreen: x, bgYellow: x, bgBlue: x, bgMagenta: x, bgCyan: x, bgWhite: x, blackBright: x, redBright: x, greenBright: x, yellowBright: x, blueBright: x, magentaBright: x, cyanBright: x, whiteBright: x, bgBlackBright: x, bgRedBright: x, bgGreenBright: x, bgYellowBright: x, bgBlueBright: x, bgMagentaBright: x, bgCyanBright: x, bgWhiteBright: x };
     };
     module.exports = create();
     module.exports.createColors = create;
   }
 });
 
-// (disabled):external/npm/node_modules/critters/node_modules/postcss/lib/terminal-highlight
+// (disabled):external/npm/node_modules/postcss/lib/terminal-highlight
 var require_terminal_highlight = __commonJS({
-  "(disabled):external/npm/node_modules/critters/node_modules/postcss/lib/terminal-highlight"() {
+  "(disabled):external/npm/node_modules/postcss/lib/terminal-highlight"() {
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/css-syntax-error.js
+// external/npm/node_modules/postcss/lib/css-syntax-error.js
 var require_css_syntax_error = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/css-syntax-error.js"(exports, module) {
+  "external/npm/node_modules/postcss/lib/css-syntax-error.js"(exports, module) {
     "use strict";
     var pico = require_picocolors_browser();
     var terminalHighlight = require_terminal_highlight();
@@ -6380,30 +6380,40 @@ var require_css_syntax_error = __commonJS({
         let css = this.source;
         if (color == null)
           color = pico.isColorSupported;
-        if (terminalHighlight) {
-          if (color)
-            css = terminalHighlight(css);
+        let aside = (text) => text;
+        let mark = (text) => text;
+        let highlight = (text) => text;
+        if (color) {
+          let { bold, gray, red } = pico.createColors(true);
+          mark = (text) => bold(red(text));
+          aside = (text) => gray(text);
+          if (terminalHighlight) {
+            highlight = (text) => terminalHighlight(text);
+          }
         }
         let lines = css.split(/\r?\n/);
         let start = Math.max(this.line - 3, 0);
         let end = Math.min(this.line + 2, lines.length);
         let maxWidth = String(end).length;
-        let mark, aside;
-        if (color) {
-          let { bold, gray, red } = pico.createColors(true);
-          mark = (text) => bold(red(text));
-          aside = (text) => gray(text);
-        } else {
-          mark = aside = (str) => str;
-        }
         return lines.slice(start, end).map((line, index) => {
           let number = start + 1 + index;
           let gutter = " " + (" " + number).slice(-maxWidth) + " | ";
           if (number === this.line) {
+            if (line.length > 160) {
+              let padding = 20;
+              let subLineStart = Math.max(0, this.column - padding);
+              let subLineEnd = Math.max(
+                this.column + padding,
+                this.endColumn + padding
+              );
+              let subLine = line.slice(subLineStart, subLineEnd);
+              let spacing2 = aside(gutter.replace(/\d/g, " ")) + line.slice(0, Math.min(this.column - 1, padding - 1)).replace(/[^\t]/g, " ");
+              return mark(">") + aside(gutter) + highlight(subLine) + "\n " + spacing2 + mark("^");
+            }
             let spacing = aside(gutter.replace(/\d/g, " ")) + line.slice(0, this.column - 1).replace(/[^\t]/g, " ");
-            return mark(">") + aside(gutter) + line + "\n " + spacing + mark("^");
+            return mark(">") + aside(gutter) + highlight(line) + "\n " + spacing + mark("^");
           }
-          return " " + aside(gutter) + line;
+          return " " + aside(gutter) + highlight(line);
         }).join("\n");
       }
       toString() {
@@ -6419,18 +6429,9 @@ var require_css_syntax_error = __commonJS({
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/symbols.js
-var require_symbols = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/symbols.js"(exports, module) {
-    "use strict";
-    module.exports.isClean = Symbol("isClean");
-    module.exports.my = Symbol("my");
-  }
-});
-
-// external/npm/node_modules/critters/node_modules/postcss/lib/stringifier.js
+// external/npm/node_modules/postcss/lib/stringifier.js
 var require_stringifier = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/stringifier.js"(exports, module) {
+  "external/npm/node_modules/postcss/lib/stringifier.js"(exports, module) {
     "use strict";
     var DEFAULT_RAW = {
       after: "\n",
@@ -6750,9 +6751,9 @@ var require_stringifier = __commonJS({
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/stringify.js
+// external/npm/node_modules/postcss/lib/stringify.js
 var require_stringify3 = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/stringify.js"(exports, module) {
+  "external/npm/node_modules/postcss/lib/stringify.js"(exports, module) {
     "use strict";
     var Stringifier = require_stringifier();
     function stringify(node, builder) {
@@ -6764,14 +6765,23 @@ var require_stringify3 = __commonJS({
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/node.js
-var require_node2 = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/node.js"(exports, module) {
+// external/npm/node_modules/postcss/lib/symbols.js
+var require_symbols = __commonJS({
+  "external/npm/node_modules/postcss/lib/symbols.js"(exports, module) {
     "use strict";
-    var { isClean, my } = require_symbols();
+    module.exports.isClean = Symbol("isClean");
+    module.exports.my = Symbol("my");
+  }
+});
+
+// external/npm/node_modules/postcss/lib/node.js
+var require_node2 = __commonJS({
+  "external/npm/node_modules/postcss/lib/node.js"(exports, module) {
+    "use strict";
     var CssSyntaxError = require_css_syntax_error();
     var Stringifier = require_stringifier();
     var stringify = require_stringify3();
+    var { isClean, my } = require_symbols();
     function cloneNode(obj, parent) {
       let cloned = new obj.constructor();
       for (let i in obj) {
@@ -6898,6 +6908,9 @@ var require_node2 = __commonJS({
             return true;
           }
         };
+      }
+      markClean() {
+        this[isClean] = true;
       }
       markDirty() {
         if (this[isClean]) {
@@ -7101,9 +7114,25 @@ var require_node2 = __commonJS({
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/declaration.js
+// external/npm/node_modules/postcss/lib/comment.js
+var require_comment = __commonJS({
+  "external/npm/node_modules/postcss/lib/comment.js"(exports, module) {
+    "use strict";
+    var Node = require_node2();
+    var Comment = class extends Node {
+      constructor(defaults) {
+        super(defaults);
+        this.type = "comment";
+      }
+    };
+    module.exports = Comment;
+    Comment.default = Comment;
+  }
+});
+
+// external/npm/node_modules/postcss/lib/declaration.js
 var require_declaration = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/declaration.js"(exports, module) {
+  "external/npm/node_modules/postcss/lib/declaration.js"(exports, module) {
     "use strict";
     var Node = require_node2();
     var Declaration = class extends Node {
@@ -7123,743 +7152,18 @@ var require_declaration = __commonJS({
   }
 });
 
-// (disabled):external/npm/node_modules/source-map-js/source-map.js
-var require_source_map = __commonJS({
-  "(disabled):external/npm/node_modules/source-map-js/source-map.js"() {
-  }
-});
-
-// (disabled):url
-var require_url = __commonJS({
-  "(disabled):url"() {
-  }
-});
-
-// external/npm/node_modules/nanoid/non-secure/index.cjs
-var require_non_secure = __commonJS({
-  "external/npm/node_modules/nanoid/non-secure/index.cjs"(exports, module) {
-    var urlAlphabet = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
-    var customAlphabet = (alphabet, defaultSize = 21) => {
-      return (size = defaultSize) => {
-        let id = "";
-        let i = size;
-        while (i--) {
-          id += alphabet[Math.random() * alphabet.length | 0];
-        }
-        return id;
-      };
-    };
-    var nanoid = (size = 21) => {
-      let id = "";
-      let i = size;
-      while (i--) {
-        id += urlAlphabet[Math.random() * 64 | 0];
-      }
-      return id;
-    };
-    module.exports = { nanoid, customAlphabet };
-  }
-});
-
-// external/npm/node_modules/critters/node_modules/postcss/lib/previous-map.js
-var require_previous_map = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/previous-map.js"(exports, module) {
-    "use strict";
-    var { SourceMapConsumer, SourceMapGenerator } = require_source_map();
-    var { existsSync, readFileSync } = require_fs2();
-    var { dirname, join } = require_path();
-    function fromBase64(str) {
-      if (Buffer) {
-        return Buffer.from(str, "base64").toString();
-      } else {
-        return window.atob(str);
-      }
-    }
-    var PreviousMap = class {
-      constructor(css, opts) {
-        if (opts.map === false)
-          return;
-        this.loadAnnotation(css);
-        this.inline = this.startWith(this.annotation, "data:");
-        let prev = opts.map ? opts.map.prev : void 0;
-        let text = this.loadMap(opts.from, prev);
-        if (!this.mapFile && opts.from) {
-          this.mapFile = opts.from;
-        }
-        if (this.mapFile)
-          this.root = dirname(this.mapFile);
-        if (text)
-          this.text = text;
-      }
-      consumer() {
-        if (!this.consumerCache) {
-          this.consumerCache = new SourceMapConsumer(this.text);
-        }
-        return this.consumerCache;
-      }
-      decodeInline(text) {
-        let baseCharsetUri = /^data:application\/json;charset=utf-?8;base64,/;
-        let baseUri = /^data:application\/json;base64,/;
-        let charsetUri = /^data:application\/json;charset=utf-?8,/;
-        let uri = /^data:application\/json,/;
-        let uriMatch = text.match(charsetUri) || text.match(uri);
-        if (uriMatch) {
-          return decodeURIComponent(text.substr(uriMatch[0].length));
-        }
-        let baseUriMatch = text.match(baseCharsetUri) || text.match(baseUri);
-        if (baseUriMatch) {
-          return fromBase64(text.substr(baseUriMatch[0].length));
-        }
-        let encoding = text.match(/data:application\/json;([^,]+),/)[1];
-        throw new Error("Unsupported source map encoding " + encoding);
-      }
-      getAnnotationURL(sourceMapString) {
-        return sourceMapString.replace(/^\/\*\s*# sourceMappingURL=/, "").trim();
-      }
-      isMap(map) {
-        if (typeof map !== "object")
-          return false;
-        return typeof map.mappings === "string" || typeof map._mappings === "string" || Array.isArray(map.sections);
-      }
-      loadAnnotation(css) {
-        let comments = css.match(/\/\*\s*# sourceMappingURL=/g);
-        if (!comments)
-          return;
-        let start = css.lastIndexOf(comments.pop());
-        let end = css.indexOf("*/", start);
-        if (start > -1 && end > -1) {
-          this.annotation = this.getAnnotationURL(css.substring(start, end));
-        }
-      }
-      loadFile(path) {
-        this.root = dirname(path);
-        if (existsSync(path)) {
-          this.mapFile = path;
-          return readFileSync(path, "utf-8").toString().trim();
-        }
-      }
-      loadMap(file, prev) {
-        if (prev === false)
-          return false;
-        if (prev) {
-          if (typeof prev === "string") {
-            return prev;
-          } else if (typeof prev === "function") {
-            let prevPath = prev(file);
-            if (prevPath) {
-              let map = this.loadFile(prevPath);
-              if (!map) {
-                throw new Error(
-                  "Unable to load previous source map: " + prevPath.toString()
-                );
-              }
-              return map;
-            }
-          } else if (prev instanceof SourceMapConsumer) {
-            return SourceMapGenerator.fromSourceMap(prev).toString();
-          } else if (prev instanceof SourceMapGenerator) {
-            return prev.toString();
-          } else if (this.isMap(prev)) {
-            return JSON.stringify(prev);
-          } else {
-            throw new Error(
-              "Unsupported previous source map format: " + prev.toString()
-            );
-          }
-        } else if (this.inline) {
-          return this.decodeInline(this.annotation);
-        } else if (this.annotation) {
-          let map = this.annotation;
-          if (file)
-            map = join(dirname(file), map);
-          return this.loadFile(map);
-        }
-      }
-      startWith(string, start) {
-        if (!string)
-          return false;
-        return string.substr(0, start.length) === start;
-      }
-      withContent() {
-        return !!(this.consumer().sourcesContent && this.consumer().sourcesContent.length > 0);
-      }
-    };
-    module.exports = PreviousMap;
-    PreviousMap.default = PreviousMap;
-  }
-});
-
-// external/npm/node_modules/critters/node_modules/postcss/lib/input.js
-var require_input = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/input.js"(exports, module) {
-    "use strict";
-    var { SourceMapConsumer, SourceMapGenerator } = require_source_map();
-    var { fileURLToPath, pathToFileURL } = require_url();
-    var { isAbsolute, resolve } = require_path();
-    var { nanoid } = require_non_secure();
-    var terminalHighlight = require_terminal_highlight();
-    var CssSyntaxError = require_css_syntax_error();
-    var PreviousMap = require_previous_map();
-    var fromOffsetCache = Symbol("fromOffsetCache");
-    var sourceMapAvailable = Boolean(SourceMapConsumer && SourceMapGenerator);
-    var pathAvailable = Boolean(resolve && isAbsolute);
-    var Input = class {
-      constructor(css, opts = {}) {
-        if (css === null || typeof css === "undefined" || typeof css === "object" && !css.toString) {
-          throw new Error(`PostCSS received ${css} instead of CSS string`);
-        }
-        this.css = css.toString();
-        if (this.css[0] === "\uFEFF" || this.css[0] === "\uFFFE") {
-          this.hasBOM = true;
-          this.css = this.css.slice(1);
-        } else {
-          this.hasBOM = false;
-        }
-        if (opts.from) {
-          if (!pathAvailable || /^\w+:\/\//.test(opts.from) || isAbsolute(opts.from)) {
-            this.file = opts.from;
-          } else {
-            this.file = resolve(opts.from);
-          }
-        }
-        if (pathAvailable && sourceMapAvailable) {
-          let map = new PreviousMap(this.css, opts);
-          if (map.text) {
-            this.map = map;
-            let file = map.consumer().file;
-            if (!this.file && file)
-              this.file = this.mapResolve(file);
-          }
-        }
-        if (!this.file) {
-          this.id = "<input css " + nanoid(6) + ">";
-        }
-        if (this.map)
-          this.map.file = this.from;
-      }
-      error(message, line, column, opts = {}) {
-        let result, endLine, endColumn;
-        if (line && typeof line === "object") {
-          let start = line;
-          let end = column;
-          if (typeof start.offset === "number") {
-            let pos = this.fromOffset(start.offset);
-            line = pos.line;
-            column = pos.col;
-          } else {
-            line = start.line;
-            column = start.column;
-          }
-          if (typeof end.offset === "number") {
-            let pos = this.fromOffset(end.offset);
-            endLine = pos.line;
-            endColumn = pos.col;
-          } else {
-            endLine = end.line;
-            endColumn = end.column;
-          }
-        } else if (!column) {
-          let pos = this.fromOffset(line);
-          line = pos.line;
-          column = pos.col;
-        }
-        let origin = this.origin(line, column, endLine, endColumn);
-        if (origin) {
-          result = new CssSyntaxError(
-            message,
-            origin.endLine === void 0 ? origin.line : { column: origin.column, line: origin.line },
-            origin.endLine === void 0 ? origin.column : { column: origin.endColumn, line: origin.endLine },
-            origin.source,
-            origin.file,
-            opts.plugin
-          );
-        } else {
-          result = new CssSyntaxError(
-            message,
-            endLine === void 0 ? line : { column, line },
-            endLine === void 0 ? column : { column: endColumn, line: endLine },
-            this.css,
-            this.file,
-            opts.plugin
-          );
-        }
-        result.input = { column, endColumn, endLine, line, source: this.css };
-        if (this.file) {
-          if (pathToFileURL) {
-            result.input.url = pathToFileURL(this.file).toString();
-          }
-          result.input.file = this.file;
-        }
-        return result;
-      }
-      fromOffset(offset) {
-        let lastLine, lineToIndex;
-        if (!this[fromOffsetCache]) {
-          let lines = this.css.split("\n");
-          lineToIndex = new Array(lines.length);
-          let prevIndex = 0;
-          for (let i = 0, l = lines.length; i < l; i++) {
-            lineToIndex[i] = prevIndex;
-            prevIndex += lines[i].length + 1;
-          }
-          this[fromOffsetCache] = lineToIndex;
-        } else {
-          lineToIndex = this[fromOffsetCache];
-        }
-        lastLine = lineToIndex[lineToIndex.length - 1];
-        let min = 0;
-        if (offset >= lastLine) {
-          min = lineToIndex.length - 1;
-        } else {
-          let max = lineToIndex.length - 2;
-          let mid;
-          while (min < max) {
-            mid = min + (max - min >> 1);
-            if (offset < lineToIndex[mid]) {
-              max = mid - 1;
-            } else if (offset >= lineToIndex[mid + 1]) {
-              min = mid + 1;
-            } else {
-              min = mid;
-              break;
-            }
-          }
-        }
-        return {
-          col: offset - lineToIndex[min] + 1,
-          line: min + 1
-        };
-      }
-      mapResolve(file) {
-        if (/^\w+:\/\//.test(file)) {
-          return file;
-        }
-        return resolve(this.map.consumer().sourceRoot || this.map.root || ".", file);
-      }
-      origin(line, column, endLine, endColumn) {
-        if (!this.map)
-          return false;
-        let consumer = this.map.consumer();
-        let from = consumer.originalPositionFor({ column, line });
-        if (!from.source)
-          return false;
-        let to;
-        if (typeof endLine === "number") {
-          to = consumer.originalPositionFor({ column: endColumn, line: endLine });
-        }
-        let fromUrl;
-        if (isAbsolute(from.source)) {
-          fromUrl = pathToFileURL(from.source);
-        } else {
-          fromUrl = new URL(
-            from.source,
-            this.map.consumer().sourceRoot || pathToFileURL(this.map.mapFile)
-          );
-        }
-        let result = {
-          column: from.column,
-          endColumn: to && to.column,
-          endLine: to && to.line,
-          line: from.line,
-          url: fromUrl.toString()
-        };
-        if (fromUrl.protocol === "file:") {
-          if (fileURLToPath) {
-            result.file = fileURLToPath(fromUrl);
-          } else {
-            throw new Error(`file: protocol is not available in this PostCSS build`);
-          }
-        }
-        let source = consumer.sourceContentFor(from.source);
-        if (source)
-          result.source = source;
-        return result;
-      }
-      toJSON() {
-        let json = {};
-        for (let name of ["hasBOM", "css", "file", "id"]) {
-          if (this[name] != null) {
-            json[name] = this[name];
-          }
-        }
-        if (this.map) {
-          json.map = __spreadValues({}, this.map);
-          if (json.map.consumerCache) {
-            json.map.consumerCache = void 0;
-          }
-        }
-        return json;
-      }
-      get from() {
-        return this.file || this.id;
-      }
-    };
-    module.exports = Input;
-    Input.default = Input;
-    if (terminalHighlight && terminalHighlight.registerInput) {
-      terminalHighlight.registerInput(Input);
-    }
-  }
-});
-
-// external/npm/node_modules/critters/node_modules/postcss/lib/map-generator.js
-var require_map_generator = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/map-generator.js"(exports, module) {
-    "use strict";
-    var { SourceMapConsumer, SourceMapGenerator } = require_source_map();
-    var { dirname, relative, resolve, sep } = require_path();
-    var { pathToFileURL } = require_url();
-    var Input = require_input();
-    var sourceMapAvailable = Boolean(SourceMapConsumer && SourceMapGenerator);
-    var pathAvailable = Boolean(dirname && resolve && relative && sep);
-    var MapGenerator = class {
-      constructor(stringify, root, opts, cssString) {
-        this.stringify = stringify;
-        this.mapOpts = opts.map || {};
-        this.root = root;
-        this.opts = opts;
-        this.css = cssString;
-        this.originalCSS = cssString;
-        this.usesFileUrls = !this.mapOpts.from && this.mapOpts.absolute;
-        this.memoizedFileURLs = /* @__PURE__ */ new Map();
-        this.memoizedPaths = /* @__PURE__ */ new Map();
-        this.memoizedURLs = /* @__PURE__ */ new Map();
-      }
-      addAnnotation() {
-        let content;
-        if (this.isInline()) {
-          content = "data:application/json;base64," + this.toBase64(this.map.toString());
-        } else if (typeof this.mapOpts.annotation === "string") {
-          content = this.mapOpts.annotation;
-        } else if (typeof this.mapOpts.annotation === "function") {
-          content = this.mapOpts.annotation(this.opts.to, this.root);
-        } else {
-          content = this.outputFile() + ".map";
-        }
-        let eol = "\n";
-        if (this.css.includes("\r\n"))
-          eol = "\r\n";
-        this.css += eol + "/*# sourceMappingURL=" + content + " */";
-      }
-      applyPrevMaps() {
-        for (let prev of this.previous()) {
-          let from = this.toUrl(this.path(prev.file));
-          let root = prev.root || dirname(prev.file);
-          let map;
-          if (this.mapOpts.sourcesContent === false) {
-            map = new SourceMapConsumer(prev.text);
-            if (map.sourcesContent) {
-              map.sourcesContent = null;
-            }
-          } else {
-            map = prev.consumer();
-          }
-          this.map.applySourceMap(map, from, this.toUrl(this.path(root)));
-        }
-      }
-      clearAnnotation() {
-        if (this.mapOpts.annotation === false)
-          return;
-        if (this.root) {
-          let node;
-          for (let i = this.root.nodes.length - 1; i >= 0; i--) {
-            node = this.root.nodes[i];
-            if (node.type !== "comment")
-              continue;
-            if (node.text.indexOf("# sourceMappingURL=") === 0) {
-              this.root.removeChild(i);
-            }
-          }
-        } else if (this.css) {
-          this.css = this.css.replace(/\n*\/\*#[\S\s]*?\*\/$/gm, "");
-        }
-      }
-      generate() {
-        this.clearAnnotation();
-        if (pathAvailable && sourceMapAvailable && this.isMap()) {
-          return this.generateMap();
-        } else {
-          let result = "";
-          this.stringify(this.root, (i) => {
-            result += i;
-          });
-          return [result];
-        }
-      }
-      generateMap() {
-        if (this.root) {
-          this.generateString();
-        } else if (this.previous().length === 1) {
-          let prev = this.previous()[0].consumer();
-          prev.file = this.outputFile();
-          this.map = SourceMapGenerator.fromSourceMap(prev, {
-            ignoreInvalidMapping: true
-          });
-        } else {
-          this.map = new SourceMapGenerator({
-            file: this.outputFile(),
-            ignoreInvalidMapping: true
-          });
-          this.map.addMapping({
-            generated: { column: 0, line: 1 },
-            original: { column: 0, line: 1 },
-            source: this.opts.from ? this.toUrl(this.path(this.opts.from)) : "<no source>"
-          });
-        }
-        if (this.isSourcesContent())
-          this.setSourcesContent();
-        if (this.root && this.previous().length > 0)
-          this.applyPrevMaps();
-        if (this.isAnnotation())
-          this.addAnnotation();
-        if (this.isInline()) {
-          return [this.css];
-        } else {
-          return [this.css, this.map];
-        }
-      }
-      generateString() {
-        this.css = "";
-        this.map = new SourceMapGenerator({
-          file: this.outputFile(),
-          ignoreInvalidMapping: true
-        });
-        let line = 1;
-        let column = 1;
-        let noSource = "<no source>";
-        let mapping = {
-          generated: { column: 0, line: 0 },
-          original: { column: 0, line: 0 },
-          source: ""
-        };
-        let lines, last;
-        this.stringify(this.root, (str, node, type) => {
-          this.css += str;
-          if (node && type !== "end") {
-            mapping.generated.line = line;
-            mapping.generated.column = column - 1;
-            if (node.source && node.source.start) {
-              mapping.source = this.sourcePath(node);
-              mapping.original.line = node.source.start.line;
-              mapping.original.column = node.source.start.column - 1;
-              this.map.addMapping(mapping);
-            } else {
-              mapping.source = noSource;
-              mapping.original.line = 1;
-              mapping.original.column = 0;
-              this.map.addMapping(mapping);
-            }
-          }
-          lines = str.match(/\n/g);
-          if (lines) {
-            line += lines.length;
-            last = str.lastIndexOf("\n");
-            column = str.length - last;
-          } else {
-            column += str.length;
-          }
-          if (node && type !== "start") {
-            let p = node.parent || { raws: {} };
-            let childless = node.type === "decl" || node.type === "atrule" && !node.nodes;
-            if (!childless || node !== p.last || p.raws.semicolon) {
-              if (node.source && node.source.end) {
-                mapping.source = this.sourcePath(node);
-                mapping.original.line = node.source.end.line;
-                mapping.original.column = node.source.end.column - 1;
-                mapping.generated.line = line;
-                mapping.generated.column = column - 2;
-                this.map.addMapping(mapping);
-              } else {
-                mapping.source = noSource;
-                mapping.original.line = 1;
-                mapping.original.column = 0;
-                mapping.generated.line = line;
-                mapping.generated.column = column - 1;
-                this.map.addMapping(mapping);
-              }
-            }
-          }
-        });
-      }
-      isAnnotation() {
-        if (this.isInline()) {
-          return true;
-        }
-        if (typeof this.mapOpts.annotation !== "undefined") {
-          return this.mapOpts.annotation;
-        }
-        if (this.previous().length) {
-          return this.previous().some((i) => i.annotation);
-        }
-        return true;
-      }
-      isInline() {
-        if (typeof this.mapOpts.inline !== "undefined") {
-          return this.mapOpts.inline;
-        }
-        let annotation = this.mapOpts.annotation;
-        if (typeof annotation !== "undefined" && annotation !== true) {
-          return false;
-        }
-        if (this.previous().length) {
-          return this.previous().some((i) => i.inline);
-        }
-        return true;
-      }
-      isMap() {
-        if (typeof this.opts.map !== "undefined") {
-          return !!this.opts.map;
-        }
-        return this.previous().length > 0;
-      }
-      isSourcesContent() {
-        if (typeof this.mapOpts.sourcesContent !== "undefined") {
-          return this.mapOpts.sourcesContent;
-        }
-        if (this.previous().length) {
-          return this.previous().some((i) => i.withContent());
-        }
-        return true;
-      }
-      outputFile() {
-        if (this.opts.to) {
-          return this.path(this.opts.to);
-        } else if (this.opts.from) {
-          return this.path(this.opts.from);
-        } else {
-          return "to.css";
-        }
-      }
-      path(file) {
-        if (this.mapOpts.absolute)
-          return file;
-        if (file.charCodeAt(0) === 60)
-          return file;
-        if (/^\w+:\/\//.test(file))
-          return file;
-        let cached = this.memoizedPaths.get(file);
-        if (cached)
-          return cached;
-        let from = this.opts.to ? dirname(this.opts.to) : ".";
-        if (typeof this.mapOpts.annotation === "string") {
-          from = dirname(resolve(from, this.mapOpts.annotation));
-        }
-        let path = relative(from, file);
-        this.memoizedPaths.set(file, path);
-        return path;
-      }
-      previous() {
-        if (!this.previousMaps) {
-          this.previousMaps = [];
-          if (this.root) {
-            this.root.walk((node) => {
-              if (node.source && node.source.input.map) {
-                let map = node.source.input.map;
-                if (!this.previousMaps.includes(map)) {
-                  this.previousMaps.push(map);
-                }
-              }
-            });
-          } else {
-            let input = new Input(this.originalCSS, this.opts);
-            if (input.map)
-              this.previousMaps.push(input.map);
-          }
-        }
-        return this.previousMaps;
-      }
-      setSourcesContent() {
-        let already = {};
-        if (this.root) {
-          this.root.walk((node) => {
-            if (node.source) {
-              let from = node.source.input.from;
-              if (from && !already[from]) {
-                already[from] = true;
-                let fromUrl = this.usesFileUrls ? this.toFileUrl(from) : this.toUrl(this.path(from));
-                this.map.setSourceContent(fromUrl, node.source.input.css);
-              }
-            }
-          });
-        } else if (this.css) {
-          let from = this.opts.from ? this.toUrl(this.path(this.opts.from)) : "<no source>";
-          this.map.setSourceContent(from, this.css);
-        }
-      }
-      sourcePath(node) {
-        if (this.mapOpts.from) {
-          return this.toUrl(this.mapOpts.from);
-        } else if (this.usesFileUrls) {
-          return this.toFileUrl(node.source.input.from);
-        } else {
-          return this.toUrl(this.path(node.source.input.from));
-        }
-      }
-      toBase64(str) {
-        if (Buffer) {
-          return Buffer.from(str).toString("base64");
-        } else {
-          return window.btoa(unescape(encodeURIComponent(str)));
-        }
-      }
-      toFileUrl(path) {
-        let cached = this.memoizedFileURLs.get(path);
-        if (cached)
-          return cached;
-        if (pathToFileURL) {
-          let fileURL = pathToFileURL(path).toString();
-          this.memoizedFileURLs.set(path, fileURL);
-          return fileURL;
-        } else {
-          throw new Error(
-            "`map.absolute` option is not available in this PostCSS build"
-          );
-        }
-      }
-      toUrl(path) {
-        let cached = this.memoizedURLs.get(path);
-        if (cached)
-          return cached;
-        if (sep === "\\") {
-          path = path.replace(/\\/g, "/");
-        }
-        let url = encodeURI(path).replace(/[#?]/g, encodeURIComponent);
-        this.memoizedURLs.set(path, url);
-        return url;
-      }
-    };
-    module.exports = MapGenerator;
-  }
-});
-
-// external/npm/node_modules/critters/node_modules/postcss/lib/comment.js
-var require_comment = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/comment.js"(exports, module) {
-    "use strict";
-    var Node = require_node2();
-    var Comment = class extends Node {
-      constructor(defaults) {
-        super(defaults);
-        this.type = "comment";
-      }
-    };
-    module.exports = Comment;
-    Comment.default = Comment;
-  }
-});
-
-// external/npm/node_modules/critters/node_modules/postcss/lib/container.js
+// external/npm/node_modules/postcss/lib/container.js
 var require_container = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/container.js"(exports, module) {
+  "external/npm/node_modules/postcss/lib/container.js"(exports, module) {
     "use strict";
-    var { isClean, my } = require_symbols();
-    var Declaration = require_declaration();
     var Comment = require_comment();
+    var Declaration = require_declaration();
     var Node = require_node2();
-    var parse;
-    var Rule;
+    var { isClean, my } = require_symbols();
     var AtRule;
+    var parse;
     var Root;
+    var Rule;
     function cleanSource(nodes) {
       return nodes.map((i) => {
         if (i.nodes)
@@ -8047,7 +7351,7 @@ var require_container = __commonJS({
           throw new Error("Unknown node type in node creation");
         }
         let processed = nodes.map((i) => {
-          if (!i[my])
+          if (!i[my] || !i.markClean)
             Container.rebuild(i);
           i = i.proxyOf;
           if (i.parent)
@@ -8255,9 +7559,36 @@ var require_container = __commonJS({
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/document.js
+// external/npm/node_modules/postcss/lib/at-rule.js
+var require_at_rule = __commonJS({
+  "external/npm/node_modules/postcss/lib/at-rule.js"(exports, module) {
+    "use strict";
+    var Container = require_container();
+    var AtRule = class extends Container {
+      constructor(defaults) {
+        super(defaults);
+        this.type = "atrule";
+      }
+      append(...children) {
+        if (!this.proxyOf.nodes)
+          this.nodes = [];
+        return super.append(...children);
+      }
+      prepend(...children) {
+        if (!this.proxyOf.nodes)
+          this.nodes = [];
+        return super.prepend(...children);
+      }
+    };
+    module.exports = AtRule;
+    AtRule.default = AtRule;
+    Container.registerAtRule(AtRule);
+  }
+});
+
+// external/npm/node_modules/postcss/lib/document.js
 var require_document = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/document.js"(exports, module) {
+  "external/npm/node_modules/postcss/lib/document.js"(exports, module) {
     "use strict";
     var Container = require_container();
     var LazyResult;
@@ -8285,101 +7616,917 @@ var require_document = __commonJS({
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/warn-once.js
-var require_warn_once = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/warn-once.js"(exports, module) {
-    "use strict";
-    var printed = {};
-    module.exports = function warnOnce(message) {
-      if (printed[message])
-        return;
-      printed[message] = true;
-      if (typeof console !== "undefined" && console.warn) {
-        console.warn(message);
-      }
+// external/npm/node_modules/nanoid/non-secure/index.cjs
+var require_non_secure = __commonJS({
+  "external/npm/node_modules/nanoid/non-secure/index.cjs"(exports, module) {
+    var urlAlphabet = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
+    var customAlphabet = (alphabet, defaultSize = 21) => {
+      return (size = defaultSize) => {
+        let id = "";
+        let i = size;
+        while (i--) {
+          id += alphabet[Math.random() * alphabet.length | 0];
+        }
+        return id;
+      };
     };
+    var nanoid = (size = 21) => {
+      let id = "";
+      let i = size;
+      while (i--) {
+        id += urlAlphabet[Math.random() * 64 | 0];
+      }
+      return id;
+    };
+    module.exports = { nanoid, customAlphabet };
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/warning.js
-var require_warning = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/warning.js"(exports, module) {
-    "use strict";
-    var Warning = class {
-      constructor(text, opts = {}) {
-        this.type = "warning";
-        this.text = text;
-        if (opts.node && opts.node.source) {
-          let range = opts.node.rangeBy(opts);
-          this.line = range.start.line;
-          this.column = range.start.column;
-          this.endLine = range.end.line;
-          this.endColumn = range.end.column;
-        }
-        for (let opt in opts)
-          this[opt] = opts[opt];
-      }
-      toString() {
-        if (this.node) {
-          return this.node.error(this.text, {
-            index: this.index,
-            plugin: this.plugin,
-            word: this.word
-          }).message;
-        }
-        if (this.plugin) {
-          return this.plugin + ": " + this.text;
-        }
-        return this.text;
-      }
-    };
-    module.exports = Warning;
-    Warning.default = Warning;
+// (disabled):external/npm/node_modules/source-map-js/source-map.js
+var require_source_map = __commonJS({
+  "(disabled):external/npm/node_modules/source-map-js/source-map.js"() {
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/result.js
-var require_result = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/result.js"(exports, module) {
+// (disabled):url
+var require_url = __commonJS({
+  "(disabled):url"() {
+  }
+});
+
+// external/npm/node_modules/postcss/lib/previous-map.js
+var require_previous_map = __commonJS({
+  "external/npm/node_modules/postcss/lib/previous-map.js"(exports, module) {
     "use strict";
-    var Warning = require_warning();
-    var Result = class {
-      constructor(processor, root, opts) {
-        this.processor = processor;
-        this.messages = [];
-        this.root = root;
-        this.opts = opts;
-        this.css = void 0;
-        this.map = void 0;
+    var { existsSync, readFileSync } = require_fs2();
+    var { dirname, join } = require_path();
+    var { SourceMapConsumer, SourceMapGenerator } = require_source_map();
+    function fromBase64(str) {
+      if (Buffer) {
+        return Buffer.from(str, "base64").toString();
+      } else {
+        return window.atob(str);
       }
-      toString() {
-        return this.css;
+    }
+    var PreviousMap = class {
+      constructor(css, opts) {
+        if (opts.map === false)
+          return;
+        this.loadAnnotation(css);
+        this.inline = this.startWith(this.annotation, "data:");
+        let prev = opts.map ? opts.map.prev : void 0;
+        let text = this.loadMap(opts.from, prev);
+        if (!this.mapFile && opts.from) {
+          this.mapFile = opts.from;
+        }
+        if (this.mapFile)
+          this.root = dirname(this.mapFile);
+        if (text)
+          this.text = text;
       }
-      warn(text, opts = {}) {
-        if (!opts.plugin) {
-          if (this.lastPlugin && this.lastPlugin.postcssPlugin) {
-            opts.plugin = this.lastPlugin.postcssPlugin;
+      consumer() {
+        if (!this.consumerCache) {
+          this.consumerCache = new SourceMapConsumer(this.text);
+        }
+        return this.consumerCache;
+      }
+      decodeInline(text) {
+        let baseCharsetUri = /^data:application\/json;charset=utf-?8;base64,/;
+        let baseUri = /^data:application\/json;base64,/;
+        let charsetUri = /^data:application\/json;charset=utf-?8,/;
+        let uri = /^data:application\/json,/;
+        let uriMatch = text.match(charsetUri) || text.match(uri);
+        if (uriMatch) {
+          return decodeURIComponent(text.substr(uriMatch[0].length));
+        }
+        let baseUriMatch = text.match(baseCharsetUri) || text.match(baseUri);
+        if (baseUriMatch) {
+          return fromBase64(text.substr(baseUriMatch[0].length));
+        }
+        let encoding = text.match(/data:application\/json;([^,]+),/)[1];
+        throw new Error("Unsupported source map encoding " + encoding);
+      }
+      getAnnotationURL(sourceMapString) {
+        return sourceMapString.replace(/^\/\*\s*# sourceMappingURL=/, "").trim();
+      }
+      isMap(map) {
+        if (typeof map !== "object")
+          return false;
+        return typeof map.mappings === "string" || typeof map._mappings === "string" || Array.isArray(map.sections);
+      }
+      loadAnnotation(css) {
+        let comments = css.match(/\/\*\s*# sourceMappingURL=/g);
+        if (!comments)
+          return;
+        let start = css.lastIndexOf(comments.pop());
+        let end = css.indexOf("*/", start);
+        if (start > -1 && end > -1) {
+          this.annotation = this.getAnnotationURL(css.substring(start, end));
+        }
+      }
+      loadFile(path) {
+        this.root = dirname(path);
+        if (existsSync(path)) {
+          this.mapFile = path;
+          return readFileSync(path, "utf-8").toString().trim();
+        }
+      }
+      loadMap(file, prev) {
+        if (prev === false)
+          return false;
+        if (prev) {
+          if (typeof prev === "string") {
+            return prev;
+          } else if (typeof prev === "function") {
+            let prevPath = prev(file);
+            if (prevPath) {
+              let map = this.loadFile(prevPath);
+              if (!map) {
+                throw new Error(
+                  "Unable to load previous source map: " + prevPath.toString()
+                );
+              }
+              return map;
+            }
+          } else if (prev instanceof SourceMapConsumer) {
+            return SourceMapGenerator.fromSourceMap(prev).toString();
+          } else if (prev instanceof SourceMapGenerator) {
+            return prev.toString();
+          } else if (this.isMap(prev)) {
+            return JSON.stringify(prev);
+          } else {
+            throw new Error(
+              "Unsupported previous source map format: " + prev.toString()
+            );
+          }
+        } else if (this.inline) {
+          return this.decodeInline(this.annotation);
+        } else if (this.annotation) {
+          let map = this.annotation;
+          if (file)
+            map = join(dirname(file), map);
+          return this.loadFile(map);
+        }
+      }
+      startWith(string, start) {
+        if (!string)
+          return false;
+        return string.substr(0, start.length) === start;
+      }
+      withContent() {
+        return !!(this.consumer().sourcesContent && this.consumer().sourcesContent.length > 0);
+      }
+    };
+    module.exports = PreviousMap;
+    PreviousMap.default = PreviousMap;
+  }
+});
+
+// external/npm/node_modules/postcss/lib/input.js
+var require_input = __commonJS({
+  "external/npm/node_modules/postcss/lib/input.js"(exports, module) {
+    "use strict";
+    var { nanoid } = require_non_secure();
+    var { isAbsolute, resolve } = require_path();
+    var { SourceMapConsumer, SourceMapGenerator } = require_source_map();
+    var { fileURLToPath, pathToFileURL } = require_url();
+    var CssSyntaxError = require_css_syntax_error();
+    var PreviousMap = require_previous_map();
+    var terminalHighlight = require_terminal_highlight();
+    var fromOffsetCache = Symbol("fromOffsetCache");
+    var sourceMapAvailable = Boolean(SourceMapConsumer && SourceMapGenerator);
+    var pathAvailable = Boolean(resolve && isAbsolute);
+    var Input = class {
+      constructor(css, opts = {}) {
+        if (css === null || typeof css === "undefined" || typeof css === "object" && !css.toString) {
+          throw new Error(`PostCSS received ${css} instead of CSS string`);
+        }
+        this.css = css.toString();
+        if (this.css[0] === "\uFEFF" || this.css[0] === "\uFFFE") {
+          this.hasBOM = true;
+          this.css = this.css.slice(1);
+        } else {
+          this.hasBOM = false;
+        }
+        if (opts.from) {
+          if (!pathAvailable || /^\w+:\/\//.test(opts.from) || isAbsolute(opts.from)) {
+            this.file = opts.from;
+          } else {
+            this.file = resolve(opts.from);
           }
         }
-        let warning = new Warning(text, opts);
-        this.messages.push(warning);
-        return warning;
+        if (pathAvailable && sourceMapAvailable) {
+          let map = new PreviousMap(this.css, opts);
+          if (map.text) {
+            this.map = map;
+            let file = map.consumer().file;
+            if (!this.file && file)
+              this.file = this.mapResolve(file);
+          }
+        }
+        if (!this.file) {
+          this.id = "<input css " + nanoid(6) + ">";
+        }
+        if (this.map)
+          this.map.file = this.from;
       }
-      warnings() {
-        return this.messages.filter((i) => i.type === "warning");
+      error(message, line, column, opts = {}) {
+        let endColumn, endLine, result;
+        if (line && typeof line === "object") {
+          let start = line;
+          let end = column;
+          if (typeof start.offset === "number") {
+            let pos = this.fromOffset(start.offset);
+            line = pos.line;
+            column = pos.col;
+          } else {
+            line = start.line;
+            column = start.column;
+          }
+          if (typeof end.offset === "number") {
+            let pos = this.fromOffset(end.offset);
+            endLine = pos.line;
+            endColumn = pos.col;
+          } else {
+            endLine = end.line;
+            endColumn = end.column;
+          }
+        } else if (!column) {
+          let pos = this.fromOffset(line);
+          line = pos.line;
+          column = pos.col;
+        }
+        let origin = this.origin(line, column, endLine, endColumn);
+        if (origin) {
+          result = new CssSyntaxError(
+            message,
+            origin.endLine === void 0 ? origin.line : { column: origin.column, line: origin.line },
+            origin.endLine === void 0 ? origin.column : { column: origin.endColumn, line: origin.endLine },
+            origin.source,
+            origin.file,
+            opts.plugin
+          );
+        } else {
+          result = new CssSyntaxError(
+            message,
+            endLine === void 0 ? line : { column, line },
+            endLine === void 0 ? column : { column: endColumn, line: endLine },
+            this.css,
+            this.file,
+            opts.plugin
+          );
+        }
+        result.input = { column, endColumn, endLine, line, source: this.css };
+        if (this.file) {
+          if (pathToFileURL) {
+            result.input.url = pathToFileURL(this.file).toString();
+          }
+          result.input.file = this.file;
+        }
+        return result;
       }
-      get content() {
-        return this.css;
+      fromOffset(offset) {
+        let lastLine, lineToIndex;
+        if (!this[fromOffsetCache]) {
+          let lines = this.css.split("\n");
+          lineToIndex = new Array(lines.length);
+          let prevIndex = 0;
+          for (let i = 0, l = lines.length; i < l; i++) {
+            lineToIndex[i] = prevIndex;
+            prevIndex += lines[i].length + 1;
+          }
+          this[fromOffsetCache] = lineToIndex;
+        } else {
+          lineToIndex = this[fromOffsetCache];
+        }
+        lastLine = lineToIndex[lineToIndex.length - 1];
+        let min = 0;
+        if (offset >= lastLine) {
+          min = lineToIndex.length - 1;
+        } else {
+          let max = lineToIndex.length - 2;
+          let mid;
+          while (min < max) {
+            mid = min + (max - min >> 1);
+            if (offset < lineToIndex[mid]) {
+              max = mid - 1;
+            } else if (offset >= lineToIndex[mid + 1]) {
+              min = mid + 1;
+            } else {
+              min = mid;
+              break;
+            }
+          }
+        }
+        return {
+          col: offset - lineToIndex[min] + 1,
+          line: min + 1
+        };
+      }
+      mapResolve(file) {
+        if (/^\w+:\/\//.test(file)) {
+          return file;
+        }
+        return resolve(this.map.consumer().sourceRoot || this.map.root || ".", file);
+      }
+      origin(line, column, endLine, endColumn) {
+        if (!this.map)
+          return false;
+        let consumer = this.map.consumer();
+        let from = consumer.originalPositionFor({ column, line });
+        if (!from.source)
+          return false;
+        let to;
+        if (typeof endLine === "number") {
+          to = consumer.originalPositionFor({ column: endColumn, line: endLine });
+        }
+        let fromUrl;
+        if (isAbsolute(from.source)) {
+          fromUrl = pathToFileURL(from.source);
+        } else {
+          fromUrl = new URL(
+            from.source,
+            this.map.consumer().sourceRoot || pathToFileURL(this.map.mapFile)
+          );
+        }
+        let result = {
+          column: from.column,
+          endColumn: to && to.column,
+          endLine: to && to.line,
+          line: from.line,
+          url: fromUrl.toString()
+        };
+        if (fromUrl.protocol === "file:") {
+          if (fileURLToPath) {
+            result.file = fileURLToPath(fromUrl);
+          } else {
+            throw new Error(`file: protocol is not available in this PostCSS build`);
+          }
+        }
+        let source = consumer.sourceContentFor(from.source);
+        if (source)
+          result.source = source;
+        return result;
+      }
+      toJSON() {
+        let json = {};
+        for (let name of ["hasBOM", "css", "file", "id"]) {
+          if (this[name] != null) {
+            json[name] = this[name];
+          }
+        }
+        if (this.map) {
+          json.map = __spreadValues({}, this.map);
+          if (json.map.consumerCache) {
+            json.map.consumerCache = void 0;
+          }
+        }
+        return json;
+      }
+      get from() {
+        return this.file || this.id;
       }
     };
-    module.exports = Result;
-    Result.default = Result;
+    module.exports = Input;
+    Input.default = Input;
+    if (terminalHighlight && terminalHighlight.registerInput) {
+      terminalHighlight.registerInput(Input);
+    }
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/tokenize.js
+// external/npm/node_modules/postcss/lib/root.js
+var require_root = __commonJS({
+  "external/npm/node_modules/postcss/lib/root.js"(exports, module) {
+    "use strict";
+    var Container = require_container();
+    var LazyResult;
+    var Processor;
+    var Root = class extends Container {
+      constructor(defaults) {
+        super(defaults);
+        this.type = "root";
+        if (!this.nodes)
+          this.nodes = [];
+      }
+      normalize(child, sample, type) {
+        let nodes = super.normalize(child);
+        if (sample) {
+          if (type === "prepend") {
+            if (this.nodes.length > 1) {
+              sample.raws.before = this.nodes[1].raws.before;
+            } else {
+              delete sample.raws.before;
+            }
+          } else if (this.first !== sample) {
+            for (let node of nodes) {
+              node.raws.before = sample.raws.before;
+            }
+          }
+        }
+        return nodes;
+      }
+      removeChild(child, ignore) {
+        let index = this.index(child);
+        if (!ignore && index === 0 && this.nodes.length > 1) {
+          this.nodes[1].raws.before = this.nodes[index].raws.before;
+        }
+        return super.removeChild(child);
+      }
+      toResult(opts = {}) {
+        let lazy = new LazyResult(new Processor(), this, opts);
+        return lazy.stringify();
+      }
+    };
+    Root.registerLazyResult = (dependant) => {
+      LazyResult = dependant;
+    };
+    Root.registerProcessor = (dependant) => {
+      Processor = dependant;
+    };
+    module.exports = Root;
+    Root.default = Root;
+    Container.registerRoot(Root);
+  }
+});
+
+// external/npm/node_modules/postcss/lib/list.js
+var require_list = __commonJS({
+  "external/npm/node_modules/postcss/lib/list.js"(exports, module) {
+    "use strict";
+    var list = {
+      comma(string) {
+        return list.split(string, [","], true);
+      },
+      space(string) {
+        let spaces = [" ", "\n", "	"];
+        return list.split(string, spaces);
+      },
+      split(string, separators, last) {
+        let array = [];
+        let current = "";
+        let split = false;
+        let func = 0;
+        let inQuote = false;
+        let prevQuote = "";
+        let escape = false;
+        for (let letter of string) {
+          if (escape) {
+            escape = false;
+          } else if (letter === "\\") {
+            escape = true;
+          } else if (inQuote) {
+            if (letter === prevQuote) {
+              inQuote = false;
+            }
+          } else if (letter === '"' || letter === "'") {
+            inQuote = true;
+            prevQuote = letter;
+          } else if (letter === "(") {
+            func += 1;
+          } else if (letter === ")") {
+            if (func > 0)
+              func -= 1;
+          } else if (func === 0) {
+            if (separators.includes(letter))
+              split = true;
+          }
+          if (split) {
+            if (current !== "")
+              array.push(current.trim());
+            current = "";
+            split = false;
+          } else {
+            current += letter;
+          }
+        }
+        if (last || current !== "")
+          array.push(current.trim());
+        return array;
+      }
+    };
+    module.exports = list;
+    list.default = list;
+  }
+});
+
+// external/npm/node_modules/postcss/lib/rule.js
+var require_rule = __commonJS({
+  "external/npm/node_modules/postcss/lib/rule.js"(exports, module) {
+    "use strict";
+    var Container = require_container();
+    var list = require_list();
+    var Rule = class extends Container {
+      constructor(defaults) {
+        super(defaults);
+        this.type = "rule";
+        if (!this.nodes)
+          this.nodes = [];
+      }
+      get selectors() {
+        return list.comma(this.selector);
+      }
+      set selectors(values) {
+        let match = this.selector ? this.selector.match(/,\s*/) : null;
+        let sep = match ? match[0] : "," + this.raw("between", "beforeOpen");
+        this.selector = values.join(sep);
+      }
+    };
+    module.exports = Rule;
+    Rule.default = Rule;
+    Container.registerRule(Rule);
+  }
+});
+
+// external/npm/node_modules/postcss/lib/fromJSON.js
+var require_fromJSON = __commonJS({
+  "external/npm/node_modules/postcss/lib/fromJSON.js"(exports, module) {
+    "use strict";
+    var AtRule = require_at_rule();
+    var Comment = require_comment();
+    var Declaration = require_declaration();
+    var Input = require_input();
+    var PreviousMap = require_previous_map();
+    var Root = require_root();
+    var Rule = require_rule();
+    function fromJSON(json, inputs) {
+      if (Array.isArray(json))
+        return json.map((n) => fromJSON(n));
+      let _a = json, { inputs: ownInputs } = _a, defaults = __objRest(_a, ["inputs"]);
+      if (ownInputs) {
+        inputs = [];
+        for (let input of ownInputs) {
+          let inputHydrated = __spreadProps(__spreadValues({}, input), { __proto__: Input.prototype });
+          if (inputHydrated.map) {
+            inputHydrated.map = __spreadProps(__spreadValues({}, inputHydrated.map), {
+              __proto__: PreviousMap.prototype
+            });
+          }
+          inputs.push(inputHydrated);
+        }
+      }
+      if (defaults.nodes) {
+        defaults.nodes = json.nodes.map((n) => fromJSON(n, inputs));
+      }
+      if (defaults.source) {
+        let _b = defaults.source, { inputId } = _b, source = __objRest(_b, ["inputId"]);
+        defaults.source = source;
+        if (inputId != null) {
+          defaults.source.input = inputs[inputId];
+        }
+      }
+      if (defaults.type === "root") {
+        return new Root(defaults);
+      } else if (defaults.type === "decl") {
+        return new Declaration(defaults);
+      } else if (defaults.type === "rule") {
+        return new Rule(defaults);
+      } else if (defaults.type === "comment") {
+        return new Comment(defaults);
+      } else if (defaults.type === "atrule") {
+        return new AtRule(defaults);
+      } else {
+        throw new Error("Unknown node type: " + json.type);
+      }
+    }
+    module.exports = fromJSON;
+    fromJSON.default = fromJSON;
+  }
+});
+
+// external/npm/node_modules/postcss/lib/map-generator.js
+var require_map_generator = __commonJS({
+  "external/npm/node_modules/postcss/lib/map-generator.js"(exports, module) {
+    "use strict";
+    var { dirname, relative, resolve, sep } = require_path();
+    var { SourceMapConsumer, SourceMapGenerator } = require_source_map();
+    var { pathToFileURL } = require_url();
+    var Input = require_input();
+    var sourceMapAvailable = Boolean(SourceMapConsumer && SourceMapGenerator);
+    var pathAvailable = Boolean(dirname && resolve && relative && sep);
+    var MapGenerator = class {
+      constructor(stringify, root, opts, cssString) {
+        this.stringify = stringify;
+        this.mapOpts = opts.map || {};
+        this.root = root;
+        this.opts = opts;
+        this.css = cssString;
+        this.originalCSS = cssString;
+        this.usesFileUrls = !this.mapOpts.from && this.mapOpts.absolute;
+        this.memoizedFileURLs = /* @__PURE__ */ new Map();
+        this.memoizedPaths = /* @__PURE__ */ new Map();
+        this.memoizedURLs = /* @__PURE__ */ new Map();
+      }
+      addAnnotation() {
+        let content;
+        if (this.isInline()) {
+          content = "data:application/json;base64," + this.toBase64(this.map.toString());
+        } else if (typeof this.mapOpts.annotation === "string") {
+          content = this.mapOpts.annotation;
+        } else if (typeof this.mapOpts.annotation === "function") {
+          content = this.mapOpts.annotation(this.opts.to, this.root);
+        } else {
+          content = this.outputFile() + ".map";
+        }
+        let eol = "\n";
+        if (this.css.includes("\r\n"))
+          eol = "\r\n";
+        this.css += eol + "/*# sourceMappingURL=" + content + " */";
+      }
+      applyPrevMaps() {
+        for (let prev of this.previous()) {
+          let from = this.toUrl(this.path(prev.file));
+          let root = prev.root || dirname(prev.file);
+          let map;
+          if (this.mapOpts.sourcesContent === false) {
+            map = new SourceMapConsumer(prev.text);
+            if (map.sourcesContent) {
+              map.sourcesContent = null;
+            }
+          } else {
+            map = prev.consumer();
+          }
+          this.map.applySourceMap(map, from, this.toUrl(this.path(root)));
+        }
+      }
+      clearAnnotation() {
+        if (this.mapOpts.annotation === false)
+          return;
+        if (this.root) {
+          let node;
+          for (let i = this.root.nodes.length - 1; i >= 0; i--) {
+            node = this.root.nodes[i];
+            if (node.type !== "comment")
+              continue;
+            if (node.text.startsWith("# sourceMappingURL=")) {
+              this.root.removeChild(i);
+            }
+          }
+        } else if (this.css) {
+          this.css = this.css.replace(/\n*\/\*#[\S\s]*?\*\/$/gm, "");
+        }
+      }
+      generate() {
+        this.clearAnnotation();
+        if (pathAvailable && sourceMapAvailable && this.isMap()) {
+          return this.generateMap();
+        } else {
+          let result = "";
+          this.stringify(this.root, (i) => {
+            result += i;
+          });
+          return [result];
+        }
+      }
+      generateMap() {
+        if (this.root) {
+          this.generateString();
+        } else if (this.previous().length === 1) {
+          let prev = this.previous()[0].consumer();
+          prev.file = this.outputFile();
+          this.map = SourceMapGenerator.fromSourceMap(prev, {
+            ignoreInvalidMapping: true
+          });
+        } else {
+          this.map = new SourceMapGenerator({
+            file: this.outputFile(),
+            ignoreInvalidMapping: true
+          });
+          this.map.addMapping({
+            generated: { column: 0, line: 1 },
+            original: { column: 0, line: 1 },
+            source: this.opts.from ? this.toUrl(this.path(this.opts.from)) : "<no source>"
+          });
+        }
+        if (this.isSourcesContent())
+          this.setSourcesContent();
+        if (this.root && this.previous().length > 0)
+          this.applyPrevMaps();
+        if (this.isAnnotation())
+          this.addAnnotation();
+        if (this.isInline()) {
+          return [this.css];
+        } else {
+          return [this.css, this.map];
+        }
+      }
+      generateString() {
+        this.css = "";
+        this.map = new SourceMapGenerator({
+          file: this.outputFile(),
+          ignoreInvalidMapping: true
+        });
+        let line = 1;
+        let column = 1;
+        let noSource = "<no source>";
+        let mapping = {
+          generated: { column: 0, line: 0 },
+          original: { column: 0, line: 0 },
+          source: ""
+        };
+        let last, lines;
+        this.stringify(this.root, (str, node, type) => {
+          this.css += str;
+          if (node && type !== "end") {
+            mapping.generated.line = line;
+            mapping.generated.column = column - 1;
+            if (node.source && node.source.start) {
+              mapping.source = this.sourcePath(node);
+              mapping.original.line = node.source.start.line;
+              mapping.original.column = node.source.start.column - 1;
+              this.map.addMapping(mapping);
+            } else {
+              mapping.source = noSource;
+              mapping.original.line = 1;
+              mapping.original.column = 0;
+              this.map.addMapping(mapping);
+            }
+          }
+          lines = str.match(/\n/g);
+          if (lines) {
+            line += lines.length;
+            last = str.lastIndexOf("\n");
+            column = str.length - last;
+          } else {
+            column += str.length;
+          }
+          if (node && type !== "start") {
+            let p = node.parent || { raws: {} };
+            let childless = node.type === "decl" || node.type === "atrule" && !node.nodes;
+            if (!childless || node !== p.last || p.raws.semicolon) {
+              if (node.source && node.source.end) {
+                mapping.source = this.sourcePath(node);
+                mapping.original.line = node.source.end.line;
+                mapping.original.column = node.source.end.column - 1;
+                mapping.generated.line = line;
+                mapping.generated.column = column - 2;
+                this.map.addMapping(mapping);
+              } else {
+                mapping.source = noSource;
+                mapping.original.line = 1;
+                mapping.original.column = 0;
+                mapping.generated.line = line;
+                mapping.generated.column = column - 1;
+                this.map.addMapping(mapping);
+              }
+            }
+          }
+        });
+      }
+      isAnnotation() {
+        if (this.isInline()) {
+          return true;
+        }
+        if (typeof this.mapOpts.annotation !== "undefined") {
+          return this.mapOpts.annotation;
+        }
+        if (this.previous().length) {
+          return this.previous().some((i) => i.annotation);
+        }
+        return true;
+      }
+      isInline() {
+        if (typeof this.mapOpts.inline !== "undefined") {
+          return this.mapOpts.inline;
+        }
+        let annotation = this.mapOpts.annotation;
+        if (typeof annotation !== "undefined" && annotation !== true) {
+          return false;
+        }
+        if (this.previous().length) {
+          return this.previous().some((i) => i.inline);
+        }
+        return true;
+      }
+      isMap() {
+        if (typeof this.opts.map !== "undefined") {
+          return !!this.opts.map;
+        }
+        return this.previous().length > 0;
+      }
+      isSourcesContent() {
+        if (typeof this.mapOpts.sourcesContent !== "undefined") {
+          return this.mapOpts.sourcesContent;
+        }
+        if (this.previous().length) {
+          return this.previous().some((i) => i.withContent());
+        }
+        return true;
+      }
+      outputFile() {
+        if (this.opts.to) {
+          return this.path(this.opts.to);
+        } else if (this.opts.from) {
+          return this.path(this.opts.from);
+        } else {
+          return "to.css";
+        }
+      }
+      path(file) {
+        if (this.mapOpts.absolute)
+          return file;
+        if (file.charCodeAt(0) === 60)
+          return file;
+        if (/^\w+:\/\//.test(file))
+          return file;
+        let cached = this.memoizedPaths.get(file);
+        if (cached)
+          return cached;
+        let from = this.opts.to ? dirname(this.opts.to) : ".";
+        if (typeof this.mapOpts.annotation === "string") {
+          from = dirname(resolve(from, this.mapOpts.annotation));
+        }
+        let path = relative(from, file);
+        this.memoizedPaths.set(file, path);
+        return path;
+      }
+      previous() {
+        if (!this.previousMaps) {
+          this.previousMaps = [];
+          if (this.root) {
+            this.root.walk((node) => {
+              if (node.source && node.source.input.map) {
+                let map = node.source.input.map;
+                if (!this.previousMaps.includes(map)) {
+                  this.previousMaps.push(map);
+                }
+              }
+            });
+          } else {
+            let input = new Input(this.originalCSS, this.opts);
+            if (input.map)
+              this.previousMaps.push(input.map);
+          }
+        }
+        return this.previousMaps;
+      }
+      setSourcesContent() {
+        let already = {};
+        if (this.root) {
+          this.root.walk((node) => {
+            if (node.source) {
+              let from = node.source.input.from;
+              if (from && !already[from]) {
+                already[from] = true;
+                let fromUrl = this.usesFileUrls ? this.toFileUrl(from) : this.toUrl(this.path(from));
+                this.map.setSourceContent(fromUrl, node.source.input.css);
+              }
+            }
+          });
+        } else if (this.css) {
+          let from = this.opts.from ? this.toUrl(this.path(this.opts.from)) : "<no source>";
+          this.map.setSourceContent(from, this.css);
+        }
+      }
+      sourcePath(node) {
+        if (this.mapOpts.from) {
+          return this.toUrl(this.mapOpts.from);
+        } else if (this.usesFileUrls) {
+          return this.toFileUrl(node.source.input.from);
+        } else {
+          return this.toUrl(this.path(node.source.input.from));
+        }
+      }
+      toBase64(str) {
+        if (Buffer) {
+          return Buffer.from(str).toString("base64");
+        } else {
+          return window.btoa(unescape(encodeURIComponent(str)));
+        }
+      }
+      toFileUrl(path) {
+        let cached = this.memoizedFileURLs.get(path);
+        if (cached)
+          return cached;
+        if (pathToFileURL) {
+          let fileURL = pathToFileURL(path).toString();
+          this.memoizedFileURLs.set(path, fileURL);
+          return fileURL;
+        } else {
+          throw new Error(
+            "`map.absolute` option is not available in this PostCSS build"
+          );
+        }
+      }
+      toUrl(path) {
+        let cached = this.memoizedURLs.get(path);
+        if (cached)
+          return cached;
+        if (sep === "\\") {
+          path = path.replace(/\\/g, "/");
+        }
+        let url = encodeURI(path).replace(/[#?]/g, encodeURIComponent);
+        this.memoizedURLs.set(path, url);
+        return url;
+      }
+    };
+    module.exports = MapGenerator;
+  }
+});
+
+// external/npm/node_modules/postcss/lib/tokenize.js
 var require_tokenize = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/tokenize.js"(exports, module) {
+  "external/npm/node_modules/postcss/lib/tokenize.js"(exports, module) {
     "use strict";
     var SINGLE_QUOTE = "'".charCodeAt(0);
     var DOUBLE_QUOTE = '"'.charCodeAt(0);
@@ -8407,8 +8554,8 @@ var require_tokenize = __commonJS({
     module.exports = function tokenizer(input, options = {}) {
       let css = input.css.valueOf();
       let ignore = options.ignoreErrors;
-      let code, next, quote, content, escape;
-      let escaped, escapePos, prev, n, currentToken;
+      let code, content, escape, next, quote;
+      let currentToken, escaped, escapePos, n, prev;
       let length = css.length;
       let pos = 0;
       let buffer = [];
@@ -8594,186 +8741,16 @@ var require_tokenize = __commonJS({
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/at-rule.js
-var require_at_rule = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/at-rule.js"(exports, module) {
-    "use strict";
-    var Container = require_container();
-    var AtRule = class extends Container {
-      constructor(defaults) {
-        super(defaults);
-        this.type = "atrule";
-      }
-      append(...children) {
-        if (!this.proxyOf.nodes)
-          this.nodes = [];
-        return super.append(...children);
-      }
-      prepend(...children) {
-        if (!this.proxyOf.nodes)
-          this.nodes = [];
-        return super.prepend(...children);
-      }
-    };
-    module.exports = AtRule;
-    AtRule.default = AtRule;
-    Container.registerAtRule(AtRule);
-  }
-});
-
-// external/npm/node_modules/critters/node_modules/postcss/lib/root.js
-var require_root = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/root.js"(exports, module) {
-    "use strict";
-    var Container = require_container();
-    var LazyResult;
-    var Processor;
-    var Root = class extends Container {
-      constructor(defaults) {
-        super(defaults);
-        this.type = "root";
-        if (!this.nodes)
-          this.nodes = [];
-      }
-      normalize(child, sample, type) {
-        let nodes = super.normalize(child);
-        if (sample) {
-          if (type === "prepend") {
-            if (this.nodes.length > 1) {
-              sample.raws.before = this.nodes[1].raws.before;
-            } else {
-              delete sample.raws.before;
-            }
-          } else if (this.first !== sample) {
-            for (let node of nodes) {
-              node.raws.before = sample.raws.before;
-            }
-          }
-        }
-        return nodes;
-      }
-      removeChild(child, ignore) {
-        let index = this.index(child);
-        if (!ignore && index === 0 && this.nodes.length > 1) {
-          this.nodes[1].raws.before = this.nodes[index].raws.before;
-        }
-        return super.removeChild(child);
-      }
-      toResult(opts = {}) {
-        let lazy = new LazyResult(new Processor(), this, opts);
-        return lazy.stringify();
-      }
-    };
-    Root.registerLazyResult = (dependant) => {
-      LazyResult = dependant;
-    };
-    Root.registerProcessor = (dependant) => {
-      Processor = dependant;
-    };
-    module.exports = Root;
-    Root.default = Root;
-    Container.registerRoot(Root);
-  }
-});
-
-// external/npm/node_modules/critters/node_modules/postcss/lib/list.js
-var require_list = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/list.js"(exports, module) {
-    "use strict";
-    var list = {
-      comma(string) {
-        return list.split(string, [","], true);
-      },
-      space(string) {
-        let spaces = [" ", "\n", "	"];
-        return list.split(string, spaces);
-      },
-      split(string, separators, last) {
-        let array = [];
-        let current = "";
-        let split = false;
-        let func = 0;
-        let inQuote = false;
-        let prevQuote = "";
-        let escape = false;
-        for (let letter of string) {
-          if (escape) {
-            escape = false;
-          } else if (letter === "\\") {
-            escape = true;
-          } else if (inQuote) {
-            if (letter === prevQuote) {
-              inQuote = false;
-            }
-          } else if (letter === '"' || letter === "'") {
-            inQuote = true;
-            prevQuote = letter;
-          } else if (letter === "(") {
-            func += 1;
-          } else if (letter === ")") {
-            if (func > 0)
-              func -= 1;
-          } else if (func === 0) {
-            if (separators.includes(letter))
-              split = true;
-          }
-          if (split) {
-            if (current !== "")
-              array.push(current.trim());
-            current = "";
-            split = false;
-          } else {
-            current += letter;
-          }
-        }
-        if (last || current !== "")
-          array.push(current.trim());
-        return array;
-      }
-    };
-    module.exports = list;
-    list.default = list;
-  }
-});
-
-// external/npm/node_modules/critters/node_modules/postcss/lib/rule.js
-var require_rule = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/rule.js"(exports, module) {
-    "use strict";
-    var Container = require_container();
-    var list = require_list();
-    var Rule = class extends Container {
-      constructor(defaults) {
-        super(defaults);
-        this.type = "rule";
-        if (!this.nodes)
-          this.nodes = [];
-      }
-      get selectors() {
-        return list.comma(this.selector);
-      }
-      set selectors(values) {
-        let match = this.selector ? this.selector.match(/,\s*/) : null;
-        let sep = match ? match[0] : "," + this.raw("between", "beforeOpen");
-        this.selector = values.join(sep);
-      }
-    };
-    module.exports = Rule;
-    Rule.default = Rule;
-    Container.registerRule(Rule);
-  }
-});
-
-// external/npm/node_modules/critters/node_modules/postcss/lib/parser.js
+// external/npm/node_modules/postcss/lib/parser.js
 var require_parser = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/parser.js"(exports, module) {
+  "external/npm/node_modules/postcss/lib/parser.js"(exports, module) {
     "use strict";
-    var Declaration = require_declaration();
-    var tokenizer = require_tokenize();
-    var Comment = require_comment();
     var AtRule = require_at_rule();
+    var Comment = require_comment();
+    var Declaration = require_declaration();
     var Root = require_root();
     var Rule = require_rule();
+    var tokenizer = require_tokenize();
     var SAFE_COMMENT_NEIGHBOR = {
       empty: true,
       space: true
@@ -8895,7 +8872,7 @@ var require_parser = __commonJS({
       }
       colon(tokens) {
         let brackets = 0;
-        let token, type, prev;
+        let prev, token, type;
         for (let [i, element] of tokens.entries()) {
           token = element;
           type = token[0];
@@ -9005,12 +8982,12 @@ var require_parser = __commonJS({
             let str = "";
             for (let j = i; j > 0; j--) {
               let type = cache[j][0];
-              if (str.trim().indexOf("!") === 0 && type !== "space") {
+              if (str.trim().startsWith("!") && type !== "space") {
                 break;
               }
               str = cache.pop()[1] + str;
             }
-            if (str.trim().indexOf("!") === 0) {
+            if (str.trim().startsWith("!")) {
               node.important = true;
               node.raws.important = str;
               tokens = cache;
@@ -9311,13 +9288,13 @@ var require_parser = __commonJS({
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/parse.js
+// external/npm/node_modules/postcss/lib/parse.js
 var require_parse3 = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/parse.js"(exports, module) {
+  "external/npm/node_modules/postcss/lib/parse.js"(exports, module) {
     "use strict";
     var Container = require_container();
-    var Parser = require_parser();
     var Input = require_input();
+    var Parser = require_parser();
     function parse(css, opts) {
       let input = new Input(css, opts);
       let parser = new Parser(input);
@@ -9345,19 +9322,111 @@ var require_parse3 = __commonJS({
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/lazy-result.js
-var require_lazy_result = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/lazy-result.js"(exports, module) {
+// external/npm/node_modules/postcss/lib/warning.js
+var require_warning = __commonJS({
+  "external/npm/node_modules/postcss/lib/warning.js"(exports, module) {
     "use strict";
-    var { isClean, my } = require_symbols();
-    var MapGenerator = require_map_generator();
-    var stringify = require_stringify3();
+    var Warning = class {
+      constructor(text, opts = {}) {
+        this.type = "warning";
+        this.text = text;
+        if (opts.node && opts.node.source) {
+          let range = opts.node.rangeBy(opts);
+          this.line = range.start.line;
+          this.column = range.start.column;
+          this.endLine = range.end.line;
+          this.endColumn = range.end.column;
+        }
+        for (let opt in opts)
+          this[opt] = opts[opt];
+      }
+      toString() {
+        if (this.node) {
+          return this.node.error(this.text, {
+            index: this.index,
+            plugin: this.plugin,
+            word: this.word
+          }).message;
+        }
+        if (this.plugin) {
+          return this.plugin + ": " + this.text;
+        }
+        return this.text;
+      }
+    };
+    module.exports = Warning;
+    Warning.default = Warning;
+  }
+});
+
+// external/npm/node_modules/postcss/lib/result.js
+var require_result = __commonJS({
+  "external/npm/node_modules/postcss/lib/result.js"(exports, module) {
+    "use strict";
+    var Warning = require_warning();
+    var Result = class {
+      constructor(processor, root, opts) {
+        this.processor = processor;
+        this.messages = [];
+        this.root = root;
+        this.opts = opts;
+        this.css = void 0;
+        this.map = void 0;
+      }
+      toString() {
+        return this.css;
+      }
+      warn(text, opts = {}) {
+        if (!opts.plugin) {
+          if (this.lastPlugin && this.lastPlugin.postcssPlugin) {
+            opts.plugin = this.lastPlugin.postcssPlugin;
+          }
+        }
+        let warning = new Warning(text, opts);
+        this.messages.push(warning);
+        return warning;
+      }
+      warnings() {
+        return this.messages.filter((i) => i.type === "warning");
+      }
+      get content() {
+        return this.css;
+      }
+    };
+    module.exports = Result;
+    Result.default = Result;
+  }
+});
+
+// external/npm/node_modules/postcss/lib/warn-once.js
+var require_warn_once = __commonJS({
+  "external/npm/node_modules/postcss/lib/warn-once.js"(exports, module) {
+    "use strict";
+    var printed = {};
+    module.exports = function warnOnce(message) {
+      if (printed[message])
+        return;
+      printed[message] = true;
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn(message);
+      }
+    };
+  }
+});
+
+// external/npm/node_modules/postcss/lib/lazy-result.js
+var require_lazy_result = __commonJS({
+  "external/npm/node_modules/postcss/lib/lazy-result.js"(exports, module) {
+    "use strict";
     var Container = require_container();
     var Document = require_document();
-    var warnOnce = require_warn_once();
-    var Result = require_result();
+    var MapGenerator = require_map_generator();
     var parse = require_parse3();
+    var Result = require_result();
     var Root = require_root();
+    var stringify = require_stringify3();
+    var { isClean, my } = require_symbols();
+    var warnOnce = require_warn_once();
     var TYPE_TO_CLASS_NAME = {
       atrule: "AtRule",
       comment: "Comment",
@@ -9841,15 +9910,15 @@ var require_lazy_result = __commonJS({
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/no-work-result.js
+// external/npm/node_modules/postcss/lib/no-work-result.js
 var require_no_work_result = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/no-work-result.js"(exports, module) {
+  "external/npm/node_modules/postcss/lib/no-work-result.js"(exports, module) {
     "use strict";
     var MapGenerator = require_map_generator();
-    var stringify = require_stringify3();
-    var warnOnce = require_warn_once();
     var parse = require_parse3();
     var Result = require_result();
+    var stringify = require_stringify3();
+    var warnOnce = require_warn_once();
     var NoWorkResult = class {
       constructor(processor, css, opts) {
         css = css.toString();
@@ -9959,17 +10028,17 @@ var require_no_work_result = __commonJS({
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/processor.js
+// external/npm/node_modules/postcss/lib/processor.js
 var require_processor = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/processor.js"(exports, module) {
+  "external/npm/node_modules/postcss/lib/processor.js"(exports, module) {
     "use strict";
-    var NoWorkResult = require_no_work_result();
-    var LazyResult = require_lazy_result();
     var Document = require_document();
+    var LazyResult = require_lazy_result();
+    var NoWorkResult = require_no_work_result();
     var Root = require_root();
     var Processor = class {
       constructor(plugins = []) {
-        this.version = "8.4.41";
+        this.version = "8.4.44";
         this.plugins = this.normalize(plugins);
       }
       normalize(plugins) {
@@ -10017,84 +10086,28 @@ var require_processor = __commonJS({
   }
 });
 
-// external/npm/node_modules/critters/node_modules/postcss/lib/fromJSON.js
-var require_fromJSON = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/fromJSON.js"(exports, module) {
-    "use strict";
-    var Declaration = require_declaration();
-    var PreviousMap = require_previous_map();
-    var Comment = require_comment();
-    var AtRule = require_at_rule();
-    var Input = require_input();
-    var Root = require_root();
-    var Rule = require_rule();
-    function fromJSON(json, inputs) {
-      if (Array.isArray(json))
-        return json.map((n) => fromJSON(n));
-      let _a = json, { inputs: ownInputs } = _a, defaults = __objRest(_a, ["inputs"]);
-      if (ownInputs) {
-        inputs = [];
-        for (let input of ownInputs) {
-          let inputHydrated = __spreadProps(__spreadValues({}, input), { __proto__: Input.prototype });
-          if (inputHydrated.map) {
-            inputHydrated.map = __spreadProps(__spreadValues({}, inputHydrated.map), {
-              __proto__: PreviousMap.prototype
-            });
-          }
-          inputs.push(inputHydrated);
-        }
-      }
-      if (defaults.nodes) {
-        defaults.nodes = json.nodes.map((n) => fromJSON(n, inputs));
-      }
-      if (defaults.source) {
-        let _b = defaults.source, { inputId } = _b, source = __objRest(_b, ["inputId"]);
-        defaults.source = source;
-        if (inputId != null) {
-          defaults.source.input = inputs[inputId];
-        }
-      }
-      if (defaults.type === "root") {
-        return new Root(defaults);
-      } else if (defaults.type === "decl") {
-        return new Declaration(defaults);
-      } else if (defaults.type === "rule") {
-        return new Rule(defaults);
-      } else if (defaults.type === "comment") {
-        return new Comment(defaults);
-      } else if (defaults.type === "atrule") {
-        return new AtRule(defaults);
-      } else {
-        throw new Error("Unknown node type: " + json.type);
-      }
-    }
-    module.exports = fromJSON;
-    fromJSON.default = fromJSON;
-  }
-});
-
-// external/npm/node_modules/critters/node_modules/postcss/lib/postcss.js
+// external/npm/node_modules/postcss/lib/postcss.js
 var require_postcss = __commonJS({
-  "external/npm/node_modules/critters/node_modules/postcss/lib/postcss.js"(exports, module) {
+  "external/npm/node_modules/postcss/lib/postcss.js"(exports, module) {
     "use strict";
+    var AtRule = require_at_rule();
+    var Comment = require_comment();
+    var Container = require_container();
     var CssSyntaxError = require_css_syntax_error();
     var Declaration = require_declaration();
-    var LazyResult = require_lazy_result();
-    var Container = require_container();
-    var Processor = require_processor();
-    var stringify = require_stringify3();
-    var fromJSON = require_fromJSON();
     var Document = require_document();
-    var Warning = require_warning();
-    var Comment = require_comment();
-    var AtRule = require_at_rule();
-    var Result = require_result();
+    var fromJSON = require_fromJSON();
     var Input = require_input();
-    var parse = require_parse3();
+    var LazyResult = require_lazy_result();
     var list = require_list();
-    var Rule = require_rule();
-    var Root = require_root();
     var Node = require_node2();
+    var parse = require_parse3();
+    var Processor = require_processor();
+    var Result = require_result();
+    var Root = require_root();
+    var Rule = require_rule();
+    var stringify = require_stringify3();
+    var Warning = require_warning();
     function postcss(...plugins) {
       if (plugins.length === 1 && Array.isArray(plugins[0])) {
         plugins = plugins[0];

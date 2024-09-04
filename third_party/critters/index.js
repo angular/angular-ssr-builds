@@ -6324,15 +6324,15 @@ var require_picocolors_browser = __commonJS({
   }
 });
 
-// (disabled):external/npm/node_modules/postcss/lib/terminal-highlight
+// (disabled):external/npm/node_modules/critters/node_modules/postcss/lib/terminal-highlight
 var require_terminal_highlight = __commonJS({
-  "(disabled):external/npm/node_modules/postcss/lib/terminal-highlight"() {
+  "(disabled):external/npm/node_modules/critters/node_modules/postcss/lib/terminal-highlight"() {
   }
 });
 
-// external/npm/node_modules/postcss/lib/css-syntax-error.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/css-syntax-error.js
 var require_css_syntax_error = __commonJS({
-  "external/npm/node_modules/postcss/lib/css-syntax-error.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/css-syntax-error.js"(exports, module) {
     "use strict";
     var pico = require_picocolors_browser();
     var terminalHighlight = require_terminal_highlight();
@@ -6429,9 +6429,9 @@ var require_css_syntax_error = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/stringifier.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/stringifier.js
 var require_stringifier = __commonJS({
-  "external/npm/node_modules/postcss/lib/stringifier.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/stringifier.js"(exports, module) {
     "use strict";
     var DEFAULT_RAW = {
       after: "\n",
@@ -6751,9 +6751,9 @@ var require_stringifier = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/stringify.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/stringify.js
 var require_stringify3 = __commonJS({
-  "external/npm/node_modules/postcss/lib/stringify.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/stringify.js"(exports, module) {
     "use strict";
     var Stringifier = require_stringifier();
     function stringify(node, builder) {
@@ -6765,18 +6765,18 @@ var require_stringify3 = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/symbols.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/symbols.js
 var require_symbols = __commonJS({
-  "external/npm/node_modules/postcss/lib/symbols.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/symbols.js"(exports, module) {
     "use strict";
     module.exports.isClean = Symbol("isClean");
     module.exports.my = Symbol("my");
   }
 });
 
-// external/npm/node_modules/postcss/lib/node.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/node.js
 var require_node2 = __commonJS({
-  "external/npm/node_modules/postcss/lib/node.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/node.js"(exports, module) {
     "use strict";
     var CssSyntaxError = require_css_syntax_error();
     var Stringifier = require_stringifier();
@@ -7114,9 +7114,9 @@ var require_node2 = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/comment.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/comment.js
 var require_comment = __commonJS({
-  "external/npm/node_modules/postcss/lib/comment.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/comment.js"(exports, module) {
     "use strict";
     var Node = require_node2();
     var Comment = class extends Node {
@@ -7130,9 +7130,9 @@ var require_comment = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/declaration.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/declaration.js
 var require_declaration = __commonJS({
-  "external/npm/node_modules/postcss/lib/declaration.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/declaration.js"(exports, module) {
     "use strict";
     var Node = require_node2();
     var Declaration = class extends Node {
@@ -7152,9 +7152,9 @@ var require_declaration = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/container.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/container.js
 var require_container = __commonJS({
-  "external/npm/node_modules/postcss/lib/container.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/container.js"(exports, module) {
     "use strict";
     var Comment = require_comment();
     var Declaration = require_declaration();
@@ -7559,9 +7559,9 @@ var require_container = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/at-rule.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/at-rule.js
 var require_at_rule = __commonJS({
-  "external/npm/node_modules/postcss/lib/at-rule.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/at-rule.js"(exports, module) {
     "use strict";
     var Container = require_container();
     var AtRule = class extends Container {
@@ -7586,9 +7586,9 @@ var require_at_rule = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/document.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/document.js
 var require_document = __commonJS({
-  "external/npm/node_modules/postcss/lib/document.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/document.js"(exports, module) {
     "use strict";
     var Container = require_container();
     var LazyResult;
@@ -7654,9 +7654,9 @@ var require_url = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/previous-map.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/previous-map.js
 var require_previous_map = __commonJS({
-  "external/npm/node_modules/postcss/lib/previous-map.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/previous-map.js"(exports, module) {
     "use strict";
     var { existsSync, readFileSync } = require_fs2();
     var { dirname, join } = require_path();
@@ -7782,9 +7782,9 @@ var require_previous_map = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/input.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/input.js
 var require_input = __commonJS({
-  "external/npm/node_modules/postcss/lib/input.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/input.js"(exports, module) {
     "use strict";
     var { nanoid } = require_non_secure();
     var { isAbsolute, resolve } = require_path();
@@ -7995,9 +7995,9 @@ var require_input = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/root.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/root.js
 var require_root = __commonJS({
-  "external/npm/node_modules/postcss/lib/root.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/root.js"(exports, module) {
     "use strict";
     var Container = require_container();
     var LazyResult;
@@ -8050,9 +8050,9 @@ var require_root = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/list.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/list.js
 var require_list = __commonJS({
-  "external/npm/node_modules/postcss/lib/list.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/list.js"(exports, module) {
     "use strict";
     var list = {
       comma(string) {
@@ -8110,9 +8110,9 @@ var require_list = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/rule.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/rule.js
 var require_rule = __commonJS({
-  "external/npm/node_modules/postcss/lib/rule.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/rule.js"(exports, module) {
     "use strict";
     var Container = require_container();
     var list = require_list();
@@ -8138,9 +8138,9 @@ var require_rule = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/fromJSON.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/fromJSON.js
 var require_fromJSON = __commonJS({
-  "external/npm/node_modules/postcss/lib/fromJSON.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/fromJSON.js"(exports, module) {
     "use strict";
     var AtRule = require_at_rule();
     var Comment = require_comment();
@@ -8194,9 +8194,9 @@ var require_fromJSON = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/map-generator.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/map-generator.js
 var require_map_generator = __commonJS({
-  "external/npm/node_modules/postcss/lib/map-generator.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/map-generator.js"(exports, module) {
     "use strict";
     var { dirname, relative, resolve, sep } = require_path();
     var { SourceMapConsumer, SourceMapGenerator } = require_source_map();
@@ -8524,9 +8524,9 @@ var require_map_generator = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/tokenize.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/tokenize.js
 var require_tokenize = __commonJS({
-  "external/npm/node_modules/postcss/lib/tokenize.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/tokenize.js"(exports, module) {
     "use strict";
     var SINGLE_QUOTE = "'".charCodeAt(0);
     var DOUBLE_QUOTE = '"'.charCodeAt(0);
@@ -8741,9 +8741,9 @@ var require_tokenize = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/parser.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/parser.js
 var require_parser = __commonJS({
-  "external/npm/node_modules/postcss/lib/parser.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/parser.js"(exports, module) {
     "use strict";
     var AtRule = require_at_rule();
     var Comment = require_comment();
@@ -9288,9 +9288,9 @@ var require_parser = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/parse.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/parse.js
 var require_parse3 = __commonJS({
-  "external/npm/node_modules/postcss/lib/parse.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/parse.js"(exports, module) {
     "use strict";
     var Container = require_container();
     var Input = require_input();
@@ -9322,9 +9322,9 @@ var require_parse3 = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/warning.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/warning.js
 var require_warning = __commonJS({
-  "external/npm/node_modules/postcss/lib/warning.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/warning.js"(exports, module) {
     "use strict";
     var Warning = class {
       constructor(text, opts = {}) {
@@ -9359,9 +9359,9 @@ var require_warning = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/result.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/result.js
 var require_result = __commonJS({
-  "external/npm/node_modules/postcss/lib/result.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/result.js"(exports, module) {
     "use strict";
     var Warning = require_warning();
     var Result = class {
@@ -9398,9 +9398,9 @@ var require_result = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/warn-once.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/warn-once.js
 var require_warn_once = __commonJS({
-  "external/npm/node_modules/postcss/lib/warn-once.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/warn-once.js"(exports, module) {
     "use strict";
     var printed = {};
     module.exports = function warnOnce(message) {
@@ -9414,9 +9414,9 @@ var require_warn_once = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/lazy-result.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/lazy-result.js
 var require_lazy_result = __commonJS({
-  "external/npm/node_modules/postcss/lib/lazy-result.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/lazy-result.js"(exports, module) {
     "use strict";
     var Container = require_container();
     var Document = require_document();
@@ -9910,9 +9910,9 @@ var require_lazy_result = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/no-work-result.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/no-work-result.js
 var require_no_work_result = __commonJS({
-  "external/npm/node_modules/postcss/lib/no-work-result.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/no-work-result.js"(exports, module) {
     "use strict";
     var MapGenerator = require_map_generator();
     var parse = require_parse3();
@@ -10028,9 +10028,9 @@ var require_no_work_result = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/processor.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/processor.js
 var require_processor = __commonJS({
-  "external/npm/node_modules/postcss/lib/processor.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/processor.js"(exports, module) {
     "use strict";
     var Document = require_document();
     var LazyResult = require_lazy_result();
@@ -10086,9 +10086,9 @@ var require_processor = __commonJS({
   }
 });
 
-// external/npm/node_modules/postcss/lib/postcss.js
+// external/npm/node_modules/critters/node_modules/postcss/lib/postcss.js
 var require_postcss = __commonJS({
-  "external/npm/node_modules/postcss/lib/postcss.js"(exports, module) {
+  "external/npm/node_modules/critters/node_modules/postcss/lib/postcss.js"(exports, module) {
     "use strict";
     var AtRule = require_at_rule();
     var Comment = require_comment();

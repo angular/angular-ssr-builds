@@ -1,5 +1,5 @@
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
-import { ɵConsole as _Console, ɵresetCompiledComponents as _resetCompiledComponents, createPlatformFactory, platformCore, ApplicationRef, ɵwhenStable as _whenStable, Compiler, InjectionToken } from '@angular/core';
+import { ɵConsole as _Console, createPlatformFactory, platformCore, ApplicationRef, ɵwhenStable as _whenStable, Compiler, InjectionToken, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
 import { renderModule, renderApplication, INITIAL_CONFIG, ɵINTERNAL_SERVER_PLATFORM_PROVIDERS as _INTERNAL_SERVER_PLATFORM_PROVIDERS, ɵSERVER_CONTEXT as _SERVER_CONTEXT } from '@angular/platform-server';
 import { ɵloadChildren as _loadChildren, Router } from '@angular/router';
 import Critters from '../third_party/critters/index.js';
@@ -504,12 +504,6 @@ function resolveRedirectTo(routePath, redirectTo) {
  * @returns A promise that resolves to an object of type `AngularRouterConfigResult`.
  */
 async function getRoutesFromAngularRouterConfig(bootstrap, document, url) {
-    if (typeof ngDevMode === 'undefined' || ngDevMode) {
-        // Need to clean up GENERATED_COMP_IDS map in `@angular/core`.
-        // Otherwise an incorrect component ID generation collision detected warning will be displayed in development.
-        // See: https://github.com/angular/angular-cli/issues/25924
-        _resetCompiledComponents();
-    }
     const { protocol, host } = url;
     // Create and initialize the Angular platform for server-side rendering.
     const platformRef = createPlatformFactory(platformCore, 'server', [
@@ -1030,12 +1024,6 @@ class AngularServerApp {
                 useValue: responseInit,
             });
         }
-        if (typeof ngDevMode === 'undefined' || ngDevMode) {
-            // Need to clean up GENERATED_COMP_IDS map in `@angular/core`.
-            // Otherwise an incorrect component ID generation collision detected warning will be displayed in development.
-            // See: https://github.com/angular/angular-cli/issues/25924
-            _resetCompiledComponents();
-        }
         const { manifest, hooks, assets } = this;
         let html = await assets.getIndexServerHtml();
         // Skip extra microtask if there are no pre hooks.
@@ -1072,6 +1060,12 @@ function getOrCreateAngularServerApp() {
  * typically when server configuration or application state needs to be refreshed.
  */
 function destroyAngularServerApp() {
+    if (typeof ngDevMode === 'undefined' || ngDevMode) {
+        // Need to clean up GENERATED_COMP_IDS map in `@angular/core`.
+        // Otherwise an incorrect component ID generation collision detected warning will be displayed in development.
+        // See: https://github.com/angular/angular-cli/issues/25924
+        _resetCompiledComponents();
+    }
     angularServerApp = undefined;
 }
 

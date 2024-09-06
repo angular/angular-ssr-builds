@@ -104,9 +104,10 @@ declare interface AngularAppManifest {
     readonly assets: Readonly<Map<string, () => Promise<string>>>;
     /**
      * The bootstrap mechanism for the server application.
-     * A function that returns a reference to an NgModule or a function returning a promise that resolves to an ApplicationRef.
+     * A function that returns a promise that resolves to an `NgModule` or a function
+     * returning a promise that resolves to an `ApplicationRef`.
      */
-    readonly bootstrap: () => AngularBootstrap;
+    readonly bootstrap: () => Promise<AngularBootstrap>;
     /**
      * Indicates whether critical CSS should be inlined into the HTML.
      * If set to `true`, critical CSS will be inlined for faster page rendering.
@@ -186,6 +187,10 @@ declare class AngularServerApp {
      * The `inlineCriticalCssProcessor` is responsible for handling critical CSS inlining.
      */
     private inlineCriticalCssProcessor;
+    /**
+     * The bootstrap mechanism for the server application.
+     */
+    private boostrap;
     /**
      * Renders a response for the given HTTP request using the server application.
      *

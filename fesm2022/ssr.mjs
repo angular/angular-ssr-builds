@@ -575,7 +575,7 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url) {
 async function extractRoutesAndCreateRouteTree(url, manifest = getAngularAppManifest()) {
     const routeTree = new RouteTree();
     const document = await new ServerAssets(manifest).getIndexServerHtml();
-    const { baseHref, routes } = await getRoutesFromAngularRouterConfig(manifest.bootstrap(), document, url);
+    const { baseHref, routes } = await getRoutesFromAngularRouterConfig(await manifest.bootstrap(), document, url);
     for (let { route, redirectTo } of routes) {
         route = joinUrlParts(baseHref, route);
         redirectTo = redirectTo === undefined ? undefined : joinUrlParts(baseHref, redirectTo);
@@ -1030,7 +1030,8 @@ class AngularServerApp {
         if (hooks.has('html:transform:pre')) {
             html = await hooks.run('html:transform:pre', { html });
         }
-        html = await renderAngular(html, manifest.bootstrap(), new URL(request.url), platformProviders);
+        this.boostrap ??= await manifest.bootstrap();
+        html = await renderAngular(html, this.boostrap, new URL(request.url), platformProviders);
         if (manifest.inlineCriticalCss) {
             // Optionally inline critical CSS.
             this.inlineCriticalCssProcessor ??= new InlineCriticalCssProcessor((path) => {

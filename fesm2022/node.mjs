@@ -2,7 +2,7 @@ import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderApplication, renderModule } 
 import * as fs from 'node:fs';
 import { dirname, join, normalize, resolve } from 'node:path';
 import { URL as URL$1 } from 'node:url';
-import { ɵInlineCriticalCssProcessor as _InlineCriticalCssProcessor } from '@angular/ssr';
+import { ɵInlineCriticalCssProcessor as _InlineCriticalCssProcessor, AngularAppEngine } from '@angular/ssr';
 import { readFile } from 'node:fs/promises';
 
 class CommonEngineInlineCriticalCssProcessor {
@@ -182,59 +182,6 @@ function isBootstrapFn(value) {
 }
 
 /**
- * Streams a web-standard `Response` into a Node.js `ServerResponse`.
- *
- * @param source - The web-standard `Response` object to stream from.
- * @param destination - The Node.js `ServerResponse` object to stream into.
- * @returns A promise that resolves once the streaming operation is complete.
- * @developerPreview
- */
-async function writeResponseToNodeResponse(source, destination) {
-    const { status, headers, body } = source;
-    destination.statusCode = status;
-    let cookieHeaderSet = false;
-    for (const [name, value] of headers.entries()) {
-        if (name === 'set-cookie') {
-            if (cookieHeaderSet) {
-                continue;
-            }
-            // Sets the 'set-cookie' header only once to ensure it is correctly applied.
-            // Concatenating 'set-cookie' values can lead to incorrect behavior, so we use a single value from `headers.getSetCookie()`.
-            destination.setHeader(name, headers.getSetCookie());
-            cookieHeaderSet = true;
-        }
-        else {
-            destination.setHeader(name, value);
-        }
-    }
-    if (!body) {
-        destination.end();
-        return;
-    }
-    try {
-        const reader = body.getReader();
-        destination.on('close', () => {
-            reader.cancel().catch((error) => {
-                // eslint-disable-next-line no-console
-                console.error(`An error occurred while writing the response body for: ${destination.req.url}.`, error);
-            });
-        });
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-                destination.end();
-                break;
-            }
-            destination.write(value);
-        }
-    }
-    catch {
-        destination.end('Internal server error.');
-    }
-}
-
-/**
  * Converts a Node.js `IncomingMessage` into a Web Standard `Request`.
  *
  * @param nodeRequest - The Node.js `IncomingMessage` object to convert.
@@ -292,5 +239,117 @@ function createRequestUrl(nodeRequest) {
     return new URL(url, `${protocol}://${hostnameWithPort}`);
 }
 
-export { CommonEngine, createWebRequestFromNodeRequest, writeResponseToNodeResponse };
+/**
+ * Angular server application engine.
+ * Manages Angular server applications (including localized ones), handles rendering requests,
+ * and optionally transforms index HTML before rendering.
+ *
+ * @note This class should be instantiated once and used as a singleton across the server-side
+ * application to ensure consistent handling of rendering requests and resource management.
+ *
+ * @developerPreview
+ */
+class AngularNodeAppEngine {
+    angularAppEngine = new AngularAppEngine();
+    /**
+     * Renders an HTTP response based on the incoming request using the Angular server application.
+     *
+     * The method processes the incoming request, determines the appropriate route, and prepares the
+     * rendering context to generate a response. If the request URL corresponds to a static file (excluding `/index.html`),
+     * the method returns `null`.
+     *
+     * Example: A request to `https://www.example.com/page/index.html` will render the Angular route
+     * associated with `https://www.example.com/page`.
+     *
+     * @param request - The incoming HTTP request object to be rendered.
+     * @param requestContext - Optional additional context for the request, such as metadata or custom settings.
+     * @returns A promise that resolves to a `Response` object, or `null` if the request URL is for a static file
+     * (e.g., `./logo.png`) rather than an application route.
+     */
+    render(request, requestContext) {
+        return this.angularAppEngine.render(createWebRequestFromNodeRequest(request), requestContext);
+    }
+    /**
+     * Retrieves HTTP headers for a request associated with statically generated (SSG) pages,
+     * based on the URL pathname.
+     *
+     * @param request - The incoming request object.
+     * @returns A `Map` containing the HTTP headers as key-value pairs.
+     * @note This function should be used exclusively for retrieving headers of SSG pages.
+     * @example
+     * ```typescript
+     * const angularAppEngine = new AngularNodeAppEngine();
+     *
+     * app.use(express.static('dist/browser', {
+     *   setHeaders: (res, path) => {
+     *     // Retrieve headers for the current request
+     *     const headers = angularAppEngine.getHeaders(res.req);
+     *
+     *     // Apply the retrieved headers to the response
+     *     for (const { key, value } of headers) {
+     *       res.setHeader(key, value);
+     *     }
+     *   }
+       }));
+    * ```
+    */
+    getHeaders(request) {
+        return this.angularAppEngine.getHeaders(createWebRequestFromNodeRequest(request));
+    }
+}
+
+/**
+ * Streams a web-standard `Response` into a Node.js `ServerResponse`.
+ *
+ * @param source - The web-standard `Response` object to stream from.
+ * @param destination - The Node.js `ServerResponse` object to stream into.
+ * @returns A promise that resolves once the streaming operation is complete.
+ * @developerPreview
+ */
+async function writeResponseToNodeResponse(source, destination) {
+    const { status, headers, body } = source;
+    destination.statusCode = status;
+    let cookieHeaderSet = false;
+    for (const [name, value] of headers.entries()) {
+        if (name === 'set-cookie') {
+            if (cookieHeaderSet) {
+                continue;
+            }
+            // Sets the 'set-cookie' header only once to ensure it is correctly applied.
+            // Concatenating 'set-cookie' values can lead to incorrect behavior, so we use a single value from `headers.getSetCookie()`.
+            destination.setHeader(name, headers.getSetCookie());
+            cookieHeaderSet = true;
+        }
+        else {
+            destination.setHeader(name, value);
+        }
+    }
+    if (!body) {
+        destination.end();
+        return;
+    }
+    try {
+        const reader = body.getReader();
+        destination.on('close', () => {
+            reader.cancel().catch((error) => {
+                // eslint-disable-next-line no-console
+                console.error(`An error occurred while writing the response body for: ${destination.req.url}.`, error);
+            });
+        });
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                destination.end();
+                break;
+            }
+            destination.write(value);
+        }
+    }
+    catch {
+        destination.end('Internal server error.');
+    }
+}
+
+export { AngularNodeAppEngine, CommonEngine, createWebRequestFromNodeRequest, writeResponseToNodeResponse };
 //# sourceMappingURL=node.mjs.map

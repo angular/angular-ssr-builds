@@ -1069,6 +1069,8 @@ function destroyAngularServerApp() {
     angularServerApp = undefined;
 }
 
+// ɵgetRoutesFromAngularRouterConfig is only used by the Webpack based server builder.
+
 /**
  * Extracts a potential locale ID from a given URL based on the specified base path.
  *
@@ -1108,6 +1110,11 @@ function getPotentialLocaleIdFromUrl(url, basePath) {
  * Angular server application engine.
  * Manages Angular server applications (including localized ones), handles rendering requests,
  * and optionally transforms index HTML before rendering.
+ *
+ * @note This class should be instantiated once and used as a singleton across the server-side
+ * application to ensure consistent handling of rendering requests and resource management.
+ *
+ * @developerPreview
  */
 class AngularAppEngine {
     constructor() {
@@ -1182,35 +1189,23 @@ class AngularAppEngine {
         const potentialLocale = getPotentialLocaleIdFromUrl(url, basePath);
         return entryPoints.get(potentialLocale);
     }
-}
-let angularAppEngine;
-/**
- * Retrieves an existing `AngularAppEngine` instance or creates a new one if none exists.
- *
- * This method ensures that only a single instance of `AngularAppEngine` is created and reused across
- * the application lifecycle, providing efficient resource management. If the instance does not exist,
- * it will be instantiated upon the first call.
- *
- * @developerPreview
- * @returns The existing or newly created instance of `AngularAppEngine`.
- */
-function getOrCreateAngularAppEngine() {
-    return (angularAppEngine ??= new AngularAppEngine());
-}
-/**
- * Destroys the current `AngularAppEngine` instance, releasing any associated resources.
- *
- * This method resets the reference to the `AngularAppEngine` instance to `undefined`, allowing
- * a new instance to be created on the next call to `getOrCreateAngularAppEngine()`. It is typically
- * used when reinitializing the server environment or refreshing the application state is necessary.
- *
- * @developerPreview
- */
-function destroyAngularAppEngine() {
-    angularAppEngine = undefined;
+    /**
+     * Retrieves HTTP headers for a request associated with statically generated (SSG) pages,
+     * based on the URL pathname.
+     *
+     * @param request - The incoming request object.
+     * @returns A `Map` containing the HTTP headers as key-value pairs.
+     * @note This function should be used exclusively for retrieving headers of SSG pages.
+     */
+    getHeaders(request) {
+        if (this.manifest.staticPathsHeaders.size === 0) {
+            return new Map();
+        }
+        const { pathname } = stripIndexHtmlFromURL(new URL(request.url));
+        const headers = this.manifest.staticPathsHeaders.get(pathname);
+        return new Map(headers);
+    }
 }
 
-// ɵgetRoutesFromAngularRouterConfig is only used by the Webpack based server builder.
-
-export { destroyAngularAppEngine, getOrCreateAngularAppEngine, AngularAppEngine as ɵAngularAppEngine, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, ServerRenderContext as ɵServerRenderContext, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
+export { AngularAppEngine, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, ServerRenderContext as ɵServerRenderContext, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
 //# sourceMappingURL=ssr.mjs.map

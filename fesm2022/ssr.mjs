@@ -1,6 +1,6 @@
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
-import { ɵConsole as _Console, createPlatformFactory, platformCore, ApplicationRef, ɵwhenStable as _whenStable, Compiler, InjectionToken, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
-import { renderModule, renderApplication, INITIAL_CONFIG, ɵINTERNAL_SERVER_PLATFORM_PROVIDERS as _INTERNAL_SERVER_PLATFORM_PROVIDERS, ɵSERVER_CONTEXT as _SERVER_CONTEXT } from '@angular/platform-server';
+import { ɵConsole as _Console, InjectionToken, makeEnvironmentProviders, runInInjectionContext, createPlatformFactory, platformCore, ApplicationRef, ɵwhenStable as _whenStable, Compiler, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
+import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule, renderApplication, INITIAL_CONFIG, ɵINTERNAL_SERVER_PLATFORM_PROVIDERS as _INTERNAL_SERVER_PLATFORM_PROVIDERS } from '@angular/platform-server';
 import { ɵloadChildren as _loadChildren, Router } from '@angular/router';
 import Critters from '../third_party/critters/index.js';
 
@@ -217,21 +217,38 @@ function stripIndexHtmlFromURL(url) {
  *              correctly handle route-based rendering.
  * @param platformProviders - An array of platform providers to be used during the
  *                             rendering process.
+ * @param serverContext - A string representing the server context, used to provide additional
+ *                        context or metadata during server-side rendering.
  * @returns A promise that resolves to a string containing the rendered HTML.
  */
-function renderAngular(html, bootstrap, url, platformProviders) {
+function renderAngular(html, bootstrap, url, platformProviders, serverContext) {
+    const providers = [
+        {
+            provide: _SERVER_CONTEXT,
+            useValue: serverContext,
+        },
+        {
+            // An Angular Console Provider that does not print a set of predefined logs.
+            provide: _Console,
+            // Using `useClass` would necessitate decorating `Console` with `@Injectable`,
+            // which would require switching from `ts_library` to `ng_module`. This change
+            // would also necessitate various patches of `@angular/bazel` to support ESM.
+            useFactory: () => new Console(),
+        },
+        ...platformProviders,
+    ];
     // A request to `http://www.example.com/page/index.html` will render the Angular route corresponding to `http://www.example.com/page`.
     const urlToRender = stripIndexHtmlFromURL(url).toString();
     return isNgModule(bootstrap)
         ? renderModule(bootstrap, {
             url: urlToRender,
             document: html,
-            extraProviders: platformProviders,
+            extraProviders: providers,
         })
         : renderApplication(bootstrap, {
             url: urlToRender,
             document: html,
-            platformProviders,
+            platformProviders: providers,
         });
 }
 /**
@@ -247,9 +264,71 @@ function isNgModule(value) {
 }
 
 /**
+ * Different rendering modes for server routes.
+ * @developerPreview
+ */
+var RenderMode;
+(function (RenderMode) {
+    /** AppShell rendering mode, typically used for pre-rendered shells of the application. */
+    RenderMode[RenderMode["AppShell"] = 0] = "AppShell";
+    /** Server-Side Rendering (SSR) mode, where content is rendered on the server for each request. */
+    RenderMode[RenderMode["Server"] = 1] = "Server";
+    /** Client-Side Rendering (CSR) mode, where content is rendered on the client side in the browser. */
+    RenderMode[RenderMode["Client"] = 2] = "Client";
+    /** Static Site Generation (SSG) mode, where content is pre-rendered at build time and served as static files. */
+    RenderMode[RenderMode["Prerender"] = 3] = "Prerender";
+})(RenderMode || (RenderMode = {}));
+/**
+ * Defines the fallback strategies for Static Site Generation (SSG) routes when a pre-rendered path is not available.
+ * This is particularly relevant for routes with parameterized URLs where some paths might not be pre-rendered at build time.
+ *
+ * @developerPreview
+ */
+var PrerenderFallback;
+(function (PrerenderFallback) {
+    /**
+     * Fallback to Server-Side Rendering (SSR) if the pre-rendered path is not available.
+     * This strategy dynamically generates the page on the server at request time.
+     */
+    PrerenderFallback[PrerenderFallback["Server"] = 0] = "Server";
+    /**
+     * Fallback to Client-Side Rendering (CSR) if the pre-rendered path is not available.
+     * This strategy allows the page to be rendered on the client side.
+     */
+    PrerenderFallback[PrerenderFallback["Client"] = 1] = "Client";
+    /**
+     * No fallback; if the path is not pre-rendered, the server will not handle the request.
+     * This means the application will not provide any response for paths that are not pre-rendered.
+     */
+    PrerenderFallback[PrerenderFallback["None"] = 2] = "None";
+})(PrerenderFallback || (PrerenderFallback = {}));
+/**
+ * Token for providing the server routes configuration.
+ * @internal
+ */
+const SERVER_ROUTES_CONFIG = new InjectionToken('SERVER_ROUTES_CONFIG');
+/**
+ * Configures the necessary providers for server routes configuration.
+ *
+ * @param routes - An array of server routes to be provided.
+ * @returns An `EnvironmentProviders` object that contains the server routes configuration.
+ * @developerPreview
+ */
+function provideServerRoutesConfig(routes) {
+    return makeEnvironmentProviders([
+        {
+            provide: SERVER_ROUTES_CONFIG,
+            useValue: routes,
+        },
+    ]);
+}
+
+/**
  * A route tree implementation that supports efficient route matching, including support for wildcard routes.
  * This structure is useful for organizing and retrieving routes in a hierarchical manner,
  * enabling complex routing scenarios with nested paths.
+ *
+ * @typeParam AdditionalMetadata - Type of additional metadata that can be associated with route nodes.
  */
 class RouteTree {
     constructor() {
@@ -422,36 +501,62 @@ class RouteTree {
 }
 
 /**
- * Recursively traverses the Angular router configuration to retrieve routes.
- *
- * Iterates through the router configuration, yielding each route along with its potential
- * redirection or error status. Handles nested routes and lazy-loaded child routes.
- *
- * @param options - An object containing the parameters for traversing routes.
- * @returns An async iterator yielding `RouteResult` objects.
+ * Regular expression to match segments preceded by a colon in a string.
  */
-async function* traverseRoutesConfig(options) {
-    const { routes, compiler, parentInjector, parentRoute } = options;
+const URL_PARAMETER_REGEXP = /(?<!\\):([^/]+)/g;
+/**
+ * An set of HTTP status codes that are considered valid for redirect responses.
+ */
+const VALID_REDIRECT_RESPONSE_CODES = new Set([301, 302, 303, 307, 308]);
+/**
+ * Traverses an array of route configurations to generate route tree node metadata.
+ *
+ * This function processes each route and its children, handling redirects, SSG (Static Site Generation) settings,
+ * and lazy-loaded routes. It yields route metadata for each route and its potential variants.
+ *
+ * @param options - The configuration options for traversing routes.
+ * @returns An async iterable iterator of route tree node metadata.
+ */
+async function* traverseRoutesConfig({ routes, compiler, parentInjector, parentRoute, serverConfigRouteTree, invokeGetPrerenderParams, }) {
     for (const route of routes) {
         const { path = '', redirectTo, loadChildren, children } = route;
         const currentRoutePath = joinUrlParts(parentRoute, path);
-        yield {
+        // Get route metadata from the server config route tree, if available
+        const metadata = {
+            ...(serverConfigRouteTree
+                ? getMatchedRouteMetadata(serverConfigRouteTree, currentRoutePath)
+                : undefined),
             route: currentRoutePath,
-            redirectTo: typeof redirectTo === 'string'
-                ? resolveRedirectTo(currentRoutePath, redirectTo)
-                : undefined,
         };
+        // Handle redirects
+        if (typeof redirectTo === 'string') {
+            const redirectToResolved = resolveRedirectTo(currentRoutePath, redirectTo);
+            if (metadata.status && !VALID_REDIRECT_RESPONSE_CODES.has(metadata.status)) {
+                throw new Error(`The '${metadata.status}' status code is not a valid redirect response code. ` +
+                    `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`);
+            }
+            yield { ...metadata, redirectTo: redirectToResolved };
+        }
+        else if (metadata.renderMode === RenderMode.Prerender) {
+            // Handle SSG routes
+            yield* handleSSGRoute(metadata, parentInjector, invokeGetPrerenderParams);
+        }
+        else {
+            yield metadata;
+        }
+        // Recursively process child routes
         if (children?.length) {
-            // Recursively process child routes.
             yield* traverseRoutesConfig({
                 routes: children,
                 compiler,
                 parentInjector,
                 parentRoute: currentRoutePath,
+                serverConfigRouteTree,
+                invokeGetPrerenderParams,
             });
         }
+        // Load and process lazy-loaded child routes
         if (loadChildren) {
-            // Load and process lazy-loaded child routes.
             const loadedChildRoutes = await _loadChildren(route, compiler, parentInjector).toPromise();
             if (loadedChildRoutes) {
                 const { routes: childRoutes, injector = parentInjector } = loadedChildRoutes;
@@ -460,9 +565,75 @@ async function* traverseRoutesConfig(options) {
                     compiler,
                     parentInjector: injector,
                     parentRoute: currentRoutePath,
+                    serverConfigRouteTree,
+                    invokeGetPrerenderParams,
                 });
             }
         }
+    }
+}
+/**
+ * Retrieves the matched route metadata from the server configuration route tree.
+ *
+ * @param serverConfigRouteTree - The server configuration route tree.
+ * @param currentRoutePath - The current route path being processed.
+ * @returns The metadata associated with the matched route.
+ */
+function getMatchedRouteMetadata(serverConfigRouteTree, currentRoutePath) {
+    const metadata = serverConfigRouteTree.match(currentRoutePath);
+    if (!metadata) {
+        throw new Error(`The '${currentRoutePath}' route does not match any route defined in the server routing configuration. ` +
+            'Please ensure this route is added to the server routing configuration.');
+    }
+    return metadata;
+}
+/**
+ * Handles SSG (Static Site Generation) routes by invoking `getPrerenderParams` and yielding
+ * all parameterized paths.
+ *
+ * @param metadata - The metadata associated with the route tree node.
+ * @param parentInjector - The dependency injection container for the parent route.
+ * @param invokeGetPrerenderParams - A flag indicating whether to invoke the `getPrerenderParams` function.
+ * @returns An async iterable iterator that yields route tree node metadata for each SSG path.
+ */
+async function* handleSSGRoute(metadata, parentInjector, invokeGetPrerenderParams) {
+    if (metadata.renderMode !== RenderMode.Prerender) {
+        throw new Error(`'handleSSGRoute' was called for a route which rendering mode is not prerender.`);
+    }
+    const { route: currentRoutePath, fallback, ...meta } = metadata;
+    const getPrerenderParams = 'getPrerenderParams' in meta ? meta.getPrerenderParams : undefined;
+    if ('getPrerenderParams' in meta) {
+        delete meta['getPrerenderParams'];
+    }
+    if (invokeGetPrerenderParams && URL_PARAMETER_REGEXP.test(currentRoutePath)) {
+        if (!getPrerenderParams) {
+            throw new Error(`The '${currentRoutePath}' route uses prerendering and includes parameters, but 'getPrerenderParams' is missing. ` +
+                `Please define 'getPrerenderParams' function for this route in your server routing configuration ` +
+                `or specify a different 'renderMode'.`);
+        }
+        const parameters = await runInInjectionContext(parentInjector, () => getPrerenderParams());
+        for (const params of parameters) {
+            const routeWithResolvedParams = currentRoutePath.replace(URL_PARAMETER_REGEXP, (match) => {
+                const parameterName = match.slice(1);
+                const value = params[parameterName];
+                if (typeof value !== 'string') {
+                    throw new Error(`The 'getPrerenderParams' function defined for the '${currentRoutePath}' route ` +
+                        `returned a non-string value for parameter '${parameterName}'. ` +
+                        `Please make sure the 'getPrerenderParams' function returns values for all parameters ` +
+                        'specified in this route.');
+                }
+                return value;
+            });
+            yield { ...meta, route: routeWithResolvedParams };
+        }
+    }
+    // Handle fallback render modes
+    if (fallback !== PrerenderFallback.None || !invokeGetPrerenderParams) {
+        yield {
+            ...meta,
+            route: currentRoutePath,
+            renderMode: fallback === PrerenderFallback.Client ? RenderMode.Client : RenderMode.Server,
+        };
     }
 }
 /**
@@ -487,23 +658,38 @@ function resolveRedirectTo(routePath, redirectTo) {
     return joinUrlParts(...segments, redirectTo);
 }
 /**
+ * Builds a server configuration route tree from the given server routes configuration.
+ *
+ * @param serverRoutesConfig - The array of server routes to be used for configuration.
+ * @returns A `RouteTree` populated with the server routes and their metadata.
+ */
+function buildServerConfigRouteTree(serverRoutesConfig) {
+    const serverConfigRouteTree = new RouteTree();
+    for (const { path, ...metadata } of serverRoutesConfig) {
+        serverConfigRouteTree.insert(path, metadata);
+    }
+    return serverConfigRouteTree;
+}
+/**
  * Retrieves routes from the given Angular application.
  *
  * This function initializes an Angular platform, bootstraps the application or module,
  * and retrieves routes from the Angular router configuration. It handles both module-based
- * and function-based bootstrapping. It yields the resulting routes as `RouteResult` objects.
+ * and function-based bootstrapping. It yields the resulting routes as `RouteTreeNodeMetadata` objects.
  *
  * @param bootstrap - A function that returns a promise resolving to an `ApplicationRef` or an Angular module to bootstrap.
  * @param document - The initial HTML document used for server-side rendering.
  * This document is necessary to render the application on the server.
  * @param url - The URL for server-side rendering. The URL is used to configure `ServerPlatformLocation`. This configuration is crucial
  * for ensuring that API requests for relative paths succeed, which is essential for accurate route extraction.
+ * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
+ * to handle prerendering paths. Defaults to `false`.
  * See:
  *  - https://github.com/angular/angular/blob/d608b857c689d17a7ffa33bbb510301014d24a17/packages/platform-server/src/location.ts#L51
  *  - https://github.com/angular/angular/blob/6882cc7d9eed26d3caeedca027452367ba25f2b9/packages/platform-server/src/http.ts#L44
  * @returns A promise that resolves to an object of type `AngularRouterConfigResult`.
  */
-async function getRoutesFromAngularRouterConfig(bootstrap, document, url) {
+async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams = false) {
     const { protocol, host } = url;
     // Create and initialize the Angular platform for server-side rendering.
     const platformRef = createPlatformFactory(platformCore, 'server', [
@@ -533,19 +719,25 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url) {
         const routesResults = [];
         if (router.config.length) {
             const compiler = injector.get(Compiler);
+            const serverRoutesConfig = injector.get(SERVER_ROUTES_CONFIG, null, { optional: true });
+            const serverConfigRouteTree = serverRoutesConfig
+                ? buildServerConfigRouteTree(serverRoutesConfig)
+                : undefined;
             // Retrieve all routes from the Angular router configuration.
             const traverseRoutes = traverseRoutesConfig({
                 routes: router.config,
                 compiler,
                 parentInjector: injector,
                 parentRoute: '',
+                serverConfigRouteTree,
+                invokeGetPrerenderParams,
             });
             for await (const result of traverseRoutes) {
                 routesResults.push(result);
             }
         }
         else {
-            routesResults.push({ route: '' });
+            routesResults.push({ route: '', renderMode: RenderMode.Prerender });
         }
         const baseHref = injector.get(APP_BASE_HREF, null, { optional: true }) ??
             injector.get(PlatformLocation).getBaseHrefFromDOM();
@@ -569,18 +761,21 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url) {
  *  - https://github.com/angular/angular/blob/6882cc7d9eed26d3caeedca027452367ba25f2b9/packages/platform-server/src/http.ts#L44
  * @param manifest - An optional `AngularAppManifest` that contains the application's routing and configuration details.
  * If not provided, the default manifest is retrieved using `getAngularAppManifest()`.
- *
+ * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
+ * to handle prerendering paths. Defaults to `false`.
  * @returns A promise that resolves to a populated `RouteTree` containing all extracted routes from the Angular application.
  */
-async function extractRoutesAndCreateRouteTree(url, manifest = getAngularAppManifest()) {
+async function extractRoutesAndCreateRouteTree(url, manifest = getAngularAppManifest(), invokeGetPrerenderParams = false) {
     const routeTree = new RouteTree();
     const document = await new ServerAssets(manifest).getIndexServerHtml();
     const bootstrap = await manifest.bootstrap();
-    const { baseHref, routes } = await getRoutesFromAngularRouterConfig(bootstrap, document, url);
-    for (let { route, redirectTo } of routes) {
-        route = joinUrlParts(baseHref, route);
-        redirectTo = redirectTo === undefined ? undefined : joinUrlParts(baseHref, redirectTo);
-        routeTree.insert(route, { redirectTo });
+    const { baseHref, routes } = await getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams);
+    for (const { route, ...metadata } of routes) {
+        if (metadata.redirectTo !== undefined) {
+            metadata.redirectTo = joinUrlParts(baseHref, metadata.redirectTo);
+        }
+        const fullRoute = joinUrlParts(baseHref, route);
+        routeTree.insert(fullRoute, metadata);
     }
     return routeTree;
 }
@@ -912,14 +1107,23 @@ class InlineCriticalCssProcessor extends CrittersBase {
 }
 
 /**
- * Enum representing the different contexts in which server rendering can occur.
+ * A mapping of `RenderMode` enum values to corresponding string representations.
+ *
+ * This record is used to map each `RenderMode` to a specific string value that represents
+ * the server context. The string values are used internally to differentiate
+ * between various rendering strategies when processing routes.
+ *
+ * - `RenderMode.Prerender` maps to `'ssg'` (Static Site Generation).
+ * - `RenderMode.Server` maps to `'ssr'` (Server-Side Rendering).
+ * - `RenderMode.AppShell` maps to `'app-shell'` (pre-rendered application shell).
+ * - `RenderMode.Client` maps to an empty string `''` (Client-Side Rendering, no server context needed).
  */
-var ServerRenderContext;
-(function (ServerRenderContext) {
-    ServerRenderContext["SSR"] = "ssr";
-    ServerRenderContext["SSG"] = "ssg";
-    ServerRenderContext["AppShell"] = "app-shell";
-})(ServerRenderContext || (ServerRenderContext = {}));
+const SERVER_CONTEXT_VALUE = {
+    [RenderMode.Prerender]: 'ssg',
+    [RenderMode.Server]: 'ssr',
+    [RenderMode.AppShell]: 'app-shell',
+    [RenderMode.Client]: '',
+};
 /**
  * Represents a locale-specific Angular server application managed by the server application engine.
  *
@@ -948,14 +1152,29 @@ class AngularServerApp {
      *
      * @param request - The incoming HTTP request to be rendered.
      * @param requestContext - Optional additional context for rendering, such as request metadata.
-     * @param serverContext - The rendering context.
      *
      * @returns A promise that resolves to the HTTP response object resulting from the rendering, or null if no match is found.
      */
-    render(request, requestContext, serverContext = ServerRenderContext.SSR) {
+    render(request, requestContext) {
         return Promise.race([
             this.createAbortPromise(request),
-            this.handleRendering(request, requestContext, serverContext),
+            this.handleRendering(request, /** isSsrMode */ true, requestContext),
+        ]);
+    }
+    /**
+     * Renders a page based on the provided URL via server-side rendering and returns the corresponding HTTP response.
+     * The rendering process can be interrupted by an abort signal, where the first resolved promise (either from the abort
+     * or the render process) will dictate the outcome.
+     *
+     * @param url - The full URL to be processed and rendered by the server.
+     * @param signal - (Optional) An `AbortSignal` object that allows for the cancellation of the rendering process.
+     * @returns A promise that resolves to the generated HTTP response object, or `null` if no matching route is found.
+     */
+    renderStatic(url, signal) {
+        const request = new Request(url, { signal });
+        return Promise.race([
+            this.createAbortPromise(request),
+            this.handleRendering(request, /** isSsrMode */ false),
         ]);
     }
     /**
@@ -978,12 +1197,12 @@ class AngularServerApp {
      * This method matches the request URL to a route and performs rendering if a matching route is found.
      *
      * @param request - The incoming HTTP request to be processed.
+     * @param isSsrMode - A boolean indicating whether the rendering is performed in server-side rendering (SSR) mode.
      * @param requestContext - Optional additional context for rendering, such as request metadata.
-     * @param serverContext - The rendering context. Defaults to server-side rendering (SSR).
      *
      * @returns A promise that resolves to the rendered response, or null if no matching route is found.
      */
-    async handleRendering(request, requestContext, serverContext = ServerRenderContext.SSR) {
+    async handleRendering(request, isSsrMode, requestContext) {
         const url = new URL(request.url);
         this.router ??= await ServerRouter.from(this.manifest, url);
         const matchedRoute = this.router.match(url);
@@ -991,29 +1210,27 @@ class AngularServerApp {
             // Not a known Angular route.
             return null;
         }
-        const { redirectTo } = matchedRoute;
+        const { redirectTo, status } = matchedRoute;
         if (redirectTo !== undefined) {
+            // Note: The status code is validated during route extraction.
             // 302 Found is used by default for redirections
             // See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
-            return Response.redirect(new URL(redirectTo, url), 302);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return Response.redirect(new URL(redirectTo, url), status ?? 302);
         }
-        const platformProviders = [
-            {
-                provide: _SERVER_CONTEXT,
-                useValue: serverContext,
-            },
-            {
-                // An Angular Console Provider that does not print a set of predefined logs.
-                provide: _Console,
-                // Using `useClass` would necessitate decorating `Console` with `@Injectable`,
-                // which would require switching from `ts_library` to `ng_module`. This change
-                // would also necessitate various patches of `@angular/bazel` to support ESM.
-                useFactory: () => new Console(),
-            },
-        ];
-        const isSsrMode = serverContext === ServerRenderContext.SSR;
-        const responseInit = {};
+        const { renderMode = isSsrMode ? RenderMode.Server : RenderMode.Prerender, headers } = matchedRoute;
+        const platformProviders = [];
+        let responseInit;
         if (isSsrMode) {
+            // Initialize the response with status and headers if available.
+            responseInit = {
+                status,
+                headers: headers ? new Headers(headers) : undefined,
+            };
+            if (renderMode === RenderMode.Client) {
+                // Serve the client-side rendered version if the route is configured for CSR.
+                return new Response(await this.assets.getServerAsset('index.csr.html'), responseInit);
+            }
             platformProviders.push({
                 provide: REQUEST,
                 useValue: request,
@@ -1032,7 +1249,7 @@ class AngularServerApp {
             html = await hooks.run('html:transform:pre', { html });
         }
         this.boostrap ??= await manifest.bootstrap();
-        html = await renderAngular(html, this.boostrap, new URL(request.url), platformProviders);
+        html = await renderAngular(html, this.boostrap, new URL(request.url), platformProviders, SERVER_CONTEXT_VALUE[renderMode]);
         if (manifest.inlineCriticalCss) {
             // Optionally inline critical CSS.
             this.inlineCriticalCssProcessor ??= new InlineCriticalCssProcessor((path) => {
@@ -1199,7 +1416,7 @@ class AngularAppEngine {
      * @returns A `Map` containing the HTTP headers as key-value pairs.
      * @note This function should be used exclusively for retrieving headers of SSG pages.
      */
-    getHeaders(request) {
+    getPrerenderHeaders(request) {
         if (this.manifest.staticPathsHeaders.size === 0) {
             return new Map();
         }
@@ -1209,5 +1426,5 @@ class AngularAppEngine {
     }
 }
 
-export { AngularAppEngine, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, ServerRenderContext as ɵServerRenderContext, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
+export { AngularAppEngine, provideServerRoutesConfig, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
 //# sourceMappingURL=ssr.mjs.map

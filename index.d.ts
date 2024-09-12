@@ -1,5 +1,6 @@
 import type { ApplicationRef } from '@angular/core';
 import { default as default_2 } from 'critters';
+import { EnvironmentProviders } from '@angular/core';
 import type { Type } from '@angular/core';
 
 /**
@@ -61,7 +62,7 @@ export declare class AngularAppEngine {
      * @returns A `Map` containing the HTTP headers as key-value pairs.
      * @note This function should be used exclusively for retrieving headers of SSG pages.
      */
-    getHeaders(request: Request): ReadonlyMap<string, string>;
+    getPrerenderHeaders(request: Request): ReadonlyMap<string, string>;
 }
 
 /**
@@ -140,24 +141,20 @@ declare interface AngularRouterConfigResult {
      */
     baseHref: string;
     /**
-     * An array of `RouteResult` objects representing the application's routes.
+     * An array of `RouteTreeNodeMetadata` objects representing the application's routes.
      *
-     * Each `RouteResult` contains details about a specific route, such as its path and any
+     * Each `RouteTreeNodeMetadata` contains details about a specific route, such as its path and any
      * associated redirection targets. This array is asynchronously generated and
      * provides information on how routes are structured and resolved.
-     *
-     * Example:
-     * ```typescript
-     * const result: AngularRouterConfigResult = {
-     *   baseHref: '/app/',
-     *   routes: [
-     *     { route: '/home', redirectTo: '/welcome' },
-     *     { route: '/about' },
-     *   ],
-     * };
-     * ```
      */
-    routes: RouteResult[];
+    routes: RouteTreeNodeMetadata[];
+    /**
+     * Optional configuration for server routes.
+     *
+     * This property allows you to specify an array of server routes for configuration.
+     * If not provided, the default configuration or behavior will be used.
+     */
+    serverRoutesConfig?: ServerRoute[] | null;
 }
 
 /**
@@ -198,11 +195,20 @@ declare class AngularServerApp {
      *
      * @param request - The incoming HTTP request to be rendered.
      * @param requestContext - Optional additional context for rendering, such as request metadata.
-     * @param serverContext - The rendering context.
      *
      * @returns A promise that resolves to the HTTP response object resulting from the rendering, or null if no match is found.
      */
-    render(request: Request, requestContext?: unknown, serverContext?: ɵServerRenderContext): Promise<Response | null>;
+    render(request: Request, requestContext?: unknown): Promise<Response | null>;
+    /**
+     * Renders a page based on the provided URL via server-side rendering and returns the corresponding HTTP response.
+     * The rendering process can be interrupted by an abort signal, where the first resolved promise (either from the abort
+     * or the render process) will dictate the outcome.
+     *
+     * @param url - The full URL to be processed and rendered by the server.
+     * @param signal - (Optional) An `AbortSignal` object that allows for the cancellation of the rendering process.
+     * @returns A promise that resolves to the generated HTTP response object, or `null` if no matching route is found.
+     */
+    renderStatic(url: URL, signal?: AbortSignal): Promise<Response | null>;
     /**
      * Creates a promise that rejects when the request is aborted.
      *
@@ -215,8 +221,8 @@ declare class AngularServerApp {
      * This method matches the request URL to a route and performs rendering if a matching route is found.
      *
      * @param request - The incoming HTTP request to be processed.
+     * @param isSsrMode - A boolean indicating whether the rendering is performed in server-side rendering (SSR) mode.
      * @param requestContext - Optional additional context for rendering, such as request metadata.
-     * @param serverContext - The rendering context. Defaults to server-side rendering (SSR).
      *
      * @returns A promise that resolves to the rendered response, or null if no matching route is found.
      */
@@ -335,31 +341,61 @@ declare interface PartialHTMLElement {
 }
 
 /**
- * Represents the result of processing a route.
+ * Defines the fallback strategies for Static Site Generation (SSG) routes when a pre-rendered path is not available.
+ * This is particularly relevant for routes with parameterized URLs where some paths might not be pre-rendered at build time.
+ *
+ * @developerPreview
  */
-declare interface RouteResult {
+export declare enum PrerenderFallback {
     /**
-     * The resolved path of the route.
-     *
-     * This string represents the complete URL path for the route after it has been
-     * resolved, including any parent routes or path segments that have been joined.
+     * Fallback to Server-Side Rendering (SSR) if the pre-rendered path is not available.
+     * This strategy dynamically generates the page on the server at request time.
      */
-    route: string;
+    Server = 0,
     /**
-     * The target path for route redirection, if applicable.
-     *
-     * If this route has a `redirectTo` property in the configuration, this field will
-     * contain the full resolved URL path that the route should redirect to.
+     * Fallback to Client-Side Rendering (CSR) if the pre-rendered path is not available.
+     * This strategy allows the page to be rendered on the client side.
      */
-    redirectTo?: string;
+    Client = 1,
+    /**
+     * No fallback; if the path is not pre-rendered, the server will not handle the request.
+     * This means the application will not provide any response for paths that are not pre-rendered.
+     */
+    None = 2
+}
+
+/**
+ * Configures the necessary providers for server routes configuration.
+ *
+ * @param routes - An array of server routes to be provided.
+ * @returns An `EnvironmentProviders` object that contains the server routes configuration.
+ * @developerPreview
+ */
+export declare function provideServerRoutesConfig(routes: ServerRoute[]): EnvironmentProviders;
+
+/**
+ * Different rendering modes for server routes.
+ * @developerPreview
+ */
+export declare enum RenderMode {
+    /** AppShell rendering mode, typically used for pre-rendered shells of the application. */
+    AppShell = 0,
+    /** Server-Side Rendering (SSR) mode, where content is rendered on the server for each request. */
+    Server = 1,
+    /** Client-Side Rendering (CSR) mode, where content is rendered on the client side in the browser. */
+    Client = 2,
+    /** Static Site Generation (SSG) mode, where content is pre-rendered at build time and served as static files. */
+    Prerender = 3
 }
 
 /**
  * A route tree implementation that supports efficient route matching, including support for wildcard routes.
  * This structure is useful for organizing and retrieving routes in a hierarchical manner,
  * enabling complex routing scenarios with nested paths.
+ *
+ * @typeParam AdditionalMetadata - Type of additional metadata that can be associated with route nodes.
  */
-declare class RouteTree {
+declare class RouteTree<AdditionalMetadata extends Record<string, unknown> = {}> {
     /**
      * The root node of the route tree.
      * All routes are stored and accessed relative to this root node.
@@ -379,7 +415,7 @@ declare class RouteTree {
      * @param route - The route path to insert into the tree.
      * @param metadata - Metadata associated with the route, excluding the route path itself.
      */
-    insert(route: string, metadata: RouteTreeNodeMetadataWithoutRoute): void;
+    insert(route: string, metadata: RouteTreeNodeMetadataWithoutRoute & AdditionalMetadata): void;
     /**
      * Matches a given route against the route tree and returns the best matching route's metadata.
      * The best match is determined by the lowest insertion index, meaning the earliest defined route
@@ -388,7 +424,7 @@ declare class RouteTree {
      * @param route - The route path to match against the route tree.
      * @returns The metadata of the best matching route or `undefined` if no match is found.
      */
-    match(route: string): RouteTreeNodeMetadata | undefined;
+    match(route: string): (RouteTreeNodeMetadata & AdditionalMetadata) | undefined;
     /**
      * Converts the route tree into a serialized format representation.
      * This method converts the route tree into an array of metadata objects that describe the structure of the tree.
@@ -477,6 +513,19 @@ declare interface RouteTreeNodeMetadata {
      * structure and content of the application.
      */
     route: string;
+    /**
+     * Optional status code to return for this route.
+     */
+    status?: number;
+    /**
+     * Optional additional headers to include in the response for this route.
+     */
+    headers?: Record<string, string>;
+    /**
+     * Specifies the rendering mode used for this route.
+     * If not provided, the default rendering mode for the application will be used.
+     */
+    renderMode?: RenderMode;
 }
 
 /**
@@ -484,12 +533,105 @@ declare interface RouteTreeNodeMetadata {
  */
 declare type RouteTreeNodeMetadataWithoutRoute = Omit<RouteTreeNodeMetadata, 'route'>;
 
-
 /**
  * Represents the serialized format of a route tree as an array of node metadata objects.
  * Each entry in the array corresponds to a specific node's metadata within the route tree.
  */
 declare type SerializableRouteTreeNode = ReadonlyArray<RouteTreeNodeMetadata>;
+
+/**
+ * Server route configuration.
+ * @developerPreview
+ */
+export declare type ServerRoute = ServerRouteAppShell | ServerRouteClient | ServerRoutePrerender | ServerRoutePrerenderWithParams | ServerRouteServer;
+
+/**
+ * A server route that uses AppShell rendering mode.
+ */
+declare interface ServerRouteAppShell extends Omit<ServerRouteCommon, 'headers' | 'status'> {
+    /** Specifies that the route uses AppShell rendering mode. */
+    renderMode: RenderMode.AppShell;
+}
+
+/**
+ * A server route that uses Client-Side Rendering (CSR) mode.
+ */
+declare interface ServerRouteClient extends ServerRouteCommon {
+    /** Specifies that the route uses Client-Side Rendering (CSR) mode. */
+    renderMode: RenderMode.Client;
+}
+
+/**
+ * Common interface for server routes, providing shared properties.
+ */
+declare interface ServerRouteCommon {
+    /** The path associated with this route. */
+    path: string;
+    /** Optional additional headers to include in the response for this route. */
+    headers?: Record<string, string>;
+    /** Optional status code to return for this route. */
+    status?: number;
+}
+
+/**
+ * A server route that uses Static Site Generation (SSG) mode.
+ */
+declare interface ServerRoutePrerender extends Omit<ServerRouteCommon, 'status'> {
+    /** Specifies that the route uses Static Site Generation (SSG) mode. */
+    renderMode: RenderMode.Prerender;
+    /** Fallback cannot be specified unless `getPrerenderParams` is used. */
+    fallback?: never;
+}
+
+/**
+ * A server route configuration that uses Static Site Generation (SSG) mode, including support for routes with parameters.
+ */
+declare interface ServerRoutePrerenderWithParams extends Omit<ServerRoutePrerender, 'fallback'> {
+    /**
+     * Optional strategy to use if the SSG path is not pre-rendered.
+     * This is especially relevant for routes with parameterized URLs, where some paths may not be pre-rendered at build time.
+     *
+     * This property determines how to handle requests for paths that are not pre-rendered:
+     * - `PrerenderFallback.Server`: Use Server-Side Rendering (SSR) to dynamically generate the page at request time.
+     * - `PrerenderFallback.Client`: Use Client-Side Rendering (CSR) to fetch and render the page on the client side.
+     * - `PrerenderFallback.None`: No fallback; if the path is not pre-rendered, the server will not handle the request.
+     *
+     * @default `PrerenderFallback.Server` if not provided.
+     */
+    fallback?: PrerenderFallback;
+    /**
+     * A function that returns a Promise resolving to an array of objects, each representing a route path with URL parameters.
+     * This function runs in the injector context, allowing access to Angular services and dependencies.
+     *
+     * @returns A Promise resolving to an array where each element is an object with string keys (representing URL parameter names)
+     * and string values (representing the corresponding values for those parameters in the route path).
+     *
+     * @example
+     * ```typescript
+     * export const serverRouteConfig: ServerRoutes[] = [
+     *   {
+     *     path: '/product/:id',
+     *     renderMode: RenderMode.Prerender,
+     *     async getPrerenderParams() {
+     *       const productService = inject(ProductService);
+     *       const ids = await productService.getIds(); // Assuming this returns ['1', '2', '3']
+     *
+     *       return ids.map(id => ({ id })); // Generates paths like: [{ id: '1' }, { id: '2' }, { id: '3' }]
+     *     },
+     *   },
+     * ];
+     * ```
+     */
+    getPrerenderParams: () => Promise<Record<string, string>[]>;
+}
+
+/**
+ * A server route that uses Server-Side Rendering (SSR) mode.
+ */
+declare interface ServerRouteServer extends ServerRouteCommon {
+    /** Specifies that the route uses Server-Side Rendering (SSR) mode. */
+    renderMode: RenderMode.Server;
+}
 
 /**
  * Destroys the existing `AngularServerApp` instance, releasing associated resources and resetting the
@@ -511,10 +653,11 @@ export declare function ɵdestroyAngularServerApp(): void;
  *  - https://github.com/angular/angular/blob/6882cc7d9eed26d3caeedca027452367ba25f2b9/packages/platform-server/src/http.ts#L44
  * @param manifest - An optional `AngularAppManifest` that contains the application's routing and configuration details.
  * If not provided, the default manifest is retrieved using `getAngularAppManifest()`.
- *
+ * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
+ * to handle prerendering paths. Defaults to `false`.
  * @returns A promise that resolves to a populated `RouteTree` containing all extracted routes from the Angular application.
  */
-export declare function ɵextractRoutesAndCreateRouteTree(url: URL, manifest?: AngularAppManifest): Promise<RouteTree>;
+export declare function ɵextractRoutesAndCreateRouteTree(url: URL, manifest?: AngularAppManifest, invokeGetPrerenderParams?: boolean): Promise<RouteTree>;
 
 /**
  * Retrieves or creates an instance of `AngularServerApp`.
@@ -529,19 +672,21 @@ export declare function ɵgetOrCreateAngularServerApp(): AngularServerApp;
  *
  * This function initializes an Angular platform, bootstraps the application or module,
  * and retrieves routes from the Angular router configuration. It handles both module-based
- * and function-based bootstrapping. It yields the resulting routes as `RouteResult` objects.
+ * and function-based bootstrapping. It yields the resulting routes as `RouteTreeNodeMetadata` objects.
  *
  * @param bootstrap - A function that returns a promise resolving to an `ApplicationRef` or an Angular module to bootstrap.
  * @param document - The initial HTML document used for server-side rendering.
  * This document is necessary to render the application on the server.
  * @param url - The URL for server-side rendering. The URL is used to configure `ServerPlatformLocation`. This configuration is crucial
  * for ensuring that API requests for relative paths succeed, which is essential for accurate route extraction.
+ * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
+ * to handle prerendering paths. Defaults to `false`.
  * See:
  *  - https://github.com/angular/angular/blob/d608b857c689d17a7ffa33bbb510301014d24a17/packages/platform-server/src/location.ts#L51
  *  - https://github.com/angular/angular/blob/6882cc7d9eed26d3caeedca027452367ba25f2b9/packages/platform-server/src/http.ts#L44
  * @returns A promise that resolves to an object of type `AngularRouterConfigResult`.
  */
-export declare function ɵgetRoutesFromAngularRouterConfig(bootstrap: AngularBootstrap, document: string, url: URL): Promise<AngularRouterConfigResult>;
+export declare function ɵgetRoutesFromAngularRouterConfig(bootstrap: AngularBootstrap, document: string, url: URL, invokeGetPrerenderParams?: boolean): Promise<AngularRouterConfigResult>;
 
 export declare class ɵInlineCriticalCssProcessor extends CrittersBase {
     readFile: (path: string) => Promise<string>;
@@ -563,15 +708,6 @@ export declare class ɵInlineCriticalCssProcessor extends CrittersBase {
      * if one hasn't been inserted into the document already.
      */
     private conditionallyInsertCspLoadingScript;
-}
-
-/**
- * Enum representing the different contexts in which server rendering can occur.
- */
-export declare enum ɵServerRenderContext {
-    SSR = "ssr",
-    SSG = "ssg",
-    AppShell = "app-shell"
 }
 
 /**

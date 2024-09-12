@@ -46,7 +46,7 @@ export declare class AngularNodeAppEngine {
      * app.use(express.static('dist/browser', {
      *   setHeaders: (res, path) => {
      *     // Retrieve headers for the current request
-     *     const headers = angularAppEngine.getHeaders(res.req);
+     *     const headers = angularAppEngine.getPrerenderHeaders(res.req);
      *
      *     // Apply the retrieved headers to the response
      *     for (const { key, value } of headers) {
@@ -56,7 +56,7 @@ export declare class AngularNodeAppEngine {
      }));
      * ```
      */
-    getHeaders(request: IncomingMessage): ReadonlyMap<string, string>;
+    getPrerenderHeaders(request: IncomingMessage): ReadonlyMap<string, string>;
 }
 
 /**

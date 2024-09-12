@@ -283,7 +283,7 @@ class AngularNodeAppEngine {
      * app.use(express.static('dist/browser', {
      *   setHeaders: (res, path) => {
      *     // Retrieve headers for the current request
-     *     const headers = angularAppEngine.getHeaders(res.req);
+     *     const headers = angularAppEngine.getPrerenderHeaders(res.req);
      *
      *     // Apply the retrieved headers to the response
      *     for (const { key, value } of headers) {
@@ -293,8 +293,8 @@ class AngularNodeAppEngine {
        }));
     * ```
     */
-    getHeaders(request) {
-        return this.angularAppEngine.getHeaders(createWebRequestFromNodeRequest(request));
+    getPrerenderHeaders(request) {
+        return this.angularAppEngine.getPrerenderHeaders(createWebRequestFromNodeRequest(request));
     }
 }
 

@@ -56,7 +56,7 @@ export declare class AngularNodeAppEngine {
      }));
      * ```
      */
-    getHeaders(request: IncomingMessage): Readonly<Map<string, string>>;
+    getHeaders(request: IncomingMessage): ReadonlyMap<string, string>;
 }
 
 /**

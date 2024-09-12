@@ -61,7 +61,7 @@ export declare class AngularAppEngine {
      * @returns A `Map` containing the HTTP headers as key-value pairs.
      * @note This function should be used exclusively for retrieving headers of SSG pages.
      */
-    getHeaders(request: Request): Readonly<Map<string, string>>;
+    getHeaders(request: Request): ReadonlyMap<string, string>;
 }
 
 /**
@@ -74,7 +74,7 @@ declare interface AngularAppEngineManifest {
      * - `key`: The base href for the entry point.
      * - `value`: A function that returns a promise resolving to an object of type `EntryPointExports`.
      */
-    readonly entryPoints: Readonly<Map<string, () => Promise<EntryPointExports>>>;
+    readonly entryPoints: ReadonlyMap<string, () => Promise<EntryPointExports>>;
     /**
      * The base path for the server application.
      * This is used to determine the root path of the application.
@@ -88,7 +88,7 @@ declare interface AngularAppEngineManifest {
      *   - `headerName`: The name of the HTTP header.
      *   - `headerValue`: The value of the HTTP header.
      */
-    readonly staticPathsHeaders: Readonly<Map<string, readonly [headerName: string, headerValue: string][]>>;
+    readonly staticPathsHeaders: ReadonlyMap<string, readonly [headerName: string, headerValue: string][]>;
 }
 
 /**
@@ -101,7 +101,7 @@ declare interface AngularAppManifest {
      * - `key`: The path of the asset.
      * - `value`: A function returning a promise that resolves to the file contents of the asset.
      */
-    readonly assets: Readonly<Map<string, () => Promise<string>>>;
+    readonly assets: ReadonlyMap<string, () => Promise<string>>;
     /**
      * The bootstrap mechanism for the server application.
      * A function that returns a promise that resolves to an `NgModule` or a function

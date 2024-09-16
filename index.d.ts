@@ -155,6 +155,10 @@ declare interface AngularRouterConfigResult {
      * If not provided, the default configuration or behavior will be used.
      */
     serverRoutesConfig?: ServerRoute[] | null;
+    /**
+     * A list of errors encountered during the route extraction process.
+     */
+    errors: string[];
 }
 
 /**
@@ -453,6 +457,13 @@ declare class RouteTree<AdditionalMetadata extends Record<string, unknown> = {}>
      */
     private traverse;
     /**
+     * Extracts the path segments from a given route string.
+     *
+     * @param route - The route string from which to extract segments.
+     * @returns An array of path segments.
+     */
+    private getPathSegments;
+    /**
      * Recursively traverses the route tree from a given node, attempting to match the remaining route segments.
      * If the node is a leaf node (no more segments to match) and contains metadata, the node is yielded.
      *
@@ -655,9 +666,15 @@ export declare function ɵdestroyAngularServerApp(): void;
  * If not provided, the default manifest is retrieved using `getAngularAppManifest()`.
  * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
  * to handle prerendering paths. Defaults to `false`.
- * @returns A promise that resolves to a populated `RouteTree` containing all extracted routes from the Angular application.
+ *
+ * @returns A promise that resolves to an object containing:
+ *  - `routeTree`: A populated `RouteTree` containing all extracted routes from the Angular application.
+ *  - `errors`: An array of strings representing any errors encountered during the route extraction process.
  */
-export declare function ɵextractRoutesAndCreateRouteTree(url: URL, manifest?: AngularAppManifest, invokeGetPrerenderParams?: boolean): Promise<RouteTree>;
+export declare function ɵextractRoutesAndCreateRouteTree(url: URL, manifest?: AngularAppManifest, invokeGetPrerenderParams?: boolean): Promise<{
+    routeTree: RouteTree;
+    errors: string[];
+}>;
 
 /**
  * Retrieves or creates an instance of `AngularServerApp`.
@@ -672,7 +689,7 @@ export declare function ɵgetOrCreateAngularServerApp(): AngularServerApp;
  *
  * This function initializes an Angular platform, bootstraps the application or module,
  * and retrieves routes from the Angular router configuration. It handles both module-based
- * and function-based bootstrapping. It yields the resulting routes as `RouteTreeNodeMetadata` objects.
+ * and function-based bootstrapping. It yields the resulting routes as `RouteTreeNodeMetadata` objects or errors.
  *
  * @param bootstrap - A function that returns a promise resolving to an `ApplicationRef` or an Angular module to bootstrap.
  * @param document - The initial HTML document used for server-side rendering.
@@ -681,10 +698,7 @@ export declare function ɵgetOrCreateAngularServerApp(): AngularServerApp;
  * for ensuring that API requests for relative paths succeed, which is essential for accurate route extraction.
  * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
  * to handle prerendering paths. Defaults to `false`.
- * See:
- *  - https://github.com/angular/angular/blob/d608b857c689d17a7ffa33bbb510301014d24a17/packages/platform-server/src/location.ts#L51
- *  - https://github.com/angular/angular/blob/6882cc7d9eed26d3caeedca027452367ba25f2b9/packages/platform-server/src/http.ts#L44
- * @returns A promise that resolves to an object of type `AngularRouterConfigResult`.
+ * @returns A promise that resolves to an object of type `AngularRouterConfigResult` or errors.
  */
 export declare function ɵgetRoutesFromAngularRouterConfig(bootstrap: AngularBootstrap, document: string, url: URL, invokeGetPrerenderParams?: boolean): Promise<AngularRouterConfigResult>;
 

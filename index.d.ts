@@ -666,12 +666,13 @@ export declare function ɵdestroyAngularServerApp(): void;
  * If not provided, the default manifest is retrieved using `getAngularAppManifest()`.
  * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
  * to handle prerendering paths. Defaults to `false`.
+ * @param includePrerenderFallbackRoutes - A flag indicating whether to include fallback routes in the result. Defaults to `true`.
  *
  * @returns A promise that resolves to an object containing:
  *  - `routeTree`: A populated `RouteTree` containing all extracted routes from the Angular application.
  *  - `errors`: An array of strings representing any errors encountered during the route extraction process.
  */
-export declare function ɵextractRoutesAndCreateRouteTree(url: URL, manifest?: AngularAppManifest, invokeGetPrerenderParams?: boolean): Promise<{
+export declare function ɵextractRoutesAndCreateRouteTree(url: URL, manifest?: AngularAppManifest, invokeGetPrerenderParams?: boolean, includePrerenderFallbackRoutes?: boolean): Promise<{
     routeTree: RouteTree;
     errors: string[];
 }>;
@@ -698,9 +699,11 @@ export declare function ɵgetOrCreateAngularServerApp(): AngularServerApp;
  * for ensuring that API requests for relative paths succeed, which is essential for accurate route extraction.
  * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
  * to handle prerendering paths. Defaults to `false`.
+ * @param includePrerenderFallbackRoutes - A flag indicating whether to include fallback routes in the result. Defaults to `true`.
+ *
  * @returns A promise that resolves to an object of type `AngularRouterConfigResult` or errors.
  */
-export declare function ɵgetRoutesFromAngularRouterConfig(bootstrap: AngularBootstrap, document: string, url: URL, invokeGetPrerenderParams?: boolean): Promise<AngularRouterConfigResult>;
+export declare function ɵgetRoutesFromAngularRouterConfig(bootstrap: AngularBootstrap, document: string, url: URL, invokeGetPrerenderParams?: boolean, includePrerenderFallbackRoutes?: boolean): Promise<AngularRouterConfigResult>;
 
 export declare class ɵInlineCriticalCssProcessor extends CrittersBase {
     readFile: (path: string) => Promise<string>;

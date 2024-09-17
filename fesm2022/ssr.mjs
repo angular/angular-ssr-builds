@@ -561,7 +561,8 @@ const VALID_REDIRECT_RESPONSE_CODES = new Set([301, 302, 303, 307, 308]);
  * @param options - The configuration options for traversing routes.
  * @returns An async iterable iterator yielding either route tree node metadata or an error object with an error message.
  */
-async function* traverseRoutesConfig({ routes, compiler, parentInjector, parentRoute, serverConfigRouteTree, invokeGetPrerenderParams, }) {
+async function* traverseRoutesConfig(options) {
+    const { routes, compiler, parentInjector, parentRoute, serverConfigRouteTree, invokeGetPrerenderParams, includePrerenderFallbackRoutes, } = options;
     for (const route of routes) {
         try {
             const { path = '', redirectTo, loadChildren, children } = route;
@@ -596,7 +597,7 @@ async function* traverseRoutesConfig({ routes, compiler, parentInjector, parentR
             }
             else if (metadata.renderMode === RenderMode.Prerender) {
                 // Handle SSG routes
-                yield* handleSSGRoute(metadata, parentInjector, invokeGetPrerenderParams);
+                yield* handleSSGRoute(metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
             }
             else {
                 yield metadata;
@@ -604,12 +605,9 @@ async function* traverseRoutesConfig({ routes, compiler, parentInjector, parentR
             // Recursively process child routes
             if (children?.length) {
                 yield* traverseRoutesConfig({
+                    ...options,
                     routes: children,
-                    compiler,
-                    parentInjector,
                     parentRoute: currentRoutePath,
-                    serverConfigRouteTree,
-                    invokeGetPrerenderParams,
                 });
             }
             // Load and process lazy-loaded child routes
@@ -618,12 +616,10 @@ async function* traverseRoutesConfig({ routes, compiler, parentInjector, parentR
                 if (loadedChildRoutes) {
                     const { routes: childRoutes, injector = parentInjector } = loadedChildRoutes;
                     yield* traverseRoutesConfig({
+                        ...options,
                         routes: childRoutes,
-                        compiler,
                         parentInjector: injector,
                         parentRoute: currentRoutePath,
-                        serverConfigRouteTree,
-                        invokeGetPrerenderParams,
                     });
                 }
             }
@@ -640,9 +636,10 @@ async function* traverseRoutesConfig({ routes, compiler, parentInjector, parentR
  * @param metadata - The metadata associated with the route tree node.
  * @param parentInjector - The dependency injection container for the parent route.
  * @param invokeGetPrerenderParams - A flag indicating whether to invoke the `getPrerenderParams` function.
+ * @param includePrerenderFallbackRoutes - A flag indicating whether to include fallback routes in the result.
  * @returns An async iterable iterator that yields route tree node metadata for each SSG path or errors.
  */
-async function* handleSSGRoute(metadata, parentInjector, invokeGetPrerenderParams) {
+async function* handleSSGRoute(metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes) {
     if (metadata.renderMode !== RenderMode.Prerender) {
         throw new Error(`'handleSSGRoute' was called for a route which rendering mode is not prerender.`);
     }
@@ -691,7 +688,8 @@ async function* handleSSGRoute(metadata, parentInjector, invokeGetPrerenderParam
         }
     }
     // Handle fallback render modes
-    if (fallback !== PrerenderFallback.None || !invokeGetPrerenderParams) {
+    if (includePrerenderFallbackRoutes &&
+        (fallback !== PrerenderFallback.None || !invokeGetPrerenderParams)) {
         yield {
             ...meta,
             route: currentRoutePath,
@@ -757,9 +755,11 @@ function buildServerConfigRouteTree(serverRoutesConfig) {
  * for ensuring that API requests for relative paths succeed, which is essential for accurate route extraction.
  * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
  * to handle prerendering paths. Defaults to `false`.
+ * @param includePrerenderFallbackRoutes - A flag indicating whether to include fallback routes in the result. Defaults to `true`.
+ *
  * @returns A promise that resolves to an object of type `AngularRouterConfigResult` or errors.
  */
-async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams = false) {
+async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams = false, includePrerenderFallbackRoutes = true) {
     const { protocol, host } = url;
     // Create and initialize the Angular platform for server-side rendering.
     const platformRef = createPlatformFactory(platformCore, 'server', [
@@ -814,6 +814,7 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
                 parentRoute: '',
                 serverConfigRouteTree,
                 invokeGetPrerenderParams,
+                includePrerenderFallbackRoutes,
             });
             for await (const result of traverseRoutes) {
                 if ('error' in result) {
@@ -850,16 +851,17 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
  * If not provided, the default manifest is retrieved using `getAngularAppManifest()`.
  * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
  * to handle prerendering paths. Defaults to `false`.
+ * @param includePrerenderFallbackRoutes - A flag indicating whether to include fallback routes in the result. Defaults to `true`.
  *
  * @returns A promise that resolves to an object containing:
  *  - `routeTree`: A populated `RouteTree` containing all extracted routes from the Angular application.
  *  - `errors`: An array of strings representing any errors encountered during the route extraction process.
  */
-async function extractRoutesAndCreateRouteTree(url, manifest = getAngularAppManifest(), invokeGetPrerenderParams = false) {
+async function extractRoutesAndCreateRouteTree(url, manifest = getAngularAppManifest(), invokeGetPrerenderParams = false, includePrerenderFallbackRoutes = true) {
     const routeTree = new RouteTree();
     const document = await new ServerAssets(manifest).getIndexServerHtml();
     const bootstrap = await manifest.bootstrap();
-    const { baseHref, routes, errors } = await getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams);
+    const { baseHref, routes, errors } = await getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
     for (const { route, ...metadata } of routes) {
         if (metadata.redirectTo !== undefined) {
             metadata.redirectTo = joinUrlParts(baseHref, metadata.redirectTo);

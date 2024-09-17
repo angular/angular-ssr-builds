@@ -1,9 +1,10 @@
 import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderApplication, renderModule } from '@angular/platform-server';
 import * as fs from 'node:fs';
 import { dirname, join, normalize, resolve } from 'node:path';
-import { URL as URL$1 } from 'node:url';
+import { URL as URL$1, fileURLToPath } from 'node:url';
 import { ɵInlineCriticalCssProcessor as _InlineCriticalCssProcessor, AngularAppEngine } from '@angular/ssr';
 import { readFile } from 'node:fs/promises';
+import { argv } from 'node:process';
 
 class CommonEngineInlineCriticalCssProcessor {
     resourceCache = new Map();
@@ -351,5 +352,25 @@ async function writeResponseToNodeResponse(source, destination) {
     }
 }
 
-export { AngularNodeAppEngine, CommonEngine, createWebRequestFromNodeRequest, writeResponseToNodeResponse };
+/**
+ * Determines whether the provided URL represents the main entry point module.
+ *
+ * This function checks if the provided URL corresponds to the main ESM module being executed directly.
+ * It's useful for conditionally executing code that should only run when a module is the entry point,
+ * such as starting a server or initializing an application.
+ *
+ * It performs two key checks:
+ * 1. Verifies if the URL starts with 'file:', ensuring it is a local file.
+ * 2. Compares the URL's resolved file path with the first command-line argument (`process.argv[1]`),
+ *    which points to the file being executed.
+ *
+ * @param url The URL of the module to check. This should typically be `import.meta.url`.
+ * @returns `true` if the provided URL represents the main entry point, otherwise `false`.
+ * @developerPreview
+ */
+function isMainModule(url) {
+    return url.startsWith('file:') && argv[1] === fileURLToPath(url);
+}
+
+export { AngularNodeAppEngine, CommonEngine, createWebRequestFromNodeRequest, isMainModule, writeResponseToNodeResponse };
 //# sourceMappingURL=node.mjs.map

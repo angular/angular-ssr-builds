@@ -120,6 +120,11 @@ declare interface AngularAppManifest {
      * It is used for route matching and navigation within the server application.
      */
     readonly routes?: SerializableRouteTreeNode;
+    /**
+     * An optional string representing the locale or language code to be used for
+     * the application, aiding with localization and rendering content specific to the locale.
+     */
+    readonly locale?: string;
 }
 
 /**

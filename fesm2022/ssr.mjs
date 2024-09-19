@@ -1,5 +1,5 @@
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
-import { ɵConsole as _Console, InjectionToken, makeEnvironmentProviders, runInInjectionContext, createPlatformFactory, platformCore, ApplicationRef, ɵwhenStable as _whenStable, Compiler, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
+import { ɵConsole as _Console, InjectionToken, makeEnvironmentProviders, runInInjectionContext, createPlatformFactory, platformCore, ApplicationRef, ɵwhenStable as _whenStable, Compiler, LOCALE_ID, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
 import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule, renderApplication, INITIAL_CONFIG, ɵINTERNAL_SERVER_PLATFORM_PROVIDERS as _INTERNAL_SERVER_PLATFORM_PROVIDERS } from '@angular/platform-server';
 import { ɵloadChildren as _loadChildren, Router } from '@angular/router';
 import Critters from '../third_party/critters/index.js';
@@ -1326,7 +1326,10 @@ class AngularServerApp {
             // Initialize the response with status and headers if available.
             responseInit = {
                 status,
-                headers: headers ? new Headers(headers) : undefined,
+                headers: new Headers({
+                    'Content-Type': 'text/html;charset=UTF-8',
+                    ...headers,
+                }),
             };
             if (renderMode === RenderMode.Client) {
                 // Serve the client-side rendered version if the route is configured for CSR.
@@ -1343,15 +1346,21 @@ class AngularServerApp {
                 useValue: responseInit,
             });
         }
-        const { manifest, hooks, assets } = this;
+        const { manifest: { bootstrap, inlineCriticalCss, locale }, hooks, assets, } = this;
+        if (locale !== undefined) {
+            platformProviders.push({
+                provide: LOCALE_ID,
+                useValue: locale,
+            });
+        }
         let html = await assets.getIndexServerHtml();
         // Skip extra microtask if there are no pre hooks.
         if (hooks.has('html:transform:pre')) {
             html = await hooks.run('html:transform:pre', { html });
         }
-        this.boostrap ??= await manifest.bootstrap();
+        this.boostrap ??= await bootstrap();
         html = await renderAngular(html, this.boostrap, new URL(request.url), platformProviders, SERVER_CONTEXT_VALUE[renderMode]);
-        if (manifest.inlineCriticalCss) {
+        if (inlineCriticalCss) {
             // Optionally inline critical CSS.
             this.inlineCriticalCssProcessor ??= new InlineCriticalCssProcessor((path) => {
                 const fileName = path.split('/').pop() ?? path;
@@ -1522,10 +1531,10 @@ class AngularAppEngine {
             return new Map();
         }
         const { pathname } = stripIndexHtmlFromURL(new URL(request.url));
-        const headers = this.manifest.staticPathsHeaders.get(pathname);
+        const headers = this.manifest.staticPathsHeaders.get(stripTrailingSlash(pathname));
         return new Map(headers);
     }
 }
 
-export { AngularAppEngine, provideServerRoutesConfig, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
+export { AngularAppEngine, RenderMode, provideServerRoutesConfig, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
 //# sourceMappingURL=ssr.mjs.map

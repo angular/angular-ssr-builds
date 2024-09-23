@@ -1331,20 +1331,23 @@ class AngularServerApp {
                     ...headers,
                 }),
             };
-            if (renderMode === RenderMode.Client) {
+            if (renderMode === RenderMode.Server) {
+                // Configure platform providers for request and response only for SSR.
+                platformProviders.push({
+                    provide: REQUEST,
+                    useValue: request,
+                }, {
+                    provide: REQUEST_CONTEXT,
+                    useValue: requestContext,
+                }, {
+                    provide: RESPONSE_INIT,
+                    useValue: responseInit,
+                });
+            }
+            else if (renderMode === RenderMode.Client) {
                 // Serve the client-side rendered version if the route is configured for CSR.
                 return new Response(await this.assets.getServerAsset('index.csr.html'), responseInit);
             }
-            platformProviders.push({
-                provide: REQUEST,
-                useValue: request,
-            }, {
-                provide: REQUEST_CONTEXT,
-                useValue: requestContext,
-            }, {
-                provide: RESPONSE_INIT,
-                useValue: responseInit,
-            });
         }
         const { manifest: { bootstrap, inlineCriticalCss, locale }, hooks, assets, } = this;
         if (locale !== undefined) {
@@ -1356,10 +1359,10 @@ class AngularServerApp {
         let html = await assets.getIndexServerHtml();
         // Skip extra microtask if there are no pre hooks.
         if (hooks.has('html:transform:pre')) {
-            html = await hooks.run('html:transform:pre', { html });
+            html = await hooks.run('html:transform:pre', { html, url });
         }
         this.boostrap ??= await bootstrap();
-        html = await renderAngular(html, this.boostrap, new URL(request.url), platformProviders, SERVER_CONTEXT_VALUE[renderMode]);
+        html = await renderAngular(html, this.boostrap, url, platformProviders, SERVER_CONTEXT_VALUE[renderMode]);
         if (inlineCriticalCss) {
             // Optionally inline critical CSS.
             this.inlineCriticalCssProcessor ??= new InlineCriticalCssProcessor((path) => {
@@ -1536,5 +1539,33 @@ class AngularAppEngine {
     }
 }
 
-export { AngularAppEngine, RenderMode, provideServerRoutesConfig, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
+/**
+ * Annotates a request handler function with metadata, marking it as a special
+ * handler.
+ *
+ * @param handler - The request handler function to be annotated.
+ * @returns The same handler function passed in, with metadata attached.
+ *
+ * @example
+ * Example usage in a Hono application:
+ * ```ts
+ * const app = new Hono();
+ * export default createRequestHandler(app.fetch);
+ * ```
+ *
+ * @example
+ * Example usage in a H3 application:
+ * ```ts
+ * const app = createApp();
+ * const handler = toWebHandler(app);
+ * export default createRequestHandler(handler);
+ * ```
+ * @developerPreview
+ */
+function createRequestHandler(handler) {
+    handler['__ng_request_handler__'] = true;
+    return handler;
+}
+
+export { AngularAppEngine, RenderMode, createRequestHandler, provideServerRoutesConfig, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
 //# sourceMappingURL=ssr.mjs.map

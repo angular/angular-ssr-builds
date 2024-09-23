@@ -300,6 +300,55 @@ class AngularNodeAppEngine {
 }
 
 /**
+ * Attaches metadata to the handler function to mark it as a special handler for Node.js environments.
+ *
+ * @typeParam T - The type of the handler function.
+ * @param handler - The handler function to be defined and annotated.
+ * @returns The same handler function passed as an argument, with metadata attached.
+ *
+ * @example
+ * Usage in an Express application:
+ * ```ts
+ * const app = express();
+ * export default createNodeRequestHandler(app);
+ * ```
+ *
+ * @example
+ * Usage in a Hono application:
+ * ```ts
+ * const app = new Hono();
+ * export default createNodeRequestHandler(async (req, res, next) => {
+ *   try {
+ *     const webRes = await app.fetch(createWebRequestFromNodeRequest(req));
+ *     if (webRes) {
+ *       await writeResponseToNodeResponse(webRes, res);
+ *     } else {
+ *       next();
+ *     }
+ *   } catch (error) {
+ *     next(error);
+ *   }
+ * }));
+ * ```
+ *
+ * @example
+ * Usage in a Fastify application:
+ * ```ts
+ * const app = Fastify();
+ * export default createNodeRequestHandler(async (req, res) => {
+ *   await app.ready();
+ *   app.server.emit('request', req, res);
+ *   res.send('Hello from Fastify with Node Next Handler!');
+ * }));
+ * ```
+ * @developerPreview
+ */
+function createNodeRequestHandler(handler) {
+    handler['__ng_node_request_handler__'] = true;
+    return handler;
+}
+
+/**
  * Streams a web-standard `Response` into a Node.js `ServerResponse`.
  *
  * @param source - The web-standard `Response` object to stream from.
@@ -372,5 +421,5 @@ function isMainModule(url) {
     return url.startsWith('file:') && argv[1] === fileURLToPath(url);
 }
 
-export { AngularNodeAppEngine, CommonEngine, createWebRequestFromNodeRequest, isMainModule, writeResponseToNodeResponse };
+export { AngularNodeAppEngine, CommonEngine, createNodeRequestHandler, createWebRequestFromNodeRequest, isMainModule, writeResponseToNodeResponse };
 //# sourceMappingURL=node.mjs.map

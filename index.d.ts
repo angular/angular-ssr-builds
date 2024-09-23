@@ -238,6 +238,31 @@ declare class AngularServerApp {
     private handleRendering;
 }
 
+/**
+ * Annotates a request handler function with metadata, marking it as a special
+ * handler.
+ *
+ * @param handler - The request handler function to be annotated.
+ * @returns The same handler function passed in, with metadata attached.
+ *
+ * @example
+ * Example usage in a Hono application:
+ * ```ts
+ * const app = new Hono();
+ * export default createRequestHandler(app.fetch);
+ * ```
+ *
+ * @example
+ * Example usage in a H3 application:
+ * ```ts
+ * const app = createApp();
+ * const handler = toWebHandler(app);
+ * export default createRequestHandler(handler);
+ * ```
+ * @developerPreview
+ */
+export declare function createRequestHandler(handler: RequestHandlerFunction): RequestHandlerFunction;
+
 declare interface CrittersBase {
     embedLinkedStylesheet(link: PartialHTMLElement, document: PartialDocument): Promise<unknown>;
 }
@@ -315,13 +340,14 @@ declare interface HooksMapping {
 
 
 /**
- * Handler function type for HTML transformation hooks.
- * It takes an object containing the HTML content to be modified.
+ * Defines a handler function type for transforming HTML content.
+ * This function receives an object with the HTML to be processed.
  *
- * @param ctx - The context object containing the HTML content.
- * @returns The modified HTML content or a promise that resolves to the modified HTML content.
+ * @param ctx - An object containing the URL and HTML content to be transformed.
+ * @returns The transformed HTML as a string or a promise that resolves to the transformed HTML.
  */
 declare type HtmlTransformHandler = (ctx: {
+    url: URL;
     html: string;
 }) => string | Promise<string>;
 
@@ -396,6 +422,16 @@ export declare enum RenderMode {
     /** Static Site Generation (SSG) mode, where content is pre-rendered at build time and served as static files. */
     Prerender = 3
 }
+
+
+/**
+ * Function for handling HTTP requests in a web environment.
+ *
+ * @param request - The incoming HTTP request object.
+ * @returns A Promise resolving to a `Response` object, `null`, or directly a `Response`,
+ * supporting both synchronous and asynchronous handling.
+ */
+declare type RequestHandlerFunction = (request: Request) => Promise<Response | null> | null | Response;
 
 /**
  * A route tree implementation that supports efficient route matching, including support for wildcard routes.

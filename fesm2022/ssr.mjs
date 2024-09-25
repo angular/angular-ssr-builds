@@ -1039,14 +1039,17 @@ class ServerRouter {
 
 /**
  * Injection token for the current request.
+ * @developerPreview
  */
 const REQUEST = new InjectionToken('REQUEST');
 /**
  * Injection token for the response initialization options.
+ * @developerPreview
  */
 const RESPONSE_INIT = new InjectionToken('RESPONSE_INIT');
 /**
  * Injection token for additional request context.
+ * @developerPreview
  */
 const REQUEST_CONTEXT = new InjectionToken('REQUEST_CONTEXT');
 
@@ -1567,5 +1570,5 @@ function createRequestHandler(handler) {
     return handler;
 }
 
-export { AngularAppEngine, RenderMode, createRequestHandler, provideServerRoutesConfig, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
+export { AngularAppEngine, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, RenderMode, createRequestHandler, provideServerRoutesConfig, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
 //# sourceMappingURL=ssr.mjs.map

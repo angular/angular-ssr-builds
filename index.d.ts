@@ -28,6 +28,10 @@ export declare class AngularAppEngine {
      */
     private readonly manifest;
     /**
+     * A cache that holds entry points, keyed by their potential locale string.
+     */
+    private readonly entryPointsCache;
+    /**
      * Renders a response for the given HTTP request using the server application.
      *
      * This method processes the request, determines the appropriate route and rendering context,
@@ -44,18 +48,6 @@ export declare class AngularAppEngine {
      */
     render(request: Request, requestContext?: unknown): Promise<Response | null>;
     /**
-     * Retrieves the entry point path and locale for the Angular server application based on the provided URL.
-     *
-     * This method determines the appropriate entry point and locale for rendering the application by examining the URL.
-     * If there is only one entry point available, it is returned regardless of the URL.
-     * Otherwise, the method extracts a potential locale identifier from the URL and looks up the corresponding entry point.
-     *
-     * @param url - The URL used to derive the locale and determine the appropriate entry point.
-     * @returns A function that returns a promise resolving to an object with the `EntryPointExports` type,
-     * or `undefined` if no matching entry point is found for the extracted locale.
-     */
-    private getEntryPointFromUrl;
-    /**
      * Retrieves HTTP headers for a request associated with statically generated (SSG) pages,
      * based on the URL pathname.
      *
@@ -64,6 +56,25 @@ export declare class AngularAppEngine {
      * @note This function should be used exclusively for retrieving headers of SSG pages.
      */
     getPrerenderHeaders(request: Request): ReadonlyMap<string, string>;
+    /**
+     * Retrieves the exports for a specific entry point, caching the result.
+     *
+     * @param potentialLocale - The locale string used to find the corresponding entry point.
+     * @returns A promise that resolves to the entry point exports or `undefined` if not found.
+     */
+    private getEntryPointExports;
+    /**
+     * Retrieves the entry point for a given URL by determining the locale and mapping it to
+     * the appropriate application bundle.
+     *
+     * This method determines the appropriate entry point and locale for rendering the application by examining the URL.
+     * If there is only one entry point available, it is returned regardless of the URL.
+     * Otherwise, the method extracts a potential locale identifier from the URL and looks up the corresponding entry point.
+     *
+     * @param url - The URL of the request.
+     * @returns A promise that resolves to the entry point exports or `undefined` if not found.
+     */
+    private getEntryPointExportsForUrl;
 }
 
 /**

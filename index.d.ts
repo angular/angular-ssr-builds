@@ -526,7 +526,7 @@ declare class RouteTree<AdditionalMetadata extends Record<string, unknown> = {}>
      *
      * @param node - The current node to start the traversal from. Defaults to the root node of the tree.
      */
-    private traverse;
+    traverse(node?: RouteTreeNode<AdditionalMetadata>): Generator<RouteTreeNodeMetadata & AdditionalMetadata>;
     /**
      * Extracts the path segments from a given route string.
      *
@@ -564,6 +564,35 @@ declare class RouteTree<AdditionalMetadata extends Record<string, unknown> = {}>
      * @returns A new, empty route tree node.
      */
     private createEmptyRouteTreeNode;
+}
+
+/**
+ * Represents a node within the route tree structure.
+ * Each node corresponds to a route segment and may have associated metadata and child nodes.
+ * The `AdditionalMetadata` type parameter allows for extending the node metadata with custom data.
+ */
+declare interface RouteTreeNode<AdditionalMetadata extends Record<string, unknown>> {
+    /**
+     * The segment value associated with this node.
+     * A segment is a single part of a route path, typically delimited by slashes (`/`).
+     * For example, in the route `/users/:id/profile`, the segments are `users`, `:id`, and `profile`.
+     * Segments can also be wildcards (`*`), which match any segment in that position of the route.
+     */
+    segment: string;
+    /**
+     * The index indicating the order in which the route was inserted into the tree.
+     * This index helps determine the priority of routes during matching, with lower indexes
+     * indicating earlier inserted routes.
+     */
+    insertionIndex: number;
+    /**
+     * A map of child nodes, keyed by their corresponding route segment or wildcard.
+     */
+    children: Map<string, RouteTreeNode<AdditionalMetadata>>;
+    /**
+     * Optional metadata associated with this node, providing additional information such as redirects.
+     */
+    metadata?: RouteTreeNodeMetadata & AdditionalMetadata;
 }
 
 /**

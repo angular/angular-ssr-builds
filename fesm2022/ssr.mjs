@@ -1531,7 +1531,7 @@ class AngularAppEngine {
      * @param potentialLocale - The locale string used to find the corresponding entry point.
      * @returns A promise that resolves to the entry point exports or `undefined` if not found.
      */
-    async getEntryPointExports(potentialLocale) {
+    getEntryPointExports(potentialLocale) {
         const cachedEntryPoint = this.entryPointsCache.get(potentialLocale);
         if (cachedEntryPoint) {
             return cachedEntryPoint;
@@ -1541,7 +1541,7 @@ class AngularAppEngine {
         if (!entryPoint) {
             return undefined;
         }
-        const entryPointExports = await entryPoint();
+        const entryPointExports = entryPoint();
         this.entryPointsCache.set(potentialLocale, entryPointExports);
         return entryPointExports;
     }

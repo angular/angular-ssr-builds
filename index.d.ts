@@ -210,6 +210,14 @@ declare class AngularServerApp {
      */
     private boostrap;
     /**
+     * Cache for storing critical CSS for pages.
+     * Stores a maximum of MAX_INLINE_CSS_CACHE_ENTRIES entries.
+     *
+     * Uses an LRU (Least Recently Used) eviction policy, meaning that when the cache is full,
+     * the least recently accessed page's critical CSS will be removed to make space for new entries.
+     */
+    private readonly criticalCssLRUCache;
+    /**
      * Renders a response for the given HTTP request using the server application.
      *
      * This method processes the request and returns a response based on the specified rendering context.

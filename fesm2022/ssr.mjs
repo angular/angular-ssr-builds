@@ -1078,6 +1078,29 @@ const RESPONSE_INIT = new InjectionToken('RESPONSE_INIT');
 const REQUEST_CONTEXT = new InjectionToken('REQUEST_CONTEXT');
 
 /**
+ * Generates a SHA-256 hash of the provided string.
+ *
+ * @param data - The input string to be hashed.
+ * @returns A promise that resolves to the SHA-256 hash of the input,
+ * represented as a hexadecimal string.
+ */
+async function sha256(data) {
+    if (typeof crypto === 'undefined') {
+        // TODO(alanagius): remove once Node.js version 18 is no longer supported.
+        throw new Error(`The global 'crypto' module is unavailable. ` +
+            `If you are running on Node.js, please ensure you are using version 20 or later, ` +
+            `which includes built-in support for the Web Crypto module.`);
+    }
+    const encodedData = new TextEncoder().encode(data);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', encodedData);
+    const hashParts = [];
+    for (const h of new Uint8Array(hashBuffer)) {
+        hashParts.push(h.toString(16).padStart(2, '0'));
+    }
+    return hashParts.join('');
+}
+
+/**
  * Pattern used to extract the media query set by Critters in an `onload` handler.
  */
 const MEDIA_SET_HANDLER_PATTERN = /^this\.media=["'](.*)["'];?$/;
@@ -1235,6 +1258,126 @@ class InlineCriticalCssProcessor extends CrittersBase {
 }
 
 /**
+ * A Least Recently Used (LRU) cache implementation.
+ *
+ * This cache stores a fixed number of key-value pairs, and when the cache exceeds its capacity,
+ * the least recently accessed items are evicted.
+ *
+ * @template Key - The type of the cache keys.
+ * @template Value - The type of the cache values.
+ */
+class LRUCache {
+    /**
+     * Creates a new LRUCache instance.
+     * @param capacity The maximum number of items the cache can hold.
+     */
+    constructor(capacity) {
+        /**
+         * Internal storage for the cache, mapping keys to their associated nodes in the linked list.
+         */
+        this.cache = new Map();
+        this.capacity = capacity;
+    }
+    /**
+     * Gets the value associated with the given key.
+     * @param key The key to retrieve the value for.
+     * @returns The value associated with the key, or undefined if the key is not found.
+     */
+    get(key) {
+        const node = this.cache.get(key);
+        if (node) {
+            this.moveToHead(node);
+            return node.value;
+        }
+        return undefined;
+    }
+    /**
+     * Puts a key-value pair into the cache.
+     * If the key already exists, the value is updated.
+     * If the cache is full, the least recently used item is evicted.
+     * @param key The key to insert or update.
+     * @param value The value to associate with the key.
+     */
+    put(key, value) {
+        const cachedNode = this.cache.get(key);
+        if (cachedNode) {
+            // Update existing node
+            cachedNode.value = value;
+            this.moveToHead(cachedNode);
+            return;
+        }
+        // Create a new node
+        const newNode = { key, value, prev: undefined, next: undefined };
+        this.cache.set(key, newNode);
+        this.addToHead(newNode);
+        if (this.cache.size > this.capacity) {
+            // Evict the LRU item
+            const tail = this.removeTail();
+            if (tail) {
+                this.cache.delete(tail.key);
+            }
+        }
+    }
+    /**
+     * Adds a node to the head of the linked list.
+     * @param node The node to add.
+     */
+    addToHead(node) {
+        node.next = this.head;
+        node.prev = undefined;
+        if (this.head) {
+            this.head.prev = node;
+        }
+        this.head = node;
+        if (!this.tail) {
+            this.tail = node;
+        }
+    }
+    /**
+     * Removes a node from the linked list.
+     * @param node The node to remove.
+     */
+    removeNode(node) {
+        if (node.prev) {
+            node.prev.next = node.next;
+        }
+        else {
+            this.head = node.next;
+        }
+        if (node.next) {
+            node.next.prev = node.prev;
+        }
+        else {
+            this.tail = node.prev;
+        }
+    }
+    /**
+     * Moves a node to the head of the linked list.
+     * @param node The node to move.
+     */
+    moveToHead(node) {
+        this.removeNode(node);
+        this.addToHead(node);
+    }
+    /**
+     * Removes the tail node from the linked list.
+     * @returns The removed tail node, or undefined if the list is empty.
+     */
+    removeTail() {
+        const node = this.tail;
+        if (node) {
+            this.removeNode(node);
+        }
+        return node;
+    }
+}
+
+/**
+ * Maximum number of critical CSS entries the cache can store.
+ * This value determines the capacity of the LRU (Least Recently Used) cache, which stores critical CSS for pages.
+ */
+const MAX_INLINE_CSS_CACHE_ENTRIES = 50;
+/**
  * A mapping of `RenderMode` enum values to corresponding string representations.
  *
  * This record is used to map each `RenderMode` to a specific string value that represents
@@ -1272,6 +1415,14 @@ class AngularServerApp {
          * An instance of ServerAsset that handles server-side asset.
          */
         this.assets = new ServerAssets(this.manifest);
+        /**
+         * Cache for storing critical CSS for pages.
+         * Stores a maximum of MAX_INLINE_CSS_CACHE_ENTRIES entries.
+         *
+         * Uses an LRU (Least Recently Used) eviction policy, meaning that when the cache is full,
+         * the least recently accessed page's critical CSS will be removed to make space for new entries.
+         */
+        this.criticalCssLRUCache = new LRUCache(MAX_INLINE_CSS_CACHE_ENTRIES);
     }
     /**
      * Renders a response for the given HTTP request using the server application.
@@ -1396,7 +1547,19 @@ class AngularServerApp {
                 const fileName = path.split('/').pop() ?? path;
                 return this.assets.getServerAsset(fileName);
             });
-            html = await this.inlineCriticalCssProcessor.process(html);
+            if (isSsrMode) {
+                // Only cache if we are running in SSR Mode.
+                const cacheKey = await sha256(html);
+                let htmlWithCriticalCss = this.criticalCssLRUCache.get(cacheKey);
+                if (htmlWithCriticalCss === undefined) {
+                    htmlWithCriticalCss = await this.inlineCriticalCssProcessor.process(html);
+                    this.criticalCssLRUCache.put(cacheKey, htmlWithCriticalCss);
+                }
+                html = htmlWithCriticalCss;
+            }
+            else {
+                html = await this.inlineCriticalCssProcessor.process(html);
+            }
         }
         return new Response(html, responseInit);
     }

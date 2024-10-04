@@ -1085,12 +1085,6 @@ const REQUEST_CONTEXT = new InjectionToken('REQUEST_CONTEXT');
  * represented as a hexadecimal string.
  */
 async function sha256(data) {
-    if (typeof crypto === 'undefined') {
-        // TODO(alanagius): remove once Node.js version 18 is no longer supported.
-        throw new Error(`The global 'crypto' module is unavailable. ` +
-            `If you are running on Node.js, please ensure you are using version 20 or later, ` +
-            `which includes built-in support for the Web Crypto module.`);
-    }
     const encodedData = new TextEncoder().encode(data);
     const hashBuffer = await crypto.subtle.digest('SHA-256', encodedData);
     const hashParts = [];
@@ -1547,7 +1541,14 @@ class AngularServerApp {
                 const fileName = path.split('/').pop() ?? path;
                 return this.assets.getServerAsset(fileName);
             });
-            if (isSsrMode) {
+            // TODO(alanagius): remove once Node.js version 18 is no longer supported.
+            if (isSsrMode && typeof crypto === 'undefined') {
+                // eslint-disable-next-line no-console
+                console.error(`The global 'crypto' module is unavailable. ` +
+                    `If you are running on Node.js, please ensure you are using version 20 or later, ` +
+                    `which includes built-in support for the Web Crypto module.`);
+            }
+            if (isSsrMode && typeof crypto !== 'undefined') {
                 // Only cache if we are running in SSR Mode.
                 const cacheKey = await sha256(html);
                 let htmlWithCriticalCss = this.criticalCssLRUCache.get(cacheKey);

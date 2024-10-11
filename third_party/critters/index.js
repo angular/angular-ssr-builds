@@ -12764,7 +12764,7 @@ var require_critters = __commonJS({
       }
       process(html) {
         return __async(this, null, function* () {
-          const start = process.hrtime.bigint();
+          const start = Date.now();
           const document = createDocument(html);
           if (this.options.additionalStylesheets.length > 0) {
             this.embedAdditionalStylesheet(document);
@@ -12779,13 +12779,13 @@ var require_critters = __commonJS({
             yield this.mergeStylesheets(document);
           }
           const output = serializeDocument(document);
-          const end = process.hrtime.bigint();
-          this.logger.info("Time " + parseFloat(end - start) / 1e6);
+          const end = Date.now();
+          this.logger.info(`Time ${end - start}ms`);
           return output;
         });
       }
       getAffectedStyleTags(document) {
-        const styles = [].slice.call(document.querySelectorAll("style"));
+        const styles = [...document.querySelectorAll("style")];
         if (this.options.reduceInlineStyles === false) {
           return styles.filter((style) => style.$$external);
         }

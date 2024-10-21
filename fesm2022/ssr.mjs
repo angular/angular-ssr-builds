@@ -8,6 +8,7 @@ import Critters from '../third_party/critters/index.js';
  * Manages server-side assets.
  */
 class ServerAssets {
+    manifest;
     /**
      * Creates an instance of ServerAsset.
      *
@@ -48,13 +49,10 @@ class ServerAssets {
  * It overrides the `log` method to suppress logs that match certain predefined messages.
  */
 class Console extends _Console {
-    constructor() {
-        super(...arguments);
-        /**
-         * A set of log messages that should be ignored and not printed to the console.
-         */
-        this.ignoredLogs = new Set(['Angular is running in development mode.']);
-    }
+    /**
+     * A set of log messages that should be ignored and not printed to the console.
+     */
+    ignoredLogs = new Set(['Angular is running in development mode.']);
     /**
      * Logs a message to the console if it is not in the set of ignored messages.
      *
@@ -367,19 +365,17 @@ function provideServerRoutesConfig(routes) {
  * @typeParam AdditionalMetadata - Type of additional metadata that can be associated with route nodes.
  */
 class RouteTree {
-    constructor() {
-        /**
-         * The root node of the route tree.
-         * All routes are stored and accessed relative to this root node.
-         */
-        this.root = this.createEmptyRouteTreeNode('');
-        /**
-         * A counter that tracks the order of route insertion.
-         * This ensures that routes are matched in the order they were defined,
-         * with earlier routes taking precedence.
-         */
-        this.insertionIndexCounter = 0;
-    }
+    /**
+     * The root node of the route tree.
+     * All routes are stored and accessed relative to this root node.
+     */
+    root = this.createEmptyRouteTreeNode('');
+    /**
+     * A counter that tracks the order of route insertion.
+     * This ensures that routes are matched in the order they were defined,
+     * with earlier routes taking precedence.
+     */
+    insertionIndexCounter = 0;
     /**
      * Inserts a new route into the route tree.
      * The route is broken down into segments, and each segment is added to the tree.
@@ -904,13 +900,11 @@ async function extractRoutesAndCreateRouteTree(url, manifest = getAngularAppMani
  * Hooks are functions that can be invoked with specific arguments to allow modifications or enhancements.
  */
 class Hooks {
-    constructor() {
-        /**
-         * A map of hook names to arrays of hook functions.
-         * Each hook name can have multiple associated functions, which are executed in sequence.
-         */
-        this.store = new Map();
-    }
+    /**
+     * A map of hook names to arrays of hook functions.
+     * Each hook name can have multiple associated functions, which are executed in sequence.
+     */
+    store = new Map();
     /**
      * Executes all hooks associated with the specified name, passing the given argument to each hook function.
      * The hooks are invoked sequentially, and the argument may be modified by each hook.
@@ -996,6 +990,7 @@ class Hooks {
  * configuration and using it to match incoming requests to the appropriate routes.
  */
 class ServerRouter {
+    routeTree;
     /**
      * Creates an instance of the `ServerRouter`.
      *
@@ -1147,6 +1142,10 @@ class CrittersBase extends Critters {
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 class InlineCriticalCssProcessor extends CrittersBase {
+    readFile;
+    outputPath;
+    addedCspScriptsDocuments = new WeakSet();
+    documentNonces = new WeakMap();
     constructor(readFile, outputPath) {
         super({
             logger: {
@@ -1171,8 +1170,6 @@ class InlineCriticalCssProcessor extends CrittersBase {
         });
         this.readFile = readFile;
         this.outputPath = outputPath;
-        this.addedCspScriptsDocuments = new WeakSet();
-        this.documentNonces = new WeakMap();
     }
     /**
      * Override of the Critters `embedLinkedStylesheet` method
@@ -1262,14 +1259,26 @@ class InlineCriticalCssProcessor extends CrittersBase {
  */
 class LRUCache {
     /**
+     * The maximum number of items the cache can hold.
+     */
+    capacity;
+    /**
+     * Internal storage for the cache, mapping keys to their associated nodes in the linked list.
+     */
+    cache = new Map();
+    /**
+     * Head of the doubly linked list, representing the most recently used item.
+     */
+    head;
+    /**
+     * Tail of the doubly linked list, representing the least recently used item.
+     */
+    tail;
+    /**
      * Creates a new LRUCache instance.
      * @param capacity The maximum number of items the cache can hold.
      */
     constructor(capacity) {
-        /**
-         * Internal storage for the cache, mapping keys to their associated nodes in the linked list.
-         */
-        this.cache = new Map();
         this.capacity = capacity;
     }
     /**
@@ -1395,29 +1404,39 @@ const SERVER_CONTEXT_VALUE = {
  * The `AngularServerApp` class handles server-side rendering and asset management for a specific locale.
  */
 class AngularServerApp {
-    constructor() {
-        /**
-         * Hooks for extending or modifying the behavior of the server application.
-         * This instance can be used to attach custom functionality to various events in the server application lifecycle.
-         */
-        this.hooks = new Hooks();
-        /**
-         * The manifest associated with this server application.
-         */
-        this.manifest = getAngularAppManifest();
-        /**
-         * An instance of ServerAsset that handles server-side asset.
-         */
-        this.assets = new ServerAssets(this.manifest);
-        /**
-         * Cache for storing critical CSS for pages.
-         * Stores a maximum of MAX_INLINE_CSS_CACHE_ENTRIES entries.
-         *
-         * Uses an LRU (Least Recently Used) eviction policy, meaning that when the cache is full,
-         * the least recently accessed page's critical CSS will be removed to make space for new entries.
-         */
-        this.criticalCssLRUCache = new LRUCache(MAX_INLINE_CSS_CACHE_ENTRIES);
-    }
+    /**
+     * Hooks for extending or modifying the behavior of the server application.
+     * This instance can be used to attach custom functionality to various events in the server application lifecycle.
+     */
+    hooks = new Hooks();
+    /**
+     * The manifest associated with this server application.
+     */
+    manifest = getAngularAppManifest();
+    /**
+     * An instance of ServerAsset that handles server-side asset.
+     */
+    assets = new ServerAssets(this.manifest);
+    /**
+     * The router instance used for route matching and handling.
+     */
+    router;
+    /**
+     * The `inlineCriticalCssProcessor` is responsible for handling critical CSS inlining.
+     */
+    inlineCriticalCssProcessor;
+    /**
+     * The bootstrap mechanism for the server application.
+     */
+    boostrap;
+    /**
+     * Cache for storing critical CSS for pages.
+     * Stores a maximum of MAX_INLINE_CSS_CACHE_ENTRIES entries.
+     *
+     * Uses an LRU (Least Recently Used) eviction policy, meaning that when the cache is full,
+     * the least recently accessed page's critical CSS will be removed to make space for new entries.
+     */
+    criticalCssLRUCache = new LRUCache(MAX_INLINE_CSS_CACHE_ENTRIES);
     /**
      * Renders a response for the given HTTP request using the server application.
      *
@@ -1640,16 +1659,6 @@ function getPotentialLocaleIdFromUrl(url, basePath) {
  * @developerPreview
  */
 class AngularAppEngine {
-    constructor() {
-        /**
-         * The manifest for the server application.
-         */
-        this.manifest = getAngularAppEngineManifest();
-        /**
-         * A cache that holds entry points, keyed by their potential locale string.
-         */
-        this.entryPointsCache = new Map();
-    }
     /**
      * Hooks for extending or modifying the behavior of the server application.
      * These hooks are used by the Angular CLI when running the development server and
@@ -1657,7 +1666,7 @@ class AngularAppEngine {
      *
      * @private
      */
-    static { this.ɵhooks = new Hooks(); }
+    static ɵhooks = /* #__PURE__*/ new Hooks();
     /**
      * Provides access to the hooks for extending or modifying the server application's behavior.
      * This allows attaching custom functionality to various server application lifecycle events.
@@ -1667,6 +1676,14 @@ class AngularAppEngine {
     get hooks() {
         return AngularAppEngine.ɵhooks;
     }
+    /**
+     * The manifest for the server application.
+     */
+    manifest = getAngularAppEngineManifest();
+    /**
+     * A cache that holds entry points, keyed by their potential locale string.
+     */
+    entryPointsCache = new Map();
     /**
      * Renders a response for the given HTTP request using the server application.
      *

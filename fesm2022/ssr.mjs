@@ -2,6 +2,7 @@ import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import { ɵConsole as _Console, InjectionToken, makeEnvironmentProviders, runInInjectionContext, createPlatformFactory, platformCore, ApplicationRef, ɵwhenStable as _whenStable, Compiler, LOCALE_ID, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
 import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule, renderApplication, INITIAL_CONFIG, ɵINTERNAL_SERVER_PLATFORM_PROVIDERS as _INTERNAL_SERVER_PLATFORM_PROVIDERS } from '@angular/platform-server';
 import { ɵloadChildren as _loadChildren, Router } from '@angular/router';
+import { REQUEST, REQUEST_CONTEXT, RESPONSE_INIT } from '@angular/ssr/tokens';
 import Critters from '../third_party/critters/index.js';
 
 /**
@@ -1057,22 +1058,6 @@ class ServerRouter {
 }
 
 /**
- * Injection token for the current request.
- * @developerPreview
- */
-const REQUEST = new InjectionToken('REQUEST');
-/**
- * Injection token for the response initialization options.
- * @developerPreview
- */
-const RESPONSE_INIT = new InjectionToken('RESPONSE_INIT');
-/**
- * Injection token for additional request context.
- * @developerPreview
- */
-const REQUEST_CONTEXT = new InjectionToken('REQUEST_CONTEXT');
-
-/**
  * Generates a SHA-256 hash of the provided string.
  *
  * @param data - The input string to be hashed.
@@ -1799,5 +1784,5 @@ function createRequestHandler(handler) {
     return handler;
 }
 
-export { AngularAppEngine, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, RenderMode, createRequestHandler, provideServerRoutesConfig, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
+export { AngularAppEngine, RenderMode, createRequestHandler, provideServerRoutesConfig, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
 //# sourceMappingURL=ssr.mjs.map

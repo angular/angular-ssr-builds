@@ -1,7 +1,6 @@
 import type { ApplicationRef } from '@angular/core';
 import { default as default_2 } from 'critters';
 import { EnvironmentProviders } from '@angular/core';
-import { InjectionToken } from '@angular/core';
 import type { Type } from '@angular/core';
 
 /**
@@ -443,18 +442,6 @@ export declare enum RenderMode {
     Prerender = 3
 }
 
-/**
- * Injection token for the current request.
- * @developerPreview
- */
-export declare const REQUEST: InjectionToken<Request>;
-
-/**
- * Injection token for additional request context.
- * @developerPreview
- */
-export declare const REQUEST_CONTEXT: InjectionToken<unknown>;
-
 
 /**
  * Function for handling HTTP requests in a web environment.
@@ -464,12 +451,6 @@ export declare const REQUEST_CONTEXT: InjectionToken<unknown>;
  * supporting both synchronous and asynchronous handling.
  */
 declare type RequestHandlerFunction = (request: Request) => Promise<Response | null> | null | Response;
-
-/**
- * Injection token for the response initialization options.
- * @developerPreview
- */
-export declare const RESPONSE_INIT: InjectionToken<ResponseInit>;
 
 /**
  * A route tree implementation that supports efficient route matching, including support for wildcard routes.

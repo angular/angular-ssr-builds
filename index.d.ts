@@ -1,5 +1,5 @@
 import type { ApplicationRef } from '@angular/core';
-import { default as default_2 } from 'critters';
+import { default as default_2 } from 'beasties';
 import { EnvironmentProviders } from '@angular/core';
 import type { Type } from '@angular/core';
 
@@ -257,6 +257,13 @@ declare class AngularServerApp {
     private handleRendering;
 }
 
+declare interface BeastiesBase {
+    embedLinkedStylesheet(link: PartialHTMLElement, document: PartialDocument): Promise<unknown>;
+}
+
+declare class BeastiesBase extends default_2 {
+}
+
 /**
  * Annotates a request handler function with metadata, marking it as a special
  * handler.
@@ -281,13 +288,6 @@ declare class AngularServerApp {
  * @developerPreview
  */
 export declare function createRequestHandler(handler: RequestHandlerFunction): RequestHandlerFunction;
-
-declare interface CrittersBase {
-    embedLinkedStylesheet(link: PartialHTMLElement, document: PartialDocument): Promise<unknown>;
-}
-
-declare class CrittersBase extends default_2 {
-}
 
 /**
  * Represents the exports of an Angular server application entry point.
@@ -794,14 +794,14 @@ export declare function ɵgetOrCreateAngularServerApp(): AngularServerApp;
  */
 export declare function ɵgetRoutesFromAngularRouterConfig(bootstrap: AngularBootstrap, document: string, url: URL, invokeGetPrerenderParams?: boolean, includePrerenderFallbackRoutes?: boolean): Promise<AngularRouterConfigResult>;
 
-export declare class ɵInlineCriticalCssProcessor extends CrittersBase {
+export declare class ɵInlineCriticalCssProcessor extends BeastiesBase {
     readFile: (path: string) => Promise<string>;
     readonly outputPath?: string | undefined;
     private addedCspScriptsDocuments;
     private documentNonces;
     constructor(readFile: (path: string) => Promise<string>, outputPath?: string | undefined);
     /**
-     * Override of the Critters `embedLinkedStylesheet` method
+     * Override of the Beasties `embedLinkedStylesheet` method
      * that makes it work with Angular's CSP APIs.
      */
     embedLinkedStylesheet(link: PartialHTMLElement, document: PartialDocument): Promise<unknown>;

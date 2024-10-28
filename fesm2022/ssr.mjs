@@ -1,6 +1,6 @@
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
-import { ɵConsole as _Console, InjectionToken, makeEnvironmentProviders, runInInjectionContext, createPlatformFactory, platformCore, ApplicationRef, ɵwhenStable as _whenStable, Compiler, LOCALE_ID, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
-import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule, renderApplication, INITIAL_CONFIG, ɵINTERNAL_SERVER_PLATFORM_PROVIDERS as _INTERNAL_SERVER_PLATFORM_PROVIDERS } from '@angular/platform-server';
+import { ɵConsole as _Console, InjectionToken, makeEnvironmentProviders, runInInjectionContext, ApplicationRef, ɵwhenStable as _whenStable, Compiler, LOCALE_ID, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
+import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule, renderApplication, platformServer, INITIAL_CONFIG } from '@angular/platform-server';
 import { ɵloadChildren as _loadChildren, Router } from '@angular/router';
 import { REQUEST, REQUEST_CONTEXT, RESPONSE_INIT } from '@angular/ssr/tokens';
 import Critters from '../third_party/critters/index.js';
@@ -763,7 +763,7 @@ function buildServerConfigRouteTree(serverRoutesConfig) {
 async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams = false, includePrerenderFallbackRoutes = true) {
     const { protocol, host } = url;
     // Create and initialize the Angular platform for server-side rendering.
-    const platformRef = createPlatformFactory(platformCore, 'server', [
+    const platformRef = platformServer([
         {
             provide: INITIAL_CONFIG,
             useValue: { document, url: `${protocol}//${host}/` },
@@ -772,8 +772,7 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
             provide: _Console,
             useFactory: () => new Console(),
         },
-        ..._INTERNAL_SERVER_PLATFORM_PROVIDERS,
-    ])();
+    ]);
     try {
         let applicationRef;
         if (isNgModule(bootstrap)) {

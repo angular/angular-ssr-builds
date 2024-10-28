@@ -9,7 +9,7 @@ import { argv } from 'node:process';
 class CommonEngineInlineCriticalCssProcessor {
     resourceCache = new Map();
     async process(html, outputPath) {
-        const critters = new _InlineCriticalCssProcessor(async (path) => {
+        const beasties = new _InlineCriticalCssProcessor(async (path) => {
             let resourceContent = this.resourceCache.get(path);
             if (resourceContent === undefined) {
                 resourceContent = await readFile(path, 'utf-8');
@@ -17,7 +17,7 @@ class CommonEngineInlineCriticalCssProcessor {
             }
             return resourceContent;
         }, outputPath);
-        return critters.process(html);
+        return beasties.process(html);
     }
 }
 

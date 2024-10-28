@@ -3,7 +3,7 @@ import { ɵConsole as _Console, InjectionToken, makeEnvironmentProviders, runInI
 import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule, renderApplication, platformServer, INITIAL_CONFIG } from '@angular/platform-server';
 import { ɵloadChildren as _loadChildren, Router } from '@angular/router';
 import { REQUEST, REQUEST_CONTEXT, RESPONSE_INIT } from '@angular/ssr/tokens';
-import Critters from '../third_party/critters/index.js';
+import Beasties from '../third_party/beasties/index.js';
 
 /**
  * Manages server-side assets.
@@ -1078,11 +1078,11 @@ async function sha256(data) {
 }
 
 /**
- * Pattern used to extract the media query set by Critters in an `onload` handler.
+ * Pattern used to extract the media query set by Beasties in an `onload` handler.
  */
 const MEDIA_SET_HANDLER_PATTERN = /^this\.media=["'](.*)["'];?$/;
 /**
- * Name of the attribute used to save the Critters media query so it can be re-assigned on load.
+ * Name of the attribute used to save the Beasties media query so it can be re-assigned on load.
  */
 const CSP_MEDIA_ATTR = 'ngCspMedia';
 /**
@@ -1124,12 +1124,11 @@ const LINK_LOAD_SCRIPT_CONTENT = `
   };
 
   documentElement.addEventListener('load', listener, true);
-})();
-`.trim();
-class CrittersBase extends Critters {
+})();`;
+class BeastiesBase extends Beasties {
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
-class InlineCriticalCssProcessor extends CrittersBase {
+class InlineCriticalCssProcessor extends BeastiesBase {
     readFile;
     outputPath;
     addedCspScriptsDocuments = new WeakSet();
@@ -1160,7 +1159,7 @@ class InlineCriticalCssProcessor extends CrittersBase {
         this.outputPath = outputPath;
     }
     /**
-     * Override of the Critters `embedLinkedStylesheet` method
+     * Override of the Beasties `embedLinkedStylesheet` method
      * that makes it work with Angular's CSP APIs.
      */
     async embedLinkedStylesheet(link, document) {
@@ -1177,17 +1176,17 @@ class InlineCriticalCssProcessor extends CrittersBase {
         const returnValue = await super.embedLinkedStylesheet(link, document);
         const cspNonce = this.findCspNonce(document);
         if (cspNonce) {
-            const crittersMedia = link.getAttribute('onload')?.match(MEDIA_SET_HANDLER_PATTERN);
-            if (crittersMedia) {
-                // If there's a Critters-generated `onload` handler and the file has an Angular CSP nonce,
+            const beastiesMedia = link.getAttribute('onload')?.match(MEDIA_SET_HANDLER_PATTERN);
+            if (beastiesMedia) {
+                // If there's a Beasties-generated `onload` handler and the file has an Angular CSP nonce,
                 // we have to remove the handler, because it's incompatible with CSP. We save the value
                 // in a different attribute and we generate a script tag with the nonce that uses
                 // `addEventListener` to apply the media query instead.
                 link.removeAttribute('onload');
-                link.setAttribute(CSP_MEDIA_ATTR, crittersMedia[1]);
+                link.setAttribute(CSP_MEDIA_ATTR, beastiesMedia[1]);
                 this.conditionallyInsertCspLoadingScript(document, cspNonce, link);
             }
-            // Ideally we would hook in at the time Critters inserts the `style` tags, but there isn't
+            // Ideally we would hook in at the time Beasties inserts the `style` tags, but there isn't
             // a way of doing that at the moment so we fall back to doing it any time a `link` tag is
             // inserted. We mitigate it by only iterating the direct children of the `<head>` which
             // should be pretty shallow.
@@ -1207,7 +1206,7 @@ class InlineCriticalCssProcessor extends CrittersBase {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             return this.documentNonces.get(document);
         }
-        // HTML attribute are case-insensitive, but the parser used by Critters is case-sensitive.
+        // HTML attribute are case-insensitive, but the parser used by Beasties is case-sensitive.
         const nonceElement = document.querySelector('[ngCspNonce], [ngcspnonce]');
         const cspNonce = nonceElement?.getAttribute('ngCspNonce') || nonceElement?.getAttribute('ngcspnonce') || null;
         this.documentNonces.set(document, cspNonce);

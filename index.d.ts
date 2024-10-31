@@ -648,7 +648,7 @@ export declare type ServerRoute = ServerRouteAppShell | ServerRouteClient | Serv
 /**
  * A server route that uses AppShell rendering mode.
  */
-declare interface ServerRouteAppShell extends Omit<ServerRouteCommon, 'headers' | 'status'> {
+export declare interface ServerRouteAppShell extends Omit<ServerRouteCommon, 'headers' | 'status'> {
     /** Specifies that the route uses AppShell rendering mode. */
     renderMode: RenderMode.AppShell;
 }
@@ -656,7 +656,7 @@ declare interface ServerRouteAppShell extends Omit<ServerRouteCommon, 'headers' 
 /**
  * A server route that uses Client-Side Rendering (CSR) mode.
  */
-declare interface ServerRouteClient extends ServerRouteCommon {
+export declare interface ServerRouteClient extends ServerRouteCommon {
     /** Specifies that the route uses Client-Side Rendering (CSR) mode. */
     renderMode: RenderMode.Client;
 }
@@ -664,7 +664,7 @@ declare interface ServerRouteClient extends ServerRouteCommon {
 /**
  * Common interface for server routes, providing shared properties.
  */
-declare interface ServerRouteCommon {
+export declare interface ServerRouteCommon {
     /** The path associated with this route. */
     path: string;
     /** Optional additional headers to include in the response for this route. */
@@ -676,7 +676,7 @@ declare interface ServerRouteCommon {
 /**
  * A server route that uses Static Site Generation (SSG) mode.
  */
-declare interface ServerRoutePrerender extends Omit<ServerRouteCommon, 'status'> {
+export declare interface ServerRoutePrerender extends Omit<ServerRouteCommon, 'status'> {
     /** Specifies that the route uses Static Site Generation (SSG) mode. */
     renderMode: RenderMode.Prerender;
     /** Fallback cannot be specified unless `getPrerenderParams` is used. */
@@ -686,7 +686,7 @@ declare interface ServerRoutePrerender extends Omit<ServerRouteCommon, 'status'>
 /**
  * A server route configuration that uses Static Site Generation (SSG) mode, including support for routes with parameters.
  */
-declare interface ServerRoutePrerenderWithParams extends Omit<ServerRoutePrerender, 'fallback'> {
+export declare interface ServerRoutePrerenderWithParams extends Omit<ServerRoutePrerender, 'fallback'> {
     /**
      * Optional strategy to use if the SSG path is not pre-rendered.
      * This is especially relevant for routes with parameterized URLs, where some paths may not be pre-rendered at build time.
@@ -728,7 +728,7 @@ declare interface ServerRoutePrerenderWithParams extends Omit<ServerRoutePrerend
 /**
  * A server route that uses Server-Side Rendering (SSR) mode.
  */
-declare interface ServerRouteServer extends ServerRouteCommon {
+export declare interface ServerRouteServer extends ServerRouteCommon {
     /** Specifies that the route uses Server-Side Rendering (SSR) mode. */
     renderMode: RenderMode.Server;
 }

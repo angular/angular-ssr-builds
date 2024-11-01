@@ -31,30 +31,29 @@ export declare class AngularAppEngine {
      */
     private readonly entryPointsCache;
     /**
-     * Renders a response for the given HTTP request using the server application.
+     * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
+     * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.
      *
-     * This method processes the request, determines the appropriate route and rendering context,
-     * and returns an HTTP response.
+     * @param request - The HTTP request to handle.
+     * @param requestContext - Optional context for rendering, such as metadata associated with the request.
+     * @returns A promise that resolves to the resulting HTTP response object, or `null` if no matching Angular route is found.
      *
-     * If the request URL appears to be for a file (excluding `/index.html`), the method returns `null`.
-     * A request to `https://www.example.com/page/index.html` will render the Angular route
+     * @note A request to `https://www.example.com/page/index.html` will serve or render the Angular route
      * corresponding to `https://www.example.com/page`.
-     *
-     * @param request - The incoming HTTP request object to be rendered.
-     * @param requestContext - Optional additional context for the request, such as metadata.
-     * @returns A promise that resolves to a Response object, or `null` if the request URL represents a file (e.g., `./logo.png`)
-     * rather than an application route.
      */
-    render(request: Request, requestContext?: unknown): Promise<Response | null>;
+    handle(request: Request, requestContext?: unknown): Promise<Response | null>;
     /**
-     * Retrieves HTTP headers for a request associated with statically generated (SSG) pages,
-     * based on the URL pathname.
+     * Retrieves the Angular server application instance for a given request.
      *
-     * @param request - The incoming request object.
-     * @returns A `Map` containing the HTTP headers as key-value pairs.
-     * @note This function should be used exclusively for retrieving headers of SSG pages.
+     * This method checks if the request URL corresponds to an Angular application entry point.
+     * If so, it initializes or retrieves an instance of the Angular server application for that entry point.
+     * Requests that resemble file requests (except for `/index.html`) are skipped.
+     *
+     * @param request - The incoming HTTP request object.
+     * @returns A promise that resolves to an `AngularServerApp` instance if a valid entry point is found,
+     * or `null` if no entry point matches the request URL.
      */
-    getPrerenderHeaders(request: Request): ReadonlyMap<string, string>;
+    private getAngularServerAppForRequest;
     /**
      * Retrieves the exports for a specific entry point, caching the result.
      *
@@ -92,15 +91,6 @@ declare interface AngularAppEngineManifest {
      * This is used to determine the root path of the application.
      */
     readonly basePath: string;
-    /**
-     * A map that associates static paths with their corresponding HTTP headers.
-     * Each entry in the map consists of:
-     * - `key`: The static path as a string.
-     * - `value`: An array of tuples, where each tuple contains:
-     *   - `headerName`: The name of the HTTP header.
-     *   - `headerValue`: The value of the HTTP header.
-     */
-    readonly staticPathsHeaders: ReadonlyMap<string, readonly [headerName: string, headerValue: string][]>;
 }
 
 /**
@@ -113,7 +103,7 @@ declare interface AngularAppManifest {
      * - `key`: The path of the asset.
      * - `value`: A function returning a promise that resolves to the file contents of the asset.
      */
-    readonly assets: ReadonlyMap<string, () => Promise<string>>;
+    readonly assets: ReadonlyMap<string, ServerAsset>;
     /**
      * The bootstrap mechanism for the server application.
      * A function that returns a promise that resolves to an `NgModule` or a function
@@ -217,17 +207,6 @@ declare class AngularServerApp {
      */
     private readonly criticalCssLRUCache;
     /**
-     * Renders a response for the given HTTP request using the server application.
-     *
-     * This method processes the request and returns a response based on the specified rendering context.
-     *
-     * @param request - The incoming HTTP request to be rendered.
-     * @param requestContext - Optional additional context for rendering, such as request metadata.
-     *
-     * @returns A promise that resolves to the HTTP response object resulting from the rendering, or null if no match is found.
-     */
-    render(request: Request, requestContext?: unknown): Promise<Response | null>;
-    /**
      * Renders a page based on the provided URL via server-side rendering and returns the corresponding HTTP response.
      * The rendering process can be interrupted by an abort signal, where the first resolved promise (either from the abort
      * or the render process) will dictate the outcome.
@@ -238,18 +217,58 @@ declare class AngularServerApp {
      */
     renderStatic(url: URL, signal?: AbortSignal): Promise<Response | null>;
     /**
-     * Creates a promise that rejects when the request is aborted.
+     * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
+     * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.
      *
-     * @param request - The HTTP request to monitor for abortion.
-     * @returns A promise that never resolves but rejects with an `AbortError` if the request is aborted.
+     * @param request - The HTTP request to handle.
+     * @param requestContext - Optional context for rendering, such as metadata associated with the request.
+     * @returns A promise that resolves to the resulting HTTP response object, or `null` if no matching Angular route is found.
+     *
+     * @note A request to `https://www.example.com/page/index.html` will serve or render the Angular route
+     * corresponding to `https://www.example.com/page`.
      */
-    private createAbortPromise;
+    handle(request: Request, requestContext?: unknown): Promise<Response | null>;
+    /**
+     * Retrieves the matched route for the incoming request based on the request URL.
+     *
+     * @param request - The incoming HTTP request to match against routes.
+     * @returns A promise that resolves to the matched route metadata or `undefined` if no route matches.
+     */
+    private getMatchedRoute;
+    /**
+     * Handles serving a prerendered static asset if available for the matched route.
+     *
+     * @param request - The incoming HTTP request for serving a static page.
+     * @param matchedRoute - Optional parameter representing the metadata of the matched route for rendering.
+     * If not provided, the method attempts to find a matching route based on the request URL.
+     * @returns A promise that resolves to a `Response` object if the prerendered page is found, or `null`.
+     */
+    private handleServe;
+    /**
+     * Handles the server-side rendering process for the given HTTP request, allowing for abortion
+     * of the rendering if the request is aborted. This method matches the request URL to a route
+     * and performs rendering if a matching route is found.
+     *
+     * @param request - The incoming HTTP request to be processed. It includes a signal to monitor
+     * for abortion events.
+     * @param isSsrMode - A boolean indicating whether the rendering is performed in server-side
+     * rendering (SSR) mode.
+     * @param matchedRoute - Optional parameter representing the metadata of the matched route for
+     * rendering. If not provided, the method attempts to find a matching route based on the request URL.
+     * @param requestContext - Optional additional context for rendering, such as request metadata.
+     *
+     * @returns A promise that resolves to the rendered response, or null if no matching route is found.
+     * If the request is aborted, the promise will reject with an `AbortError`.
+     */
+    private handleAbortableRendering;
     /**
      * Handles the server-side rendering process for the given HTTP request.
      * This method matches the request URL to a route and performs rendering if a matching route is found.
      *
      * @param request - The incoming HTTP request to be processed.
      * @param isSsrMode - A boolean indicating whether the rendering is performed in server-side rendering (SSR) mode.
+     * @param matchedRoute - Optional parameter representing the metadata of the matched route for rendering.
+     * If not provided, the method attempts to find a matching route based on the request URL.
      * @param requestContext - Optional additional context for rendering, such as request metadata.
      *
      * @returns A promise that resolves to the rendered response, or null if no matching route is found.
@@ -638,6 +657,11 @@ declare type RouteTreeNodeMetadataWithoutRoute = Omit<RouteTreeNodeMetadata, 'ro
  * Each entry in the array corresponds to a specific node's metadata within the route tree.
  */
 declare type SerializableRouteTreeNode = ReadonlyArray<RouteTreeNodeMetadata>;
+
+/**
+ * A function that returns a promise resolving to the file contents of the asset.
+ */
+declare type ServerAsset = () => Promise<string>;
 
 /**
  * Server route configuration.

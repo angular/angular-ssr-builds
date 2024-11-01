@@ -659,9 +659,24 @@ declare type RouteTreeNodeMetadataWithoutRoute = Omit<RouteTreeNodeMetadata, 'ro
 declare type SerializableRouteTreeNode = ReadonlyArray<RouteTreeNodeMetadata>;
 
 /**
- * A function that returns a promise resolving to the file contents of the asset.
+ * Represents of a server asset stored in the manifest.
  */
-declare type ServerAsset = () => Promise<string>;
+declare interface ServerAsset {
+    /**
+     * Retrieves the text content of the asset.
+     *
+     * @returns A promise that resolves to the asset's content as a string.
+     */
+    text: () => Promise<string>;
+    /**
+     * A hash string representing the asset's content.
+     */
+    hash: string;
+    /**
+     * The size of the asset's content in bytes.
+     */
+    size: number;
+}
 
 /**
  * Server route configuration.

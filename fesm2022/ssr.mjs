@@ -21,16 +21,16 @@ class ServerAssets {
     /**
      * Retrieves the content of a server-side asset using its path.
      *
-     * @param path - The path to the server asset.
-     * @returns A promise that resolves to the asset content as a string.
-     * @throws Error If the asset path is not found in the manifest, an error is thrown.
+     * @param path - The path to the server asset within the manifest.
+     * @returns The server asset associated with the provided path, as a `ServerAsset` object.
+     * @throws Error - Throws an error if the asset does not exist.
      */
-    async getServerAsset(path) {
+    getServerAsset(path) {
         const asset = this.manifest.assets.get(path);
         if (!asset) {
             throw new Error(`Server asset '${path}' does not exist.`);
         }
-        return asset();
+        return asset;
     }
     /**
      * Checks if a specific server-side asset exists.
@@ -42,10 +42,10 @@ class ServerAssets {
         return this.manifest.assets.has(path);
     }
     /**
-     * Retrieves and caches the content of 'index.server.html'.
+     * Retrieves the asset for 'index.server.html'.
      *
-     * @returns A promise that resolves to the content of 'index.server.html'.
-     * @throws Error If there is an issue retrieving the asset.
+     * @returns The `ServerAsset` object for 'index.server.html'.
+     * @throws Error - Throws an error if 'index.server.html' does not exist.
      */
     getIndexServerHtml() {
         return this.getServerAsset('index.server.html');
@@ -892,7 +892,7 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
  */
 async function extractRoutesAndCreateRouteTree(url, manifest = getAngularAppManifest(), invokeGetPrerenderParams = false, includePrerenderFallbackRoutes = true) {
     const routeTree = new RouteTree();
-    const document = await new ServerAssets(manifest).getIndexServerHtml();
+    const document = await new ServerAssets(manifest).getIndexServerHtml().text();
     const bootstrap = await manifest.bootstrap();
     const { baseHref, routes, errors } = await getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
     for (const { route, ...metadata } of routes) {
@@ -1372,11 +1372,6 @@ class LRUCache {
 }
 
 /**
- * The default maximum age in seconds.
- * Represents the total number of seconds in a 365-day period.
- */
-const DEFAULT_MAX_AGE = 365 * 24 * 60 * 60;
-/**
  * Maximum number of critical CSS entries the cache can store.
  * This value determines the capacity of the LRU (Least Recently Used) cache, which stores critical CSS for pages.
  */
@@ -1511,16 +1506,18 @@ class AngularServerApp {
         if (!this.assets.hasServerAsset(assetPath)) {
             return null;
         }
-        // TODO(alanagius): handle etags
-        const content = await this.assets.getServerAsset(assetPath);
-        return new Response(content, {
-            headers: {
-                'Content-Type': 'text/html;charset=UTF-8',
-                // 30 days in seconds
-                'Cache-Control': `max-age=${DEFAULT_MAX_AGE}`,
-                ...headers,
-            },
-        });
+        const { text, hash, size } = this.assets.getServerAsset(assetPath);
+        const etag = `"${hash}"`;
+        return request.headers.get('if-none-match') === etag
+            ? new Response(undefined, { status: 304, statusText: 'Not Modified' })
+            : new Response(await text(), {
+                headers: {
+                    'Content-Length': size.toString(),
+                    'ETag': etag,
+                    'Content-Type': 'text/html;charset=UTF-8',
+                    ...headers,
+                },
+            });
     }
     /**
      * Handles the server-side rendering process for the given HTTP request, allowing for abortion
@@ -1602,8 +1599,7 @@ class AngularServerApp {
                 });
             }
             else if (renderMode === RenderMode.Client) {
-                // Serve the client-side rendered version if the route is configured for CSR.
-                return new Response(await this.assets.getServerAsset('index.csr.html'), responseInit);
+                return new Response(await this.assets.getServerAsset('index.csr.html').text(), responseInit);
             }
         }
         const { manifest: { bootstrap, inlineCriticalCss, locale }, hooks, assets, } = this;
@@ -1613,7 +1609,7 @@ class AngularServerApp {
                 useValue: locale,
             });
         }
-        let html = await assets.getIndexServerHtml();
+        let html = await assets.getIndexServerHtml().text();
         // Skip extra microtask if there are no pre hooks.
         if (hooks.has('html:transform:pre')) {
             html = await hooks.run('html:transform:pre', { html, url });
@@ -1624,7 +1620,7 @@ class AngularServerApp {
             // Optionally inline critical CSS.
             this.inlineCriticalCssProcessor ??= new InlineCriticalCssProcessor((path) => {
                 const fileName = path.split('/').pop() ?? path;
-                return this.assets.getServerAsset(fileName);
+                return this.assets.getServerAsset(fileName).text();
             });
             // TODO(alanagius): remove once Node.js version 18 is no longer supported.
             if (isSsrMode && typeof crypto === 'undefined') {

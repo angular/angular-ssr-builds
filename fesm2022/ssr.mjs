@@ -33,6 +33,15 @@ class ServerAssets {
         return asset();
     }
     /**
+     * Checks if a specific server-side asset exists.
+     *
+     * @param path - The path to the server asset.
+     * @returns A boolean indicating whether the asset exists.
+     */
+    hasServerAsset(path) {
+        return this.manifest.assets.has(path);
+    }
+    /**
      * Retrieves and caches the content of 'index.server.html'.
      *
      * @returns A promise that resolves to the content of 'index.server.html'.
@@ -1363,6 +1372,11 @@ class LRUCache {
 }
 
 /**
+ * The default maximum age in seconds.
+ * Represents the total number of seconds in a 365-day period.
+ */
+const DEFAULT_MAX_AGE = 365 * 24 * 60 * 60;
+/**
  * Maximum number of critical CSS entries the cache can store.
  * This value determines the capacity of the LRU (Least Recently Used) cache, which stores critical CSS for pages.
  */
@@ -1425,22 +1439,6 @@ class AngularServerApp {
      */
     criticalCssLRUCache = new LRUCache(MAX_INLINE_CSS_CACHE_ENTRIES);
     /**
-     * Renders a response for the given HTTP request using the server application.
-     *
-     * This method processes the request and returns a response based on the specified rendering context.
-     *
-     * @param request - The incoming HTTP request to be rendered.
-     * @param requestContext - Optional additional context for rendering, such as request metadata.
-     *
-     * @returns A promise that resolves to the HTTP response object resulting from the rendering, or null if no match is found.
-     */
-    render(request, requestContext) {
-        return Promise.race([
-            this.createAbortPromise(request),
-            this.handleRendering(request, /** isSsrMode */ true, requestContext),
-        ]);
-    }
-    /**
      * Renders a page based on the provided URL via server-side rendering and returns the corresponding HTTP response.
      * The rendering process can be interrupted by an abort signal, where the first resolved promise (either from the abort
      * or the render process) will dictate the outcome.
@@ -1451,37 +1449,20 @@ class AngularServerApp {
      */
     renderStatic(url, signal) {
         const request = new Request(url, { signal });
-        return Promise.race([
-            this.createAbortPromise(request),
-            this.handleRendering(request, /** isSsrMode */ false),
-        ]);
+        return this.handleAbortableRendering(request, /** isSsrMode */ false);
     }
     /**
-     * Creates a promise that rejects when the request is aborted.
+     * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
+     * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.
      *
-     * @param request - The HTTP request to monitor for abortion.
-     * @returns A promise that never resolves but rejects with an `AbortError` if the request is aborted.
+     * @param request - The HTTP request to handle.
+     * @param requestContext - Optional context for rendering, such as metadata associated with the request.
+     * @returns A promise that resolves to the resulting HTTP response object, or `null` if no matching Angular route is found.
+     *
+     * @note A request to `https://www.example.com/page/index.html` will serve or render the Angular route
+     * corresponding to `https://www.example.com/page`.
      */
-    createAbortPromise(request) {
-        return new Promise((_, reject) => {
-            request.signal.addEventListener('abort', () => {
-                const abortError = new Error(`Request for: ${request.url} was aborted.\n${request.signal.reason}`);
-                abortError.name = 'AbortError';
-                reject(abortError);
-            }, { once: true });
-        });
-    }
-    /**
-     * Handles the server-side rendering process for the given HTTP request.
-     * This method matches the request URL to a route and performs rendering if a matching route is found.
-     *
-     * @param request - The incoming HTTP request to be processed.
-     * @param isSsrMode - A boolean indicating whether the rendering is performed in server-side rendering (SSR) mode.
-     * @param requestContext - Optional additional context for rendering, such as request metadata.
-     *
-     * @returns A promise that resolves to the rendered response, or null if no matching route is found.
-     */
-    async handleRendering(request, isSsrMode, requestContext) {
+    async handle(request, requestContext) {
         const url = new URL(request.url);
         this.router ??= await ServerRouter.from(this.manifest, url);
         const matchedRoute = this.router.match(url);
@@ -1489,7 +1470,105 @@ class AngularServerApp {
             // Not a known Angular route.
             return null;
         }
+        if (matchedRoute.renderMode === RenderMode.Prerender) {
+            const response = await this.handleServe(request, matchedRoute);
+            if (response) {
+                return response;
+            }
+        }
+        return this.handleAbortableRendering(request, 
+        /** isSsrMode */ true, matchedRoute, requestContext);
+    }
+    /**
+     * Retrieves the matched route for the incoming request based on the request URL.
+     *
+     * @param request - The incoming HTTP request to match against routes.
+     * @returns A promise that resolves to the matched route metadata or `undefined` if no route matches.
+     */
+    async getMatchedRoute(request) {
+        this.router ??= await ServerRouter.from(this.manifest, new URL(request.url));
+        return this.router.match(new URL(request.url));
+    }
+    /**
+     * Handles serving a prerendered static asset if available for the matched route.
+     *
+     * @param request - The incoming HTTP request for serving a static page.
+     * @param matchedRoute - Optional parameter representing the metadata of the matched route for rendering.
+     * If not provided, the method attempts to find a matching route based on the request URL.
+     * @returns A promise that resolves to a `Response` object if the prerendered page is found, or `null`.
+     */
+    async handleServe(request, matchedRoute) {
+        matchedRoute ??= await this.getMatchedRoute(request);
+        if (!matchedRoute) {
+            return null;
+        }
+        const { headers, renderMode } = matchedRoute;
+        if (renderMode !== RenderMode.Prerender) {
+            return null;
+        }
+        const { pathname } = stripIndexHtmlFromURL(new URL(request.url));
+        const assetPath = stripLeadingSlash(joinUrlParts(pathname, 'index.html'));
+        if (!this.assets.hasServerAsset(assetPath)) {
+            return null;
+        }
+        // TODO(alanagius): handle etags
+        const content = await this.assets.getServerAsset(assetPath);
+        return new Response(content, {
+            headers: {
+                'Content-Type': 'text/html;charset=UTF-8',
+                // 30 days in seconds
+                'Cache-Control': `max-age=${DEFAULT_MAX_AGE}`,
+                ...headers,
+            },
+        });
+    }
+    /**
+     * Handles the server-side rendering process for the given HTTP request, allowing for abortion
+     * of the rendering if the request is aborted. This method matches the request URL to a route
+     * and performs rendering if a matching route is found.
+     *
+     * @param request - The incoming HTTP request to be processed. It includes a signal to monitor
+     * for abortion events.
+     * @param isSsrMode - A boolean indicating whether the rendering is performed in server-side
+     * rendering (SSR) mode.
+     * @param matchedRoute - Optional parameter representing the metadata of the matched route for
+     * rendering. If not provided, the method attempts to find a matching route based on the request URL.
+     * @param requestContext - Optional additional context for rendering, such as request metadata.
+     *
+     * @returns A promise that resolves to the rendered response, or null if no matching route is found.
+     * If the request is aborted, the promise will reject with an `AbortError`.
+     */
+    async handleAbortableRendering(request, isSsrMode, matchedRoute, requestContext) {
+        return Promise.race([
+            new Promise((_, reject) => {
+                request.signal.addEventListener('abort', () => {
+                    const abortError = new Error(`Request for: ${request.url} was aborted.\n${request.signal.reason}`);
+                    abortError.name = 'AbortError';
+                    reject(abortError);
+                }, { once: true });
+            }),
+            this.handleRendering(request, isSsrMode, matchedRoute, requestContext),
+        ]);
+    }
+    /**
+     * Handles the server-side rendering process for the given HTTP request.
+     * This method matches the request URL to a route and performs rendering if a matching route is found.
+     *
+     * @param request - The incoming HTTP request to be processed.
+     * @param isSsrMode - A boolean indicating whether the rendering is performed in server-side rendering (SSR) mode.
+     * @param matchedRoute - Optional parameter representing the metadata of the matched route for rendering.
+     * If not provided, the method attempts to find a matching route based on the request URL.
+     * @param requestContext - Optional additional context for rendering, such as request metadata.
+     *
+     * @returns A promise that resolves to the rendered response, or null if no matching route is found.
+     */
+    async handleRendering(request, isSsrMode, matchedRoute, requestContext) {
+        matchedRoute ??= await this.getMatchedRoute(request);
+        if (!matchedRoute) {
+            return null;
+        }
         const { redirectTo, status } = matchedRoute;
+        const url = new URL(request.url);
         if (redirectTo !== undefined) {
             // Note: The status code is validated during route extraction.
             // 302 Found is used by default for redirections
@@ -1672,21 +1751,32 @@ class AngularAppEngine {
      */
     entryPointsCache = new Map();
     /**
-     * Renders a response for the given HTTP request using the server application.
+     * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
+     * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.
      *
-     * This method processes the request, determines the appropriate route and rendering context,
-     * and returns an HTTP response.
+     * @param request - The HTTP request to handle.
+     * @param requestContext - Optional context for rendering, such as metadata associated with the request.
+     * @returns A promise that resolves to the resulting HTTP response object, or `null` if no matching Angular route is found.
      *
-     * If the request URL appears to be for a file (excluding `/index.html`), the method returns `null`.
-     * A request to `https://www.example.com/page/index.html` will render the Angular route
+     * @note A request to `https://www.example.com/page/index.html` will serve or render the Angular route
      * corresponding to `https://www.example.com/page`.
-     *
-     * @param request - The incoming HTTP request object to be rendered.
-     * @param requestContext - Optional additional context for the request, such as metadata.
-     * @returns A promise that resolves to a Response object, or `null` if the request URL represents a file (e.g., `./logo.png`)
-     * rather than an application route.
      */
-    async render(request, requestContext) {
+    async handle(request, requestContext) {
+        const serverApp = await this.getAngularServerAppForRequest(request);
+        return serverApp ? serverApp.handle(request, requestContext) : null;
+    }
+    /**
+     * Retrieves the Angular server application instance for a given request.
+     *
+     * This method checks if the request URL corresponds to an Angular application entry point.
+     * If so, it initializes or retrieves an instance of the Angular server application for that entry point.
+     * Requests that resemble file requests (except for `/index.html`) are skipped.
+     *
+     * @param request - The incoming HTTP request object.
+     * @returns A promise that resolves to an `AngularServerApp` instance if a valid entry point is found,
+     * or `null` if no entry point matches the request URL.
+     */
+    async getAngularServerAppForRequest(request) {
         // Skip if the request looks like a file but not `/index.html`.
         const url = new URL(request.url);
         const entryPoint = await this.getEntryPointExportsForUrl(url);
@@ -1699,23 +1789,7 @@ class AngularAppEngine {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
         const serverApp = getOrCreateAngularServerApp();
         serverApp.hooks = this.hooks;
-        return serverApp.render(request, requestContext);
-    }
-    /**
-     * Retrieves HTTP headers for a request associated with statically generated (SSG) pages,
-     * based on the URL pathname.
-     *
-     * @param request - The incoming request object.
-     * @returns A `Map` containing the HTTP headers as key-value pairs.
-     * @note This function should be used exclusively for retrieving headers of SSG pages.
-     */
-    getPrerenderHeaders(request) {
-        if (this.manifest.staticPathsHeaders.size === 0) {
-            return new Map();
-        }
-        const { pathname } = stripIndexHtmlFromURL(new URL(request.url));
-        const headers = this.manifest.staticPathsHeaders.get(stripTrailingSlash(pathname));
-        return new Map(headers);
+        return serverApp;
     }
     /**
      * Retrieves the exports for a specific entry point, caching the result.

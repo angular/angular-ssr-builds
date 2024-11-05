@@ -416,7 +416,7 @@ declare interface PartialHTMLElement {
 /**
  * Defines the fallback strategies for Static Site Generation (SSG) routes when a pre-rendered path is not available.
  * This is particularly relevant for routes with parameterized URLs where some paths might not be pre-rendered at build time.
- *
+ * @see {@link ServerRoutePrerenderWithParams}
  * @developerPreview
  */
 export declare enum PrerenderFallback {
@@ -442,12 +442,15 @@ export declare enum PrerenderFallback {
  *
  * @param routes - An array of server routes to be provided.
  * @returns An `EnvironmentProviders` object that contains the server routes configuration.
+ * @see {@link ServerRoute}
  * @developerPreview
  */
 export declare function provideServerRoutesConfig(routes: ServerRoute[]): EnvironmentProviders;
 
 /**
  * Different rendering modes for server routes.
+ * @see {@link provideServerRoutesConfig}
+ * @see {@link ServerRoute}
  * @developerPreview
  */
 export declare enum RenderMode {
@@ -468,8 +471,9 @@ export declare enum RenderMode {
  * @param request - The incoming HTTP request object.
  * @returns A Promise resolving to a `Response` object, `null`, or directly a `Response`,
  * supporting both synchronous and asynchronous handling.
+ * @developerPreview
  */
-declare type RequestHandlerFunction = (request: Request) => Promise<Response | null> | null | Response;
+export declare type RequestHandlerFunction = (request: Request) => Promise<Response | null> | null | Response;
 
 /**
  * A route tree implementation that supports efficient route matching, including support for wildcard routes.
@@ -680,12 +684,15 @@ declare interface ServerAsset {
 
 /**
  * Server route configuration.
+ * @see {@link provideServerRoutesConfig}
  * @developerPreview
  */
 export declare type ServerRoute = ServerRouteAppShell | ServerRouteClient | ServerRoutePrerender | ServerRoutePrerenderWithParams | ServerRouteServer;
 
 /**
  * A server route that uses AppShell rendering mode.
+ * @see {@link RenderMode}
+ * @developerPreview
  */
 export declare interface ServerRouteAppShell extends Omit<ServerRouteCommon, 'headers' | 'status'> {
     /** Specifies that the route uses AppShell rendering mode. */
@@ -694,6 +701,8 @@ export declare interface ServerRouteAppShell extends Omit<ServerRouteCommon, 'he
 
 /**
  * A server route that uses Client-Side Rendering (CSR) mode.
+ * @see {@link RenderMode}
+ * @developerPreview
  */
 export declare interface ServerRouteClient extends ServerRouteCommon {
     /** Specifies that the route uses Client-Side Rendering (CSR) mode. */
@@ -702,6 +711,7 @@ export declare interface ServerRouteClient extends ServerRouteCommon {
 
 /**
  * Common interface for server routes, providing shared properties.
+ * @developerPreview
  */
 export declare interface ServerRouteCommon {
     /** The path associated with this route. */
@@ -714,6 +724,8 @@ export declare interface ServerRouteCommon {
 
 /**
  * A server route that uses Static Site Generation (SSG) mode.
+ * @see {@link RenderMode}
+ * @developerPreview
  */
 export declare interface ServerRoutePrerender extends Omit<ServerRouteCommon, 'status'> {
     /** Specifies that the route uses Static Site Generation (SSG) mode. */
@@ -724,6 +736,10 @@ export declare interface ServerRoutePrerender extends Omit<ServerRouteCommon, 's
 
 /**
  * A server route configuration that uses Static Site Generation (SSG) mode, including support for routes with parameters.
+ * @see {@link RenderMode}
+ * @see {@link ServerRoutePrerender}
+ * @see {@link PrerenderFallback}
+ * @developerPreview
  */
 export declare interface ServerRoutePrerenderWithParams extends Omit<ServerRoutePrerender, 'fallback'> {
     /**
@@ -766,6 +782,8 @@ export declare interface ServerRoutePrerenderWithParams extends Omit<ServerRoute
 
 /**
  * A server route that uses Server-Side Rendering (SSR) mode.
+ * @see {@link RenderMode}
+ * @developerPreview
  */
 export declare interface ServerRouteServer extends ServerRouteCommon {
     /** Specifies that the route uses Server-Side Rendering (SSR) mode. */

@@ -124,7 +124,7 @@ export declare interface CommonEngineRenderOptions {
  * ```
  * @developerPreview
  */
-export declare function createNodeRequestHandler<T extends RequestHandlerFunction>(handler: T): T;
+export declare function createNodeRequestHandler<T extends NodeRequestHandlerFunction>(handler: T): T;
 
 /**
  * Converts a Node.js `IncomingMessage` into a Web Standard `Request`.
@@ -162,8 +162,9 @@ export declare function isMainModule(url: string): boolean;
  * @param next - A callback function that signals the completion of the middleware or forwards the error if provided.
  *
  * @returns A Promise that resolves to void or simply void. The handler can be asynchronous.
+ * @developerPreview
  */
-declare type RequestHandlerFunction = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => Promise<void> | void;
+export declare type NodeRequestHandlerFunction = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => Promise<void> | void;
 
 /**
  * Streams a web-standard `Response` into a Node.js `ServerResponse`.

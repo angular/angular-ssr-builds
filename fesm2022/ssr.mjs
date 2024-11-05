@@ -309,6 +309,8 @@ function isNgModule(value) {
 
 /**
  * Different rendering modes for server routes.
+ * @see {@link provideServerRoutesConfig}
+ * @see {@link ServerRoute}
  * @developerPreview
  */
 var RenderMode;
@@ -325,7 +327,7 @@ var RenderMode;
 /**
  * Defines the fallback strategies for Static Site Generation (SSG) routes when a pre-rendered path is not available.
  * This is particularly relevant for routes with parameterized URLs where some paths might not be pre-rendered at build time.
- *
+ * @see {@link ServerRoutePrerenderWithParams}
  * @developerPreview
  */
 var PrerenderFallback;
@@ -356,9 +358,13 @@ const SERVER_ROUTES_CONFIG = new InjectionToken('SERVER_ROUTES_CONFIG');
  *
  * @param routes - An array of server routes to be provided.
  * @returns An `EnvironmentProviders` object that contains the server routes configuration.
+ * @see {@link ServerRoute}
  * @developerPreview
  */
 function provideServerRoutesConfig(routes) {
+    if (typeof ngServerMode === 'undefined' || !ngServerMode) {
+        throw new Error(`The 'provideServerRoutesConfig' function should not be invoked within the browser portion of the application.`);
+    }
     return makeEnvironmentProviders([
         {
             provide: SERVER_ROUTES_CONFIG,

@@ -15,6 +15,15 @@ import type { Type } from '@angular/core';
  */
 export declare class AngularAppEngine {
     /**
+     * A flag to enable or disable the rendering of prerendered routes.
+     *
+     * Typically used during development to avoid prerendering all routes ahead of time,
+     * allowing them to be rendered on the fly as requested.
+     *
+     * @private
+     */
+    static ɵallowStaticRouteRender: boolean;
+    /**
      * Hooks for extending or modifying the behavior of the server application.
      * These hooks are used by the Angular CLI when running the development server and
      * provide extensibility points for the application lifecycle.
@@ -173,11 +182,25 @@ declare interface AngularRouterConfigResult {
  * The `AngularServerApp` class handles server-side rendering and asset management for a specific locale.
  */
 declare class AngularServerApp {
+    private readonly options;
     /**
-     * Hooks for extending or modifying the behavior of the server application.
-     * This instance can be used to attach custom functionality to various events in the server application lifecycle.
+     * Whether prerendered routes should be rendered on demand or served directly.
+     *
+     * @see {@link AngularServerAppOptions.allowStaticRouteRender} for more details.
      */
-    hooks: Hooks;
+    private readonly allowStaticRouteRender;
+    /**
+     * Hooks for extending or modifying server behavior.
+     *
+     * @see {@link AngularServerAppOptions.hooks} for more details.
+     */
+    readonly hooks: Hooks;
+    /**
+     * Constructs an instance of `AngularServerApp`.
+     *
+     * @param options Optional configuration options for the server application.
+     */
+    constructor(options?: Readonly<AngularServerAppOptions>);
     /**
      * The manifest associated with this server application.
      */
@@ -207,16 +230,6 @@ declare class AngularServerApp {
      */
     private readonly criticalCssLRUCache;
     /**
-     * Renders a page based on the provided URL via server-side rendering and returns the corresponding HTTP response.
-     * The rendering process can be interrupted by an abort signal, where the first resolved promise (either from the abort
-     * or the render process) will dictate the outcome.
-     *
-     * @param url - The full URL to be processed and rendered by the server.
-     * @param signal - (Optional) An `AbortSignal` object that allows for the cancellation of the rendering process.
-     * @returns A promise that resolves to the generated HTTP response object, or `null` if no matching route is found.
-     */
-    renderStatic(url: URL, signal?: AbortSignal): Promise<Response | null>;
-    /**
      * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
      * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.
      *
@@ -229,51 +242,59 @@ declare class AngularServerApp {
      */
     handle(request: Request, requestContext?: unknown): Promise<Response | null>;
     /**
-     * Retrieves the matched route for the incoming request based on the request URL.
-     *
-     * @param request - The incoming HTTP request to match against routes.
-     * @returns A promise that resolves to the matched route metadata or `undefined` if no route matches.
-     */
-    private getMatchedRoute;
-    /**
      * Handles serving a prerendered static asset if available for the matched route.
      *
+     * This method only supports `GET` and `HEAD` requests.
+     *
      * @param request - The incoming HTTP request for serving a static page.
-     * @param matchedRoute - Optional parameter representing the metadata of the matched route for rendering.
+     * @param matchedRoute - The metadata of the matched route for rendering.
      * If not provided, the method attempts to find a matching route based on the request URL.
      * @returns A promise that resolves to a `Response` object if the prerendered page is found, or `null`.
      */
     private handleServe;
     /**
-     * Handles the server-side rendering process for the given HTTP request, allowing for abortion
-     * of the rendering if the request is aborted. This method matches the request URL to a route
-     * and performs rendering if a matching route is found.
-     *
-     * @param request - The incoming HTTP request to be processed. It includes a signal to monitor
-     * for abortion events.
-     * @param isSsrMode - A boolean indicating whether the rendering is performed in server-side
-     * rendering (SSR) mode.
-     * @param matchedRoute - Optional parameter representing the metadata of the matched route for
-     * rendering. If not provided, the method attempts to find a matching route based on the request URL.
-     * @param requestContext - Optional additional context for rendering, such as request metadata.
-     *
-     * @returns A promise that resolves to the rendered response, or null if no matching route is found.
-     * If the request is aborted, the promise will reject with an `AbortError`.
-     */
-    private handleAbortableRendering;
-    /**
      * Handles the server-side rendering process for the given HTTP request.
      * This method matches the request URL to a route and performs rendering if a matching route is found.
      *
      * @param request - The incoming HTTP request to be processed.
-     * @param isSsrMode - A boolean indicating whether the rendering is performed in server-side rendering (SSR) mode.
-     * @param matchedRoute - Optional parameter representing the metadata of the matched route for rendering.
+     * @param matchedRoute - The metadata of the matched route for rendering.
      * If not provided, the method attempts to find a matching route based on the request URL.
      * @param requestContext - Optional additional context for rendering, such as request metadata.
      *
      * @returns A promise that resolves to the rendered response, or null if no matching route is found.
      */
     private handleRendering;
+    /**
+     * Returns a promise that rejects if the request is aborted.
+     *
+     * @param request - The HTTP request object being monitored for abortion.
+     * @returns A promise that never resolves and rejects with an `AbortError`
+     * if the request is aborted.
+     */
+    private waitForRequestAbort;
+}
+
+/**
+ * Options for configuring an `AngularServerApp`.
+ */
+declare interface AngularServerAppOptions {
+    /**
+     * Whether to allow rendering of prerendered routes.
+     *
+     * When enabled, prerendered routes will be served directly. When disabled, they will be
+     * rendered on demand.
+     *
+     * Defaults to `false`.
+     */
+    allowStaticRouteRender?: boolean;
+    /**
+     *  Hooks for extending or modifying server behavior.
+     *
+     * This allows customization of the server's rendering process and other lifecycle events.
+     *
+     * If not provided, a new `Hooks` instance is created.
+     */
+    hooks?: Hooks;
 }
 
 declare interface BeastiesBase {
@@ -646,9 +667,8 @@ declare interface RouteTreeNodeMetadata {
     headers?: Record<string, string>;
     /**
      * Specifies the rendering mode used for this route.
-     * If not provided, the default rendering mode for the application will be used.
      */
-    renderMode?: RenderMode;
+    renderMode: RenderMode;
 }
 
 /**
@@ -827,9 +847,12 @@ export declare function ɵextractRoutesAndCreateRouteTree(url: URL, manifest?: A
  * Retrieves or creates an instance of `AngularServerApp`.
  * - If an instance of `AngularServerApp` already exists, it will return the existing one.
  * - If no instance exists, it will create a new one with the provided options.
+ *
+ * @param options Optional configuration options for the server application.
+ *
  * @returns The existing or newly created instance of `AngularServerApp`.
  */
-export declare function ɵgetOrCreateAngularServerApp(): AngularServerApp;
+export declare function ɵgetOrCreateAngularServerApp(options?: Readonly<AngularServerAppOptions>): AngularServerApp;
 
 /**
  * Retrieves routes from the given Angular application.

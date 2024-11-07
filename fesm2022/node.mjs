@@ -183,9 +183,21 @@ function isBootstrapFn(value) {
 }
 
 /**
- * Converts a Node.js `IncomingMessage` into a Web Standard `Request`.
+ * A set containing all the pseudo-headers defined in the HTTP/2 specification.
  *
- * @param nodeRequest - The Node.js `IncomingMessage` object to convert.
+ * This set can be used to filter out pseudo-headers from a list of headers,
+ * as they are not allowed to be set directly using the `Node.js` Undici API or
+ * the web `Headers` API.
+ */
+const HTTP2_PSEUDO_HEADERS = new Set([':method', ':scheme', ':authority', ':path', ':status']);
+/**
+ * Converts a Node.js `IncomingMessage` or `Http2ServerRequest` into a
+ * Web Standard `Request` object.
+ *
+ * This function adapts the Node.js request objects to a format that can
+ * be used by web platform APIs.
+ *
+ * @param nodeRequest - The Node.js request object (`IncomingMessage` or `Http2ServerRequest`) to convert.
  * @returns A Web Standard `Request` object.
  * @developerPreview
  */
@@ -208,6 +220,9 @@ function createWebRequestFromNodeRequest(nodeRequest) {
 function createRequestHeaders(nodeHeaders) {
     const headers = new Headers();
     for (const [name, value] of Object.entries(nodeHeaders)) {
+        if (HTTP2_PSEUDO_HEADERS.has(name)) {
+            continue;
+        }
         if (typeof value === 'string') {
             headers.append(name, value);
         }
@@ -222,7 +237,7 @@ function createRequestHeaders(nodeHeaders) {
 /**
  * Creates a `URL` object from a Node.js `IncomingMessage`, taking into account the protocol, host, and port.
  *
- * @param nodeRequest - The Node.js `IncomingMessage` object to extract URL information from.
+ * @param nodeRequest - The Node.js `IncomingMessage` or `Http2ServerRequest` object to extract URL information from.
  * @returns A `URL` object representing the request URL.
  */
 function createRequestUrl(nodeRequest) {
@@ -256,7 +271,10 @@ class AngularNodeAppEngine {
      * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
      * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.
      *
-     * @param request - The HTTP request to handle.
+     * This method adapts Node.js's `IncomingMessage` or `Http2ServerRequest`
+     * to a format compatible with the `AngularAppEngine` and delegates the handling logic to it.
+     *
+     * @param request - The incoming HTTP request (`IncomingMessage` or `Http2ServerRequest`).
      * @param requestContext - Optional context for rendering, such as metadata associated with the request.
      * @returns A promise that resolves to the resulting HTTP response object, or `null` if no matching Angular route is found.
      *
@@ -319,10 +337,14 @@ function createNodeRequestHandler(handler) {
 }
 
 /**
- * Streams a web-standard `Response` into a Node.js `ServerResponse`.
+ * Streams a web-standard `Response` into a Node.js `ServerResponse`
+ * or `Http2ServerResponse`.
+ *
+ * This function adapts the web `Response` object to write its content
+ * to a Node.js response object, handling both HTTP/1.1 and HTTP/2.
  *
  * @param source - The web-standard `Response` object to stream from.
- * @param destination - The Node.js `ServerResponse` object to stream into.
+ * @param destination - The Node.js response object (`ServerResponse` or `Http2ServerResponse`) to stream into.
  * @returns A promise that resolves once the streaming operation is complete.
  * @developerPreview
  */

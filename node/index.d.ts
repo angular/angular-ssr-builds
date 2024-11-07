@@ -1,4 +1,6 @@
 import { ApplicationRef } from '@angular/core';
+import type { Http2ServerRequest } from 'node:http2';
+import type { Http2ServerResponse } from 'node:http2';
 import type { IncomingMessage } from 'node:http';
 import type { ServerResponse } from 'node:http';
 import { StaticProvider } from '@angular/core';
@@ -20,14 +22,17 @@ export declare class AngularNodeAppEngine {
      * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
      * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.
      *
-     * @param request - The HTTP request to handle.
+     * This method adapts Node.js's `IncomingMessage` or `Http2ServerRequest`
+     * to a format compatible with the `AngularAppEngine` and delegates the handling logic to it.
+     *
+     * @param request - The incoming HTTP request (`IncomingMessage` or `Http2ServerRequest`).
      * @param requestContext - Optional context for rendering, such as metadata associated with the request.
      * @returns A promise that resolves to the resulting HTTP response object, or `null` if no matching Angular route is found.
      *
      * @remarks A request to `https://www.example.com/page/index.html` will serve or render the Angular route
      * corresponding to `https://www.example.com/page`.
      */
-    handle(request: IncomingMessage, requestContext?: unknown): Promise<Response | null>;
+    handle(request: IncomingMessage | Http2ServerRequest, requestContext?: unknown): Promise<Response | null>;
 }
 
 /**
@@ -127,13 +132,17 @@ export declare interface CommonEngineRenderOptions {
 export declare function createNodeRequestHandler<T extends NodeRequestHandlerFunction>(handler: T): T;
 
 /**
- * Converts a Node.js `IncomingMessage` into a Web Standard `Request`.
+ * Converts a Node.js `IncomingMessage` or `Http2ServerRequest` into a
+ * Web Standard `Request` object.
  *
- * @param nodeRequest - The Node.js `IncomingMessage` object to convert.
+ * This function adapts the Node.js request objects to a format that can
+ * be used by web platform APIs.
+ *
+ * @param nodeRequest - The Node.js request object (`IncomingMessage` or `Http2ServerRequest`) to convert.
  * @returns A Web Standard `Request` object.
  * @developerPreview
  */
-export declare function createWebRequestFromNodeRequest(nodeRequest: IncomingMessage): Request;
+export declare function createWebRequestFromNodeRequest(nodeRequest: IncomingMessage | Http2ServerRequest): Request;
 
 
 /**
@@ -167,13 +176,17 @@ export declare function isMainModule(url: string): boolean;
 export declare type NodeRequestHandlerFunction = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => Promise<void> | void;
 
 /**
- * Streams a web-standard `Response` into a Node.js `ServerResponse`.
+ * Streams a web-standard `Response` into a Node.js `ServerResponse`
+ * or `Http2ServerResponse`.
+ *
+ * This function adapts the web `Response` object to write its content
+ * to a Node.js response object, handling both HTTP/1.1 and HTTP/2.
  *
  * @param source - The web-standard `Response` object to stream from.
- * @param destination - The Node.js `ServerResponse` object to stream into.
+ * @param destination - The Node.js response object (`ServerResponse` or `Http2ServerResponse`) to stream into.
  * @returns A promise that resolves once the streaming operation is complete.
  * @developerPreview
  */
-export declare function writeResponseToNodeResponse(source: Response, destination: ServerResponse): Promise<void>;
+export declare function writeResponseToNodeResponse(source: Response, destination: ServerResponse | Http2ServerResponse<Http2ServerRequest>): Promise<void>;
 
 export { }

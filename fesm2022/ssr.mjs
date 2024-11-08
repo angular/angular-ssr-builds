@@ -315,14 +315,12 @@ function isNgModule(value) {
  */
 var RenderMode;
 (function (RenderMode) {
-    /** AppShell rendering mode, typically used for pre-rendered shells of the application. */
-    RenderMode[RenderMode["AppShell"] = 0] = "AppShell";
     /** Server-Side Rendering (SSR) mode, where content is rendered on the server for each request. */
-    RenderMode[RenderMode["Server"] = 1] = "Server";
+    RenderMode[RenderMode["Server"] = 0] = "Server";
     /** Client-Side Rendering (CSR) mode, where content is rendered on the client side in the browser. */
-    RenderMode[RenderMode["Client"] = 2] = "Client";
+    RenderMode[RenderMode["Client"] = 1] = "Client";
     /** Static Site Generation (SSG) mode, where content is pre-rendered at build time and served as static files. */
-    RenderMode[RenderMode["Prerender"] = 3] = "Prerender";
+    RenderMode[RenderMode["Prerender"] = 2] = "Prerender";
 })(RenderMode || (RenderMode = {}));
 /**
  * Defines the fallback strategies for Static Site Generation (SSG) routes when a pre-rendered path is not available.
@@ -354,21 +352,30 @@ var PrerenderFallback;
  */
 const SERVER_ROUTES_CONFIG = new InjectionToken('SERVER_ROUTES_CONFIG');
 /**
- * Configures the necessary providers for server routes configuration.
+/**
+ * Sets up the necessary providers for configuring server routes.
+ * This function accepts an array of server routes and optional configuration
+ * options, returning an `EnvironmentProviders` object that encapsulates
+ * the server routes and configuration settings.
  *
  * @param routes - An array of server routes to be provided.
+ * @param options - (Optional) An object containing additional configuration options for server routes.
+ * @returns An `EnvironmentProviders` instance with the server routes configuration.
+ *
  * @returns An `EnvironmentProviders` object that contains the server routes configuration.
+ *
  * @see {@link ServerRoute}
+ * @see {@link ServerRoutesConfigOptions}
  * @developerPreview
  */
-function provideServerRoutesConfig(routes) {
+function provideServerRoutesConfig(routes, options) {
     if (typeof ngServerMode === 'undefined' || !ngServerMode) {
         throw new Error(`The 'provideServerRoutesConfig' function should not be invoked within the browser portion of the application.`);
     }
     return makeEnvironmentProviders([
         {
             provide: SERVER_ROUTES_CONFIG,
-            useValue: routes,
+            useValue: { routes, ...options },
         },
     ]);
 }
@@ -738,7 +745,7 @@ function resolveRedirectTo(routePath, redirectTo) {
 /**
  * Builds a server configuration route tree from the given server routes configuration.
  *
- * @param serverRoutesConfig - The array of server routes to be used for configuration.
+ * @param serverRoutesConfig - The server routes to be used for configuration.
 
  * @returns An object containing:
  * - `serverConfigRouteTree`: A populated `RouteTree` instance, which organizes the server routes
@@ -746,10 +753,17 @@ function resolveRedirectTo(routePath, redirectTo) {
  * - `errors`: An array of strings that list any errors encountered during the route tree construction
  *   process, such as invalid paths.
  */
-function buildServerConfigRouteTree(serverRoutesConfig) {
+function buildServerConfigRouteTree({ routes, appShellRoute }) {
+    const serverRoutes = [...routes];
+    if (appShellRoute !== undefined) {
+        serverRoutes.unshift({
+            path: appShellRoute,
+            renderMode: RenderMode.Prerender,
+        });
+    }
     const serverConfigRouteTree = new RouteTree();
     const errors = [];
-    for (const { path, ...metadata } of serverRoutesConfig) {
+    for (const { path, ...metadata } of serverRoutes) {
         if (path[0] === '/') {
             errors.push(`Invalid '${path}' route configuration: the path cannot start with a slash.`);
             continue;
@@ -838,14 +852,6 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
                     errors.push(result.error);
                 }
                 else {
-                    if (result.renderMode === RenderMode.AppShell) {
-                        if (seenAppShellRoute !== undefined) {
-                            errors.push(`Error: Both '${seenAppShellRoute}' and '${stripLeadingSlash(result.route)}' routes have ` +
-                                `their 'renderMode' set to 'AppShell'. AppShell renderMode should only be assigned to one route. ` +
-                                `Please review your route configurations to ensure that only one route is set to 'RenderMode.AppShell'.`);
-                        }
-                        seenAppShellRoute = stripLeadingSlash(result.route);
-                    }
                     routesResults.push(result);
                 }
             }
@@ -872,6 +878,7 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
             baseHref,
             routes: routesResults,
             errors,
+            appShellRoute: serverRoutesConfig?.appShellRoute,
         };
     }
     finally {
@@ -895,13 +902,14 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
  *
  * @returns A promise that resolves to an object containing:
  *  - `routeTree`: A populated `RouteTree` containing all extracted routes from the Angular application.
+ *  - `appShellRoute`: The specified route for the app-shell, if configured.
  *  - `errors`: An array of strings representing any errors encountered during the route extraction process.
  */
 async function extractRoutesAndCreateRouteTree(url, manifest = getAngularAppManifest(), invokeGetPrerenderParams = false, includePrerenderFallbackRoutes = true) {
     const routeTree = new RouteTree();
     const document = await new ServerAssets(manifest).getIndexServerHtml().text();
     const bootstrap = await manifest.bootstrap();
-    const { baseHref, routes, errors } = await getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
+    const { baseHref, appShellRoute, routes, errors } = await getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
     for (const { route, ...metadata } of routes) {
         if (metadata.redirectTo !== undefined) {
             metadata.redirectTo = joinUrlParts(baseHref, metadata.redirectTo);
@@ -910,6 +918,7 @@ async function extractRoutesAndCreateRouteTree(url, manifest = getAngularAppMani
         routeTree.insert(fullRoute, metadata);
     }
     return {
+        appShellRoute,
         routeTree,
         errors,
     };
@@ -1392,13 +1401,11 @@ const MAX_INLINE_CSS_CACHE_ENTRIES = 50;
  *
  * - `RenderMode.Prerender` maps to `'ssg'` (Static Site Generation).
  * - `RenderMode.Server` maps to `'ssr'` (Server-Side Rendering).
- * - `RenderMode.AppShell` maps to `'app-shell'` (pre-rendered application shell).
  * - `RenderMode.Client` maps to an empty string `''` (Client-Side Rendering, no server context needed).
  */
 const SERVER_CONTEXT_VALUE = {
     [RenderMode.Prerender]: 'ssg',
     [RenderMode.Server]: 'ssr',
-    [RenderMode.AppShell]: 'app-shell',
     [RenderMode.Client]: '',
 };
 /**
@@ -1545,9 +1552,16 @@ class AngularServerApp {
      * @returns A promise that resolves to the rendered response, or null if no matching route is found.
      */
     async handleRendering(request, matchedRoute, requestContext) {
-        const { renderMode, headers, status } = matchedRoute;
-        if (!this.allowStaticRouteRender &&
-            (renderMode === RenderMode.Prerender || renderMode === RenderMode.AppShell)) {
+        const { redirectTo, status } = matchedRoute;
+        if (redirectTo !== undefined) {
+            // Note: The status code is validated during route extraction.
+            // 302 Found is used by default for redirections
+            // See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return Response.redirect(new URL(redirectTo, new URL(request.url)), status ?? 302);
+        }
+        const { renderMode, headers } = matchedRoute;
+        if (!this.allowStaticRouteRender && renderMode === RenderMode.Prerender) {
             return null;
         }
         const platformProviders = [];

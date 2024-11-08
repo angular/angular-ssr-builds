@@ -174,6 +174,10 @@ declare interface AngularRouterConfigResult {
      * A list of errors encountered during the route extraction process.
      */
     errors: string[];
+    /**
+     * The specified route for the app-shell, if configured.
+     */
+    appShellRoute?: string;
 }
 
 /**
@@ -459,14 +463,23 @@ export declare enum PrerenderFallback {
 }
 
 /**
- * Configures the necessary providers for server routes configuration.
+ /**
+ * Sets up the necessary providers for configuring server routes.
+ * This function accepts an array of server routes and optional configuration
+ * options, returning an `EnvironmentProviders` object that encapsulates
+ * the server routes and configuration settings.
  *
  * @param routes - An array of server routes to be provided.
+ * @param options - (Optional) An object containing additional configuration options for server routes.
+ * @returns An `EnvironmentProviders` instance with the server routes configuration.
+ *
  * @returns An `EnvironmentProviders` object that contains the server routes configuration.
+ *
  * @see {@link ServerRoute}
+ * @see {@link ServerRoutesConfigOptions}
  * @developerPreview
  */
-export declare function provideServerRoutesConfig(routes: ServerRoute[]): EnvironmentProviders;
+export declare function provideServerRoutesConfig(routes: ServerRoute[], options?: ServerRoutesConfigOptions): EnvironmentProviders;
 
 /**
  * Different rendering modes for server routes.
@@ -475,14 +488,12 @@ export declare function provideServerRoutesConfig(routes: ServerRoute[]): Enviro
  * @developerPreview
  */
 export declare enum RenderMode {
-    /** AppShell rendering mode, typically used for pre-rendered shells of the application. */
-    AppShell = 0,
     /** Server-Side Rendering (SSR) mode, where content is rendered on the server for each request. */
-    Server = 1,
+    Server = 0,
     /** Client-Side Rendering (CSR) mode, where content is rendered on the client side in the browser. */
-    Client = 2,
+    Client = 1,
     /** Static Site Generation (SSG) mode, where content is pre-rendered at build time and served as static files. */
-    Prerender = 3
+    Prerender = 2
 }
 
 
@@ -707,17 +718,7 @@ declare interface ServerAsset {
  * @see {@link provideServerRoutesConfig}
  * @developerPreview
  */
-export declare type ServerRoute = ServerRouteAppShell | ServerRouteClient | ServerRoutePrerender | ServerRoutePrerenderWithParams | ServerRouteServer;
-
-/**
- * A server route that uses AppShell rendering mode.
- * @see {@link RenderMode}
- * @developerPreview
- */
-export declare interface ServerRouteAppShell extends Omit<ServerRouteCommon, 'headers' | 'status'> {
-    /** Specifies that the route uses AppShell rendering mode. */
-    renderMode: RenderMode.AppShell;
-}
+export declare type ServerRoute = ServerRouteClient | ServerRoutePrerender | ServerRoutePrerenderWithParams | ServerRouteServer;
 
 /**
  * A server route that uses Client-Side Rendering (CSR) mode.
@@ -801,6 +802,26 @@ export declare interface ServerRoutePrerenderWithParams extends Omit<ServerRoute
 }
 
 /**
+ * Configuration options for server routes.
+ *
+ * This interface defines the optional settings available for configuring server routes
+ * in the server-side environment, such as specifying a path to the app shell route.
+ *
+ * @see {@link provideServerRoutesConfig}
+ * @developerPreview
+ */
+export declare interface ServerRoutesConfigOptions {
+    /**
+     * Defines the route to be used as the app shell, which serves as the main entry
+     * point for the application. This route is often used to enable server-side rendering
+     * of the application shell for requests that do not match any specific server route.
+     *
+     * @see {@link https://angular.dev/ecosystem/service-workers/app-shell | App shell pattern on Angular.dev}
+     */
+    appShellRoute?: string;
+}
+
+/**
  * A server route that uses Server-Side Rendering (SSR) mode.
  * @see {@link RenderMode}
  * @developerPreview
@@ -836,10 +857,12 @@ export declare function ɵdestroyAngularServerApp(): void;
  *
  * @returns A promise that resolves to an object containing:
  *  - `routeTree`: A populated `RouteTree` containing all extracted routes from the Angular application.
+ *  - `appShellRoute`: The specified route for the app-shell, if configured.
  *  - `errors`: An array of strings representing any errors encountered during the route extraction process.
  */
 export declare function ɵextractRoutesAndCreateRouteTree(url: URL, manifest?: AngularAppManifest, invokeGetPrerenderParams?: boolean, includePrerenderFallbackRoutes?: boolean): Promise<{
     routeTree: RouteTree;
+    appShellRoute?: string;
     errors: string[];
 }>;
 

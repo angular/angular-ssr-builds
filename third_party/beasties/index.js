@@ -1021,6 +1021,36 @@ function requireNode$1 () {
 	  return cloned
 	}
 
+	function sourceOffset(inputCSS, position) {
+	  // Not all custom syntaxes support `offset` in `source.start` and `source.end`
+	  if (
+	    position &&
+	    typeof position.offset !== 'undefined'
+	  ) {
+	    return position.offset;
+	  }
+
+	  let column = 1;
+	  let line = 1;
+	  let offset = 0;
+
+	  for (let i = 0; i < inputCSS.length; i++) {
+	    if (line === position.line && column === position.column) {
+	      offset = i;
+	      break
+	    }
+
+	    if (inputCSS[i] === '\n') {
+	      column = 1;
+	      line += 1;
+	    } else {
+	      column += 1;
+	    }
+	  }
+
+	  return offset
+	}
+
 	class Node {
 	  constructor(defaults = {}) {
 	    this.raws = {};
@@ -1163,25 +1193,29 @@ function requireNode$1 () {
 	    return this.parent.nodes[index + 1]
 	  }
 
-	  positionBy(opts, stringRepresentation) {
+	  positionBy(opts) {
 	    let pos = this.source.start;
 	    if (opts.index) {
-	      pos = this.positionInside(opts.index, stringRepresentation);
+	      pos = this.positionInside(opts.index);
 	    } else if (opts.word) {
-	      stringRepresentation = this.toString();
+	      let stringRepresentation = this.source.input.css.slice(
+	        sourceOffset(this.source.input.css, this.source.start),
+	        sourceOffset(this.source.input.css, this.source.end)
+	      );
 	      let index = stringRepresentation.indexOf(opts.word);
-	      if (index !== -1) pos = this.positionInside(index, stringRepresentation);
+	      if (index !== -1) pos = this.positionInside(index);
 	    }
 	    return pos
 	  }
 
-	  positionInside(index, stringRepresentation) {
-	    let string = stringRepresentation || this.toString();
+	  positionInside(index) {
 	    let column = this.source.start.column;
 	    let line = this.source.start.line;
+	    let offset = sourceOffset(this.source.input.css, this.source.start);
+	    let end = offset + index;
 
-	    for (let i = 0; i < index; i++) {
-	      if (string[i] === '\n') {
+	    for (let i = offset; i < end; i++) {
+	      if (this.source.input.css[i] === '\n') {
 	        column = 1;
 	        line += 1;
 	      } else {
@@ -1214,13 +1248,15 @@ function requireNode$1 () {
 	        };
 
 	    if (opts.word) {
-	      let stringRepresentation = this.toString();
+	      let stringRepresentation = this.source.input.css.slice(
+	        sourceOffset(this.source.input.css, this.source.start),
+	        sourceOffset(this.source.input.css, this.source.end)
+	      );
 	      let index = stringRepresentation.indexOf(opts.word);
 	      if (index !== -1) {
-	        start = this.positionInside(index, stringRepresentation);
+	        start = this.positionInside(index);
 	        end = this.positionInside(
 	          index + opts.word.length,
-	          stringRepresentation
 	        );
 	      }
 	    } else {
@@ -4783,7 +4819,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.4.47';
+	    this.version = '8.4.49';
 	    this.plugins = this.normalize(plugins);
 	  }
 

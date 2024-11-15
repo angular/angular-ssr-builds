@@ -1,8 +1,7 @@
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
-import { ɵConsole as _Console, InjectionToken, makeEnvironmentProviders, runInInjectionContext, ApplicationRef, ɵwhenStable as _whenStable, Compiler, LOCALE_ID, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
+import { ɵConsole as _Console, InjectionToken, makeEnvironmentProviders, runInInjectionContext, ApplicationRef, ɵwhenStable as _whenStable, Compiler, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
 import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule, renderApplication, platformServer, INITIAL_CONFIG } from '@angular/platform-server';
 import { ɵloadChildren as _loadChildren, Router } from '@angular/router';
-import { REQUEST, REQUEST_CONTEXT, RESPONSE_INIT } from '@angular/ssr/tokens';
 import Beasties from '../third_party/beasties/index.js';
 
 /**

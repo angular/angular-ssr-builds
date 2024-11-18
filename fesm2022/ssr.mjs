@@ -867,10 +867,15 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
             }
         }
         else {
-            const renderMode = serverConfigRouteTree?.match('')?.renderMode ?? RenderMode.Prerender;
-            routesResults.push({
+            const rootRouteMetadata = serverConfigRouteTree?.match('') ?? {
                 route: '',
-                renderMode,
+                renderMode: RenderMode.Prerender,
+            };
+            routesResults.push({
+                ...rootRouteMetadata,
+                // Matched route might be `/*` or `/**`, which would make Angular serve all routes rather than just `/`.
+                // So we limit to just `/` for the empty app router case.
+                route: '',
             });
         }
         return {

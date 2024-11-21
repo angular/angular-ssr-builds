@@ -817,8 +817,11 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
         const router = injector.get(Router);
         const routesResults = [];
         const errors = [];
-        const baseHref = injector.get(APP_BASE_HREF, null, { optional: true }) ??
+        let baseHref = injector.get(APP_BASE_HREF, null, { optional: true }) ??
             injector.get(PlatformLocation).getBaseHrefFromDOM();
+        if (baseHref.startsWith('./')) {
+            baseHref = baseHref.slice(2);
+        }
         const compiler = injector.get(Compiler);
         const serverRoutesConfig = injector.get(SERVER_ROUTES_CONFIG, null, { optional: true });
         let serverConfigRouteTree;

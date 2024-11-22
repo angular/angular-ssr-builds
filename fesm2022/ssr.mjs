@@ -469,6 +469,7 @@ class RouteTree {
     insert(route, metadata) {
         let node = this.root;
         const segments = this.getPathSegments(route);
+        const normalizedSegments = [];
         for (const segment of segments) {
             // Replace parameterized segments (e.g., :id) with a wildcard (*) for matching
             const normalizedSegment = segment[0] === ':' ? '*' : segment;
@@ -478,11 +479,12 @@ class RouteTree {
                 node.children.set(normalizedSegment, childNode);
             }
             node = childNode;
+            normalizedSegments.push(normalizedSegment);
         }
         // At the leaf node, store the full route and its associated metadata
         node.metadata = {
             ...metadata,
-            route: segments.join('/'),
+            route: normalizedSegments.join('/'),
         };
         node.insertionIndex = this.insertionIndexCounter++;
     }
@@ -1001,7 +1003,7 @@ async function extractRoutesAndCreateRouteTree(url, manifest = getAngularAppMani
             }
         }
         const fullRoute = joinUrlParts(baseHref, route);
-        routeTree.insert(fullRoute.replace(URL_PARAMETER_REGEXP, '*'), metadata);
+        routeTree.insert(fullRoute, metadata);
     }
     return {
         appShellRoute,

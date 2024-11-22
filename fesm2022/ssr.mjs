@@ -184,6 +184,22 @@ function addLeadingSlash(url) {
     return url[0] === '/' ? url : `/${url}`;
 }
 /**
+ * Adds a trailing slash to a URL if it does not already have one.
+ *
+ * @param url - The URL string to which the trailing slash will be added.
+ * @returns The URL string with a trailing slash.
+ *
+ * @example
+ * ```js
+ * addTrailingSlash('path'); // 'path/'
+ * addTrailingSlash('path/'); // 'path/'
+ * ```
+ */
+function addTrailingSlash(url) {
+    // Check if the URL already end with a slash
+    return url[url.length - 1] === '/' ? url : `${url}/`;
+}
+/**
  * Joins URL parts into a single URL string.
  *
  * This function takes multiple URL segments, normalizes them by removing leading
@@ -244,6 +260,50 @@ function stripIndexHtmlFromURL(url) {
         return modifiedURL;
     }
     return url;
+}
+/**
+ * Resolves `*` placeholders in a path template by mapping them to corresponding segments
+ * from a base path. This is useful for constructing paths dynamically based on a given base path.
+ *
+ * The function processes the `toPath` string, replacing each `*` placeholder with
+ * the corresponding segment from the `fromPath`. If the `toPath` contains no placeholders,
+ * it is returned as-is. Invalid `toPath` formats (not starting with `/`) will throw an error.
+ *
+ * @param toPath - A path template string that may contain `*` placeholders. Each `*` is replaced
+ * by the corresponding segment from the `fromPath`. Static paths (e.g., `/static/path`) are returned
+ * directly without placeholder replacement.
+ * @param fromPath - A base path string, split into segments, that provides values for
+ * replacing `*` placeholders in the `toPath`.
+ * @returns A resolved path string with `*` placeholders replaced by segments from the `fromPath`,
+ * or the `toPath` returned unchanged if it contains no placeholders.
+ *
+ * @throws If the `toPath` does not start with a `/`, indicating an invalid path format.
+ *
+ * @example
+ * ```typescript
+ * // Example with placeholders resolved
+ * const resolvedPath = buildPathWithParams('/*\/details', '/123/abc');
+ * console.log(resolvedPath); // Outputs: '/123/details'
+ *
+ * // Example with a static path
+ * const staticPath = buildPathWithParams('/static/path', '/base/unused');
+ * console.log(staticPath); // Outputs: '/static/path'
+ * ```
+ */
+function buildPathWithParams(toPath, fromPath) {
+    if (toPath[0] !== '/') {
+        throw new Error(`Invalid toPath: The string must start with a '/'. Received: '${toPath}'`);
+    }
+    if (fromPath[0] !== '/') {
+        throw new Error(`Invalid fromPath: The string must start with a '/'. Received: '${fromPath}'`);
+    }
+    if (!toPath.includes('/*')) {
+        return toPath;
+    }
+    const fromPathParts = fromPath.split('/');
+    const toPathParts = toPath.split('/');
+    const resolvedParts = toPathParts.map((part, index) => toPathParts[index] === '*' ? fromPathParts[index] : part);
+    return joinUrlParts(...resolvedParts);
 }
 
 /**
@@ -601,12 +661,18 @@ async function* traverseRoutesConfig(options) {
             const metadata = {
                 renderMode: RenderMode.Prerender,
                 ...matchedMetaData,
-                route: currentRoutePath,
+                // Match Angular router behavior
+                // ['one', 'two', ''] -> 'one/two/'
+                // ['one', 'two', 'three'] -> 'one/two/three'
+                route: path === '' ? addTrailingSlash(currentRoutePath) : currentRoutePath,
             };
             delete metadata.presentInClientRouter;
-            // Handle redirects
-            if (typeof redirectTo === 'string') {
-                const redirectToResolved = resolveRedirectTo(currentRoutePath, redirectTo);
+            if (metadata.renderMode === RenderMode.Prerender) {
+                // Handle SSG routes
+                yield* handleSSGRoute(typeof redirectTo === 'string' ? redirectTo : undefined, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
+            }
+            else if (typeof redirectTo === 'string') {
+                // Handle redirects
                 if (metadata.status && !VALID_REDIRECT_RESPONSE_CODES.has(metadata.status)) {
                     yield {
                         error: `The '${metadata.status}' status code is not a valid redirect response code. ` +
@@ -614,11 +680,7 @@ async function* traverseRoutesConfig(options) {
                     };
                     continue;
                 }
-                yield { ...metadata, redirectTo: redirectToResolved };
-            }
-            else if (metadata.renderMode === RenderMode.Prerender) {
-                // Handle SSG routes
-                yield* handleSSGRoute(metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
+                yield { ...metadata, redirectTo: resolveRedirectTo(metadata.route, redirectTo) };
             }
             else {
                 yield metadata;
@@ -656,13 +718,14 @@ async function* traverseRoutesConfig(options) {
  * Handles SSG (Static Site Generation) routes by invoking `getPrerenderParams` and yielding
  * all parameterized paths, returning any errors encountered.
  *
+ * @param redirectTo - Optional path to redirect to, if specified.
  * @param metadata - The metadata associated with the route tree node.
  * @param parentInjector - The dependency injection container for the parent route.
  * @param invokeGetPrerenderParams - A flag indicating whether to invoke the `getPrerenderParams` function.
  * @param includePrerenderFallbackRoutes - A flag indicating whether to include fallback routes in the result.
  * @returns An async iterable iterator that yields route tree node metadata for each SSG path or errors.
  */
-async function* handleSSGRoute(metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes) {
+async function* handleSSGRoute(redirectTo, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes) {
     if (metadata.renderMode !== RenderMode.Prerender) {
         throw new Error(`'handleSSGRoute' was called for a route which rendering mode is not prerender.`);
     }
@@ -670,6 +733,9 @@ async function* handleSSGRoute(metadata, parentInjector, invokeGetPrerenderParam
     const getPrerenderParams = 'getPrerenderParams' in meta ? meta.getPrerenderParams : undefined;
     if ('getPrerenderParams' in meta) {
         delete meta['getPrerenderParams'];
+    }
+    if (redirectTo !== undefined) {
+        meta.redirectTo = resolveRedirectTo(currentRoutePath, redirectTo);
     }
     if (!URL_PARAMETER_REGEXP.test(currentRoutePath)) {
         // Route has no parameters
@@ -702,7 +768,13 @@ async function* handleSSGRoute(metadata, parentInjector, invokeGetPrerenderParam
                     }
                     return value;
                 });
-                yield { ...meta, route: routeWithResolvedParams };
+                yield {
+                    ...meta,
+                    route: routeWithResolvedParams,
+                    redirectTo: redirectTo === undefined
+                        ? undefined
+                        : resolveRedirectTo(routeWithResolvedParams, redirectTo),
+                };
             }
         }
         catch (error) {
@@ -737,7 +809,7 @@ function resolveRedirectTo(routePath, redirectTo) {
         return redirectTo;
     }
     // Resolve relative redirectTo based on the current route path.
-    const segments = routePath.split('/');
+    const segments = routePath.replace(URL_PARAMETER_REGEXP, '*').split('/');
     segments.pop(); // Remove the last segment to make it relative.
     return joinUrlParts(...segments, redirectTo);
 }
@@ -848,7 +920,6 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
                 invokeGetPrerenderParams,
                 includePrerenderFallbackRoutes,
             });
-            let seenAppShellRoute;
             for await (const result of traverseRoutes) {
                 if ('error' in result) {
                     errors.push(result.error);
@@ -921,8 +992,16 @@ async function extractRoutesAndCreateRouteTree(url, manifest = getAngularAppMani
         if (metadata.redirectTo !== undefined) {
             metadata.redirectTo = joinUrlParts(baseHref, metadata.redirectTo);
         }
+        // Remove undefined fields
+        // Helps avoid unnecessary test updates
+        for (const [key, value] of Object.entries(metadata)) {
+            if (value === undefined) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                delete metadata[key];
+            }
+        }
         const fullRoute = joinUrlParts(baseHref, route);
-        routeTree.insert(fullRoute, metadata);
+        routeTree.insert(fullRoute.replace(URL_PARAMETER_REGEXP, '*'), metadata);
     }
     return {
         appShellRoute,
@@ -1493,11 +1572,12 @@ class AngularServerApp {
         }
         const { redirectTo, status, renderMode } = matchedRoute;
         if (redirectTo !== undefined) {
+            return Response.redirect(new URL(buildPathWithParams(redirectTo, url.pathname), url), 
             // Note: The status code is validated during route extraction.
             // 302 Found is used by default for redirections
             // See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return Response.redirect(new URL(redirectTo, url), status ?? 302);
+            status ?? 302);
         }
         if (renderMode === RenderMode.Prerender) {
             const response = await this.handleServe(request, matchedRoute);
@@ -1559,15 +1639,7 @@ class AngularServerApp {
      * @returns A promise that resolves to the rendered response, or null if no matching route is found.
      */
     async handleRendering(request, matchedRoute, requestContext) {
-        const { redirectTo, status } = matchedRoute;
-        if (redirectTo !== undefined) {
-            // Note: The status code is validated during route extraction.
-            // 302 Found is used by default for redirections
-            // See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return Response.redirect(new URL(redirectTo, new URL(request.url)), status ?? 302);
-        }
-        const { renderMode, headers } = matchedRoute;
+        const { renderMode, headers, status } = matchedRoute;
         if (!this.allowStaticRouteRender && renderMode === RenderMode.Prerender) {
             return null;
         }

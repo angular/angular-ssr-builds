@@ -187,6 +187,6 @@ export declare type NodeRequestHandlerFunction = (req: IncomingMessage, res: Ser
  * @returns A promise that resolves once the streaming operation is complete.
  * @developerPreview
  */
-export declare function writeResponseToNodeResponse(source: Response, destination: ServerResponse | Http2ServerResponse<Http2ServerRequest>): Promise<void>;
+export declare function writeResponseToNodeResponse(source: Response, destination: ServerResponse | Http2ServerResponse): Promise<void>;
 
 export { }

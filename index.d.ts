@@ -268,14 +268,6 @@ declare class AngularServerApp {
      * @returns A promise that resolves to the rendered response, or null if no matching route is found.
      */
     private handleRendering;
-    /**
-     * Returns a promise that rejects if the request is aborted.
-     *
-     * @param request - The HTTP request object being monitored for abortion.
-     * @returns A promise that never resolves and rejects with an `AbortError`
-     * if the request is aborted.
-     */
-    private waitForRequestAbort;
 }
 
 /**
@@ -844,23 +836,31 @@ export declare function ɵdestroyAngularServerApp(): void;
  * Asynchronously extracts routes from the Angular application configuration
  * and creates a `RouteTree` to manage server-side routing.
  *
- * @param url - The URL for server-side rendering. The URL is used to configure `ServerPlatformLocation`. This configuration is crucial
- * for ensuring that API requests for relative paths succeed, which is essential for accurate route extraction.
- * See:
- *  - https://github.com/angular/angular/blob/d608b857c689d17a7ffa33bbb510301014d24a17/packages/platform-server/src/location.ts#L51
- *  - https://github.com/angular/angular/blob/6882cc7d9eed26d3caeedca027452367ba25f2b9/packages/platform-server/src/http.ts#L44
- * @param manifest - An optional `AngularAppManifest` that contains the application's routing and configuration details.
- * If not provided, the default manifest is retrieved using `getAngularAppManifest()`.
- * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
- * to handle prerendering paths. Defaults to `false`.
- * @param includePrerenderFallbackRoutes - A flag indicating whether to include fallback routes in the result. Defaults to `true`.
+ * @param options - An object containing the following options:
+ *  - `url`: The URL for server-side rendering. The URL is used to configure `ServerPlatformLocation`. This configuration is crucial
+ *     for ensuring that API requests for relative paths succeed, which is essential for accurate route extraction.
+ *     See:
+ *      - https://github.com/angular/angular/blob/d608b857c689d17a7ffa33bbb510301014d24a17/packages/platform-server/src/location.ts#L51
+ *      - https://github.com/angular/angular/blob/6882cc7d9eed26d3caeedca027452367ba25f2b9/packages/platform-server/src/http.ts#L44
+ *  - `manifest`: An optional `AngularAppManifest` that contains the application's routing and configuration details.
+ *     If not provided, the default manifest is retrieved using `getAngularAppManifest()`.
+ *  - `invokeGetPrerenderParams`: A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
+ *     to handle prerendering paths. Defaults to `false`.
+ *  - `includePrerenderFallbackRoutes`: A flag indicating whether to include fallback routes in the result. Defaults to `true`.
+ *  - `signal`: An optional `AbortSignal` that can be used to abort the operation.
  *
  * @returns A promise that resolves to an object containing:
  *  - `routeTree`: A populated `RouteTree` containing all extracted routes from the Angular application.
  *  - `appShellRoute`: The specified route for the app-shell, if configured.
  *  - `errors`: An array of strings representing any errors encountered during the route extraction process.
  */
-export declare function ɵextractRoutesAndCreateRouteTree(url: URL, manifest?: AngularAppManifest, invokeGetPrerenderParams?: boolean, includePrerenderFallbackRoutes?: boolean): Promise<{
+export declare function ɵextractRoutesAndCreateRouteTree(options: {
+    url: URL;
+    manifest?: AngularAppManifest;
+    invokeGetPrerenderParams?: boolean;
+    includePrerenderFallbackRoutes?: boolean;
+    signal?: AbortSignal;
+}): Promise<{
     routeTree: RouteTree;
     appShellRoute?: string;
     errors: string[];

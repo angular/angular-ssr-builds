@@ -367,6 +367,39 @@ function isNgModule(value) {
 }
 
 /**
+ * Creates a promise that resolves with the result of the provided `promise` or rejects with an
+ * `AbortError` if the `AbortSignal` is triggered before the promise resolves.
+ *
+ * @param promise - The promise to monitor for completion.
+ * @param signal - An `AbortSignal` used to monitor for an abort event. If the signal is aborted,
+ *                 the returned promise will reject.
+ * @param errorMessagePrefix - A custom message prefix to include in the error message when the operation is aborted.
+ * @returns A promise that either resolves with the value of the provided `promise` or rejects with
+ *          an `AbortError` if the `AbortSignal` is triggered.
+ *
+ * @throws {AbortError} If the `AbortSignal` is triggered before the `promise` resolves.
+ */
+function promiseWithAbort(promise, signal, errorMessagePrefix) {
+    return new Promise((resolve, reject) => {
+        const abortHandler = () => {
+            reject(new DOMException(`${errorMessagePrefix} was aborted.\n${signal.reason}`, 'AbortError'));
+        };
+        // Check for abort signal
+        if (signal.aborted) {
+            abortHandler();
+            return;
+        }
+        signal.addEventListener('abort', abortHandler, { once: true });
+        promise
+            .then(resolve)
+            .catch(reject)
+            .finally(() => {
+            signal.removeEventListener('abort', abortHandler);
+        });
+    });
+}
+
+/**
  * Different rendering modes for server routes.
  * @see {@link provideServerRoutesConfig}
  * @see {@link ServerRoute}
@@ -969,47 +1002,53 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
  * Asynchronously extracts routes from the Angular application configuration
  * and creates a `RouteTree` to manage server-side routing.
  *
- * @param url - The URL for server-side rendering. The URL is used to configure `ServerPlatformLocation`. This configuration is crucial
- * for ensuring that API requests for relative paths succeed, which is essential for accurate route extraction.
- * See:
- *  - https://github.com/angular/angular/blob/d608b857c689d17a7ffa33bbb510301014d24a17/packages/platform-server/src/location.ts#L51
- *  - https://github.com/angular/angular/blob/6882cc7d9eed26d3caeedca027452367ba25f2b9/packages/platform-server/src/http.ts#L44
- * @param manifest - An optional `AngularAppManifest` that contains the application's routing and configuration details.
- * If not provided, the default manifest is retrieved using `getAngularAppManifest()`.
- * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
- * to handle prerendering paths. Defaults to `false`.
- * @param includePrerenderFallbackRoutes - A flag indicating whether to include fallback routes in the result. Defaults to `true`.
+ * @param options - An object containing the following options:
+ *  - `url`: The URL for server-side rendering. The URL is used to configure `ServerPlatformLocation`. This configuration is crucial
+ *     for ensuring that API requests for relative paths succeed, which is essential for accurate route extraction.
+ *     See:
+ *      - https://github.com/angular/angular/blob/d608b857c689d17a7ffa33bbb510301014d24a17/packages/platform-server/src/location.ts#L51
+ *      - https://github.com/angular/angular/blob/6882cc7d9eed26d3caeedca027452367ba25f2b9/packages/platform-server/src/http.ts#L44
+ *  - `manifest`: An optional `AngularAppManifest` that contains the application's routing and configuration details.
+ *     If not provided, the default manifest is retrieved using `getAngularAppManifest()`.
+ *  - `invokeGetPrerenderParams`: A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
+ *     to handle prerendering paths. Defaults to `false`.
+ *  - `includePrerenderFallbackRoutes`: A flag indicating whether to include fallback routes in the result. Defaults to `true`.
+ *  - `signal`: An optional `AbortSignal` that can be used to abort the operation.
  *
  * @returns A promise that resolves to an object containing:
  *  - `routeTree`: A populated `RouteTree` containing all extracted routes from the Angular application.
  *  - `appShellRoute`: The specified route for the app-shell, if configured.
  *  - `errors`: An array of strings representing any errors encountered during the route extraction process.
  */
-async function extractRoutesAndCreateRouteTree(url, manifest = getAngularAppManifest(), invokeGetPrerenderParams = false, includePrerenderFallbackRoutes = true) {
-    const routeTree = new RouteTree();
-    const document = await new ServerAssets(manifest).getIndexServerHtml().text();
-    const bootstrap = await manifest.bootstrap();
-    const { baseHref, appShellRoute, routes, errors } = await getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
-    for (const { route, ...metadata } of routes) {
-        if (metadata.redirectTo !== undefined) {
-            metadata.redirectTo = joinUrlParts(baseHref, metadata.redirectTo);
-        }
-        // Remove undefined fields
-        // Helps avoid unnecessary test updates
-        for (const [key, value] of Object.entries(metadata)) {
-            if (value === undefined) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                delete metadata[key];
+function extractRoutesAndCreateRouteTree(options) {
+    const { url, manifest = getAngularAppManifest(), invokeGetPrerenderParams = false, includePrerenderFallbackRoutes = true, signal, } = options;
+    async function extract() {
+        const routeTree = new RouteTree();
+        const document = await new ServerAssets(manifest).getIndexServerHtml().text();
+        const bootstrap = await manifest.bootstrap();
+        const { baseHref, appShellRoute, routes, errors } = await getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
+        for (const { route, ...metadata } of routes) {
+            if (metadata.redirectTo !== undefined) {
+                metadata.redirectTo = joinUrlParts(baseHref, metadata.redirectTo);
             }
+            // Remove undefined fields
+            // Helps avoid unnecessary test updates
+            for (const [key, value] of Object.entries(metadata)) {
+                if (value === undefined) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    delete metadata[key];
+                }
+            }
+            const fullRoute = joinUrlParts(baseHref, route);
+            routeTree.insert(fullRoute, metadata);
         }
-        const fullRoute = joinUrlParts(baseHref, route);
-        routeTree.insert(fullRoute, metadata);
+        return {
+            appShellRoute,
+            routeTree,
+            errors,
+        };
     }
-    return {
-        appShellRoute,
-        routeTree,
-        errors,
-    };
+    return signal ? promiseWithAbort(extract(), signal, 'Routes extraction') : extract();
 }
 
 /**
@@ -1142,7 +1181,7 @@ class ServerRouter {
         }
         // Create and store a new promise for the build process.
         // This prevents concurrent builds by re-using the same promise.
-        ServerRouter.#extractionPromise ??= extractRoutesAndCreateRouteTree(url, manifest)
+        ServerRouter.#extractionPromise ??= extractRoutesAndCreateRouteTree({ url, manifest })
             .then(({ routeTree, errors }) => {
             if (errors.length > 0) {
                 throw new Error('Error(s) occurred while extracting routes:\n' +
@@ -1587,10 +1626,7 @@ class AngularServerApp {
                 return response;
             }
         }
-        return Promise.race([
-            this.waitForRequestAbort(request),
-            this.handleRendering(request, matchedRoute, requestContext),
-        ]);
+        return promiseWithAbort(this.handleRendering(request, matchedRoute, requestContext), request.signal, `Request for: ${request.url}`);
     }
     /**
      * Handles serving a prerendered static asset if available for the matched route.
@@ -1714,22 +1750,6 @@ class AngularServerApp {
             }
         }
         return new Response(html, responseInit);
-    }
-    /**
-     * Returns a promise that rejects if the request is aborted.
-     *
-     * @param request - The HTTP request object being monitored for abortion.
-     * @returns A promise that never resolves and rejects with an `AbortError`
-     * if the request is aborted.
-     */
-    waitForRequestAbort(request) {
-        return new Promise((_, reject) => {
-            request.signal.addEventListener('abort', () => {
-                const abortError = new Error(`Request for: ${request.url} was aborted.\n${request.signal.reason}`);
-                abortError.name = 'AbortError';
-                reject(abortError);
-            }, { once: true });
-        });
     }
 }
 let angularServerApp;

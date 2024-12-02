@@ -107,6 +107,11 @@ declare interface AngularAppEngineManifest {
  */
 declare interface AngularAppManifest {
     /**
+     * The base href for the application.
+     * This is used to determine the root path of the application.
+     */
+    readonly baseHref: string;
+    /**
      * A map of assets required by the server application.
      * Each entry in the map consists of:
      * - `key`: The path of the asset.
@@ -268,6 +273,17 @@ declare class AngularServerApp {
      * @returns A promise that resolves to the rendered response, or null if no matching route is found.
      */
     private handleRendering;
+    /**
+     * Constructs the asset path on the server based on the provided HTTP request.
+     *
+     * This method processes the incoming request URL to derive a path corresponding
+     * to the requested asset. It ensures the path points to the correct file (e.g.,
+     * `index.html`) and removes any base href if it is not part of the asset path.
+     *
+     * @param request - The incoming HTTP request object.
+     * @returns The server-relative asset path derived from the request.
+     */
+    private buildServerAssetPathFromRequest;
 }
 
 /**

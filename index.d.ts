@@ -288,6 +288,14 @@ declare class AngularServerApp {
      * @returns The server-relative asset path derived from the request.
      */
     private buildServerAssetPathFromRequest;
+    /**
+     * Runs the registered transform hooks on the given HTML content.
+     *
+     * @param html - The raw HTML content to be transformed.
+     * @param url - The URL associated with the HTML content, used for context during transformations.
+     * @returns A promise that resolves to the transformed HTML string.
+     */
+    private runTransformsOnHtml;
 }
 
 /**

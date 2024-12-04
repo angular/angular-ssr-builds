@@ -1680,6 +1680,7 @@ class AngularServerApp {
         if (!this.allowStaticRouteRender && renderMode === RenderMode.Prerender) {
             return null;
         }
+        const url = new URL(request.url);
         const platformProviders = [];
         // Initialize the response with status and headers if available.
         const responseInit = {
@@ -1704,7 +1705,9 @@ class AngularServerApp {
         }
         else if (renderMode === RenderMode.Client) {
             // Serve the client-side rendered version if the route is configured for CSR.
-            return new Response(await this.assets.getServerAsset('index.csr.html').text(), responseInit);
+            let html = await this.assets.getServerAsset('index.csr.html').text();
+            html = await this.runTransformsOnHtml(html, url);
+            return new Response(html, responseInit);
         }
         const { manifest: { bootstrap, inlineCriticalCss, locale }, hooks, assets, } = this;
         if (locale !== undefined) {
@@ -1713,13 +1716,9 @@ class AngularServerApp {
                 useValue: locale,
             });
         }
-        const url = new URL(request.url);
-        let html = await assets.getIndexServerHtml().text();
-        // Skip extra microtask if there are no pre hooks.
-        if (hooks.has('html:transform:pre')) {
-            html = await hooks.run('html:transform:pre', { html, url });
-        }
         this.boostrap ??= await bootstrap();
+        let html = await assets.getIndexServerHtml().text();
+        html = await this.runTransformsOnHtml(html, url);
         html = await renderAngular(html, this.boostrap, url, platformProviders, SERVER_CONTEXT_VALUE[renderMode]);
         if (inlineCriticalCss) {
             // Optionally inline critical CSS.
@@ -1773,6 +1772,19 @@ class AngularServerApp {
             assetPath = assetPath.slice(baseHref.length);
         }
         return stripLeadingSlash(assetPath);
+    }
+    /**
+     * Runs the registered transform hooks on the given HTML content.
+     *
+     * @param html - The raw HTML content to be transformed.
+     * @param url - The URL associated with the HTML content, used for context during transformations.
+     * @returns A promise that resolves to the transformed HTML string.
+     */
+    async runTransformsOnHtml(html, url) {
+        if (this.hooks.has('html:transform:pre')) {
+            html = await this.hooks.run('html:transform:pre', { html, url });
+        }
+        return html;
     }
 }
 let angularServerApp;

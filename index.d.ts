@@ -36,6 +36,10 @@ export declare class AngularAppEngine {
      */
     private readonly manifest;
     /**
+     * The number of entry points available in the server application's manifest.
+     */
+    private readonly entryPointsCount;
+    /**
      * A cache that holds entry points, keyed by their potential locale string.
      */
     private readonly entryPointsCache;
@@ -89,12 +93,12 @@ export declare class AngularAppEngine {
  */
 declare interface AngularAppEngineManifest {
     /**
-     * A map of entry points for the server application.
-     * Each entry in the map consists of:
+     * A readonly record of entry points for the server application.
+     * Each entry consists of:
      * - `key`: The base href for the entry point.
      * - `value`: A function that returns a promise resolving to an object of type `EntryPointExports`.
      */
-    readonly entryPoints: ReadonlyMap<string, () => Promise<EntryPointExports>>;
+    readonly entryPoints: Readonly<Record<string, (() => Promise<EntryPointExports>) | undefined>>;
     /**
      * The base path for the server application.
      * This is used to determine the root path of the application.
@@ -112,12 +116,12 @@ declare interface AngularAppManifest {
      */
     readonly baseHref: string;
     /**
-     * A map of assets required by the server application.
-     * Each entry in the map consists of:
+     * A readonly record of assets required by the server application.
+     * Each entry consists of:
      * - `key`: The path of the asset.
-     * - `value`: A function returning a promise that resolves to the file contents of the asset.
+     * - `value`: An object of type `ServerAsset`.
      */
-    readonly assets: ReadonlyMap<string, ServerAsset>;
+    readonly assets: Readonly<Record<string, ServerAsset | undefined>>;
     /**
      * The bootstrap mechanism for the server application.
      * A function that returns a promise that resolves to an `NgModule` or a function
@@ -702,7 +706,7 @@ declare type RouteTreeNodeMetadataWithoutRoute = Omit<RouteTreeNodeMetadata, 'ro
 declare type SerializableRouteTreeNode = ReadonlyArray<RouteTreeNodeMetadata>;
 
 /**
- * Represents of a server asset stored in the manifest.
+ * Represents a server asset stored in the manifest.
  */
 declare interface ServerAsset {
     /**

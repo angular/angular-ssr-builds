@@ -25,7 +25,7 @@ class ServerAssets {
      * @throws Error - Throws an error if the asset does not exist.
      */
     getServerAsset(path) {
-        const asset = this.manifest.assets.get(path);
+        const asset = this.manifest.assets[path];
         if (!asset) {
             throw new Error(`Server asset '${path}' does not exist.`);
         }
@@ -38,7 +38,7 @@ class ServerAssets {
      * @returns A boolean indicating whether the asset exists.
      */
     hasServerAsset(path) {
-        return this.manifest.assets.has(path);
+        return !!this.manifest.assets[path];
     }
     /**
      * Retrieves the asset for 'index.server.html'.
@@ -1875,6 +1875,10 @@ class AngularAppEngine {
      */
     manifest = getAngularAppEngineManifest();
     /**
+     * The number of entry points available in the server application's manifest.
+     */
+    entryPointsCount = Object.keys(this.manifest.entryPoints).length;
+    /**
      * A cache that holds entry points, keyed by their potential locale string.
      */
     entryPointsCache = new Map();
@@ -1932,7 +1936,7 @@ class AngularAppEngine {
             return cachedEntryPoint;
         }
         const { entryPoints } = this.manifest;
-        const entryPoint = entryPoints.get(potentialLocale);
+        const entryPoint = entryPoints[potentialLocale];
         if (!entryPoint) {
             return undefined;
         }
@@ -1952,8 +1956,8 @@ class AngularAppEngine {
      * @returns A promise that resolves to the entry point exports or `undefined` if not found.
      */
     getEntryPointExportsForUrl(url) {
-        const { entryPoints, basePath } = this.manifest;
-        if (entryPoints.size === 1) {
+        const { basePath } = this.manifest;
+        if (this.entryPointsCount === 1) {
             return this.getEntryPointExports('');
         }
         const potentialLocale = getPotentialLocaleIdFromUrl(url, basePath);

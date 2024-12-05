@@ -454,8 +454,6 @@ const SERVER_ROUTES_CONFIG = new InjectionToken('SERVER_ROUTES_CONFIG');
  * @param options - (Optional) An object containing additional configuration options for server routes.
  * @returns An `EnvironmentProviders` instance with the server routes configuration.
  *
- * @returns An `EnvironmentProviders` object that contains the server routes configuration.
- *
  * @see {@link ServerRoute}
  * @see {@link ServerRoutesConfigOptions}
  * @developerPreview

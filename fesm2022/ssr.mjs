@@ -1646,10 +1646,11 @@ class AngularServerApp {
             return null;
         }
         const assetPath = this.buildServerAssetPathFromRequest(request);
-        if (!this.assets.hasServerAsset(assetPath)) {
+        const { manifest: { locale }, assets, } = this;
+        if (!assets.hasServerAsset(assetPath)) {
             return null;
         }
-        const { text, hash, size } = this.assets.getServerAsset(assetPath);
+        const { text, hash, size } = assets.getServerAsset(assetPath);
         const etag = `"${hash}"`;
         return request.headers.get('if-none-match') === etag
             ? new Response(undefined, { status: 304, statusText: 'Not Modified' })
@@ -1658,6 +1659,7 @@ class AngularServerApp {
                     'Content-Length': size.toString(),
                     'ETag': etag,
                     'Content-Type': 'text/html;charset=UTF-8',
+                    ...(locale !== undefined ? { 'Content-Language': locale } : {}),
                     ...headers,
                 },
             });
@@ -1680,11 +1682,13 @@ class AngularServerApp {
         }
         const url = new URL(request.url);
         const platformProviders = [];
+        const { manifest: { bootstrap, inlineCriticalCss, locale }, assets, } = this;
         // Initialize the response with status and headers if available.
         const responseInit = {
             status,
             headers: new Headers({
                 'Content-Type': 'text/html;charset=UTF-8',
+                ...(locale !== undefined ? { 'Content-Language': locale } : {}),
                 ...headers,
             }),
         };
@@ -1703,11 +1707,10 @@ class AngularServerApp {
         }
         else if (renderMode === RenderMode.Client) {
             // Serve the client-side rendered version if the route is configured for CSR.
-            let html = await this.assets.getServerAsset('index.csr.html').text();
+            let html = await assets.getServerAsset('index.csr.html').text();
             html = await this.runTransformsOnHtml(html, url);
             return new Response(html, responseInit);
         }
-        const { manifest: { bootstrap, inlineCriticalCss, locale }, hooks, assets, } = this;
         if (locale !== undefined) {
             platformProviders.push({
                 provide: LOCALE_ID,

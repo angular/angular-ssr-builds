@@ -36,9 +36,9 @@ export declare class AngularAppEngine {
      */
     private readonly manifest;
     /**
-     * The number of entry points available in the server application's manifest.
+     * A map of supported locales from the server application's manifest.
      */
-    private readonly entryPointsCount;
+    private readonly supportedLocales;
     /**
      * A cache that holds entry points, keyed by their potential locale string.
      */
@@ -55,6 +55,15 @@ export declare class AngularAppEngine {
      * corresponding to `https://www.example.com/page`.
      */
     handle(request: Request, requestContext?: unknown): Promise<Response | null>;
+    /**
+     * Handles requests for the base path when i18n is enabled.
+     * Redirects the user to a locale-specific path based on the `Accept-Language` header.
+     *
+     * @param request The incoming request.
+     * @returns A `Response` object with a 302 redirect, or `null` if i18n is not enabled
+     *          or the request is not for the base path.
+     */
+    private redirectBasedOnAcceptLanguage;
     /**
      * Retrieves the Angular server application instance for a given request.
      *
@@ -95,7 +104,7 @@ declare interface AngularAppEngineManifest {
     /**
      * A readonly record of entry points for the server application.
      * Each entry consists of:
-     * - `key`: The base href for the entry point.
+     * - `key`: The url segment for the entry point.
      * - `value`: A function that returns a promise resolving to an object of type `EntryPointExports`.
      */
     readonly entryPoints: Readonly<Record<string, (() => Promise<EntryPointExports>) | undefined>>;
@@ -104,6 +113,13 @@ declare interface AngularAppEngineManifest {
      * This is used to determine the root path of the application.
      */
     readonly basePath: string;
+    /**
+     * A readonly record mapping supported locales to their respective entry-point paths.
+     * Each entry consists of:
+     * - `key`: The locale identifier (e.g., 'en', 'fr').
+     * - `value`: The url segment associated with that locale.
+     */
+    readonly supportedLocales: Readonly<Record<string, string | undefined>>;
 }
 
 /**

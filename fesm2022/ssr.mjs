@@ -656,6 +656,11 @@ class RouteTree {
 }
 
 /**
+ * The maximum number of module preload link elements that should be added for
+ * initial scripts.
+ */
+const MODULE_PRELOAD_MAX = 10;
+/**
  * Regular expression to match segments preceded by a colon in a string.
  */
 const URL_PARAMETER_REGEXP = /(?<!\\):([^/]+)/g;
@@ -673,10 +678,10 @@ const VALID_REDIRECT_RESPONSE_CODES = new Set([301, 302, 303, 307, 308]);
  * @returns An async iterable iterator yielding either route tree node metadata or an error object with an error message.
  */
 async function* traverseRoutesConfig(options) {
-    const { routes, compiler, parentInjector, parentRoute, serverConfigRouteTree, invokeGetPrerenderParams, includePrerenderFallbackRoutes, } = options;
+    const { routes, compiler, parentInjector, parentRoute, serverConfigRouteTree, entryPointToBrowserMapping, parentPreloads, invokeGetPrerenderParams, includePrerenderFallbackRoutes, } = options;
     for (const route of routes) {
         try {
-            const { path = '', redirectTo, loadChildren, children } = route;
+            const { path = '', redirectTo, loadChildren, loadComponent, children, ɵentryName } = route;
             const currentRoutePath = joinUrlParts(parentRoute, path);
             // Get route metadata from the server config route tree, if available
             let matchedMetaData;
@@ -694,12 +699,16 @@ async function* traverseRoutesConfig(options) {
             const metadata = {
                 renderMode: RenderMode.Prerender,
                 ...matchedMetaData,
+                preload: parentPreloads,
                 // Match Angular router behavior
                 // ['one', 'two', ''] -> 'one/two/'
                 // ['one', 'two', 'three'] -> 'one/two/three'
                 route: path === '' ? addTrailingSlash(currentRoutePath) : currentRoutePath,
+                presentInClientRouter: undefined,
             };
-            delete metadata.presentInClientRouter;
+            if (ɵentryName && loadComponent) {
+                appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata, true);
+            }
             if (metadata.renderMode === RenderMode.Prerender) {
                 // Handle SSG routes
                 yield* handleSSGRoute(typeof redirectTo === 'string' ? redirectTo : undefined, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
@@ -724,10 +733,18 @@ async function* traverseRoutesConfig(options) {
                     ...options,
                     routes: children,
                     parentRoute: currentRoutePath,
+                    parentPreloads: metadata.preload,
                 });
             }
             // Load and process lazy-loaded child routes
             if (loadChildren) {
+                if (ɵentryName) {
+                    // When using `loadChildren`, the entire feature area (including multiple routes) is loaded.
+                    // As a result, we do not want all dynamic-import dependencies to be preload, because it involves multiple dependencies
+                    // across different child routes. In contrast, `loadComponent` only loads a single component, which allows
+                    // for precise control over preloading, ensuring that the files preloaded are exactly those required for that specific route.
+                    appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata, false);
+                }
                 const loadedChildRoutes = await _loadChildren(route, compiler, parentInjector).toPromise();
                 if (loadedChildRoutes) {
                     const { routes: childRoutes, injector = parentInjector } = loadedChildRoutes;
@@ -736,6 +753,7 @@ async function* traverseRoutesConfig(options) {
                         routes: childRoutes,
                         parentInjector: injector,
                         parentRoute: currentRoutePath,
+                        parentPreloads: metadata.preload,
                     });
                 }
             }
@@ -745,6 +763,27 @@ async function* traverseRoutesConfig(options) {
                 error: `Error processing route '${stripLeadingSlash(route.path ?? '')}': ${error.message}`,
             };
         }
+    }
+}
+/**
+ * Appends preload information to the metadata object based on the specified entry-point and chunk mappings.
+ *
+ * This function extracts preload data for a given entry-point from the provided chunk mappings. It adds the
+ * corresponding browser bundles to the metadata's preload list, ensuring no duplicates and limiting the total
+ * preloads to a predefined maximum.
+ */
+function appendPreloadToMetadata(entryName, entryPointToBrowserMapping, metadata, includeDynamicImports) {
+    if (!entryPointToBrowserMapping) {
+        return;
+    }
+    const preload = entryPointToBrowserMapping[entryName];
+    if (preload?.length) {
+        // Merge existing preloads with new ones, ensuring uniqueness and limiting the total to the maximum allowed.
+        const preloadPaths = preload
+            .filter(({ dynamicImport }) => includeDynamicImports || !dynamicImport)
+            .map(({ path }) => path) ?? [];
+        const combinedPreloads = [...(metadata.preload ?? []), ...preloadPaths];
+        metadata.preload = Array.from(new Set(combinedPreloads)).slice(0, MODULE_PRELOAD_MAX);
     }
 }
 /**
@@ -891,10 +930,11 @@ function buildServerConfigRouteTree({ routes, appShellRoute }) {
  * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
  * to handle prerendering paths. Defaults to `false`.
  * @param includePrerenderFallbackRoutes - A flag indicating whether to include fallback routes in the result. Defaults to `true`.
+ * @param entryPointToBrowserMapping - Maps the entry-point name to the associated JavaScript browser bundles.
  *
  * @returns A promise that resolves to an object of type `AngularRouterConfigResult` or errors.
  */
-async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams = false, includePrerenderFallbackRoutes = true) {
+async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams = false, includePrerenderFallbackRoutes = true, entryPointToBrowserMapping = undefined) {
     const { protocol, host } = url;
     // Create and initialize the Angular platform for server-side rendering.
     const platformRef = platformServer([
@@ -952,6 +992,7 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
                 serverConfigRouteTree,
                 invokeGetPrerenderParams,
                 includePrerenderFallbackRoutes,
+                entryPointToBrowserMapping,
             });
             for await (const result of traverseRoutes) {
                 if ('error' in result) {
@@ -1024,7 +1065,7 @@ function extractRoutesAndCreateRouteTree(options) {
         const routeTree = new RouteTree();
         const document = await new ServerAssets(manifest).getIndexServerHtml().text();
         const bootstrap = await manifest.bootstrap();
-        const { baseHref, appShellRoute, routes, errors } = await getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
+        const { baseHref, appShellRoute, routes, errors } = await getRoutesFromAngularRouterConfig(bootstrap, document, url, invokeGetPrerenderParams, includePrerenderFallbackRoutes, manifest.entryPointToBrowserMapping);
         for (const { route, ...metadata } of routes) {
             if (metadata.redirectTo !== undefined) {
                 metadata.redirectTo = joinUrlParts(baseHref, metadata.redirectTo);
@@ -1676,7 +1717,7 @@ class AngularServerApp {
      * @returns A promise that resolves to the rendered response, or null if no matching route is found.
      */
     async handleRendering(request, matchedRoute, requestContext) {
-        const { renderMode, headers, status } = matchedRoute;
+        const { renderMode, headers, status, preload } = matchedRoute;
         if (!this.allowStaticRouteRender && renderMode === RenderMode.Prerender) {
             return null;
         }
@@ -1707,8 +1748,8 @@ class AngularServerApp {
         }
         else if (renderMode === RenderMode.Client) {
             // Serve the client-side rendered version if the route is configured for CSR.
-            let html = await assets.getServerAsset('index.csr.html').text();
-            html = await this.runTransformsOnHtml(html, url);
+            let html = await this.assets.getServerAsset('index.csr.html').text();
+            html = await this.runTransformsOnHtml(html, url, preload);
             return new Response(html, responseInit);
         }
         if (locale !== undefined) {
@@ -1719,7 +1760,7 @@ class AngularServerApp {
         }
         this.boostrap ??= await bootstrap();
         let html = await assets.getIndexServerHtml().text();
-        html = await this.runTransformsOnHtml(html, url);
+        html = await this.runTransformsOnHtml(html, url, preload);
         html = await renderAngular(html, this.boostrap, url, platformProviders, SERVER_CONTEXT_VALUE[renderMode]);
         if (inlineCriticalCss) {
             // Optionally inline critical CSS.
@@ -1779,11 +1820,15 @@ class AngularServerApp {
      *
      * @param html - The raw HTML content to be transformed.
      * @param url - The URL associated with the HTML content, used for context during transformations.
+     * @param preload - An array of URLs representing the JavaScript resources to preload.
      * @returns A promise that resolves to the transformed HTML string.
      */
-    async runTransformsOnHtml(html, url) {
+    async runTransformsOnHtml(html, url, preload) {
         if (this.hooks.has('html:transform:pre')) {
             html = await this.hooks.run('html:transform:pre', { html, url });
+        }
+        if (preload?.length) {
+            html = appendPreloadHintsToHtml(html, preload);
         }
         return html;
     }
@@ -1816,6 +1861,31 @@ function destroyAngularServerApp() {
         _resetCompiledComponents();
     }
     angularServerApp = undefined;
+}
+/**
+ * Appends module preload hints to an HTML string for specified JavaScript resources.
+ * This function enhances the HTML by injecting `<link rel="modulepreload">` elements
+ * for each provided resource, allowing browsers to preload the specified JavaScript
+ * modules for better performance.
+ *
+ * @param html - The original HTML string to which preload hints will be added.
+ * @param preload - An array of URLs representing the JavaScript resources to preload.
+ * @returns The modified HTML string with the preload hints injected before the closing `</body>` tag.
+ *          If `</body>` is not found, the links are not added.
+ */
+function appendPreloadHintsToHtml(html, preload) {
+    const bodyCloseIdx = html.lastIndexOf('</body>');
+    if (bodyCloseIdx === -1) {
+        return html;
+    }
+    // Note: Module preloads should be placed at the end before the closing body tag to avoid a performance penalty.
+    // Placing them earlier can cause the browser to prioritize downloading these modules
+    // over other critical page resources like images, CSS, and fonts.
+    return [
+        html.slice(0, bodyCloseIdx),
+        ...preload.map((val) => `<link rel="modulepreload" href="${val}">`),
+        html.slice(bodyCloseIdx),
+    ].join('\n');
 }
 
 // ɵgetRoutesFromAngularRouterConfig is only used by the Webpack based server builder.

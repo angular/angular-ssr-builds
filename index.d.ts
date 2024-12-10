@@ -144,6 +144,26 @@ declare interface AngularAppManifest {
      * the application, aiding with localization and rendering content specific to the locale.
      */
     readonly locale?: string;
+    /**
+     * Maps entry-point names to their corresponding browser bundles and loading strategies.
+     *
+     * - **Key**: The entry-point name, typically the value of `ɵentryName`.
+     * - **Value**: An array of objects, each representing a browser bundle with:
+     *   - `path`: The filename or URL of the associated JavaScript bundle to preload.
+     *   - `dynamicImport`: A boolean indicating whether the bundle is loaded via a dynamic `import()`.
+     *     If `true`, the bundle is lazily loaded, impacting its preloading behavior.
+     *
+     * ### Example
+     * ```ts
+     * {
+     *   'src/app/lazy/lazy.ts': [{ path: 'src/app/lazy/lazy.js', dynamicImport: true }]
+     * }
+     * ```
+     */
+    readonly entryPointToBrowserMapping?: Readonly<Record<string, ReadonlyArray<{
+        path: string;
+        dynamicImport: boolean;
+    }> | undefined>>;
 }
 
 /**
@@ -293,6 +313,7 @@ declare class AngularServerApp {
      *
      * @param html - The raw HTML content to be transformed.
      * @param url - The URL associated with the HTML content, used for context during transformations.
+     * @param preload - An array of URLs representing the JavaScript resources to preload.
      * @returns A promise that resolves to the transformed HTML string.
      */
     private runTransformsOnHtml;
@@ -368,6 +389,8 @@ declare interface EntryPointExports {
      */
     ɵdestroyAngularServerApp: () => void;
 }
+
+declare type EntryPointToBrowserMapping = AngularAppManifest['entryPointToBrowserMapping'];
 
 /**
  * Defines the names of available hooks for registering and triggering custom logic within the application.
@@ -698,6 +721,10 @@ declare interface RouteTreeNodeMetadata {
      * Specifies the rendering mode used for this route.
      */
     renderMode: RenderMode;
+    /**
+     * A list of resource that should be preloaded by the browser.
+     */
+    preload?: readonly string[];
 }
 
 /**
@@ -918,10 +945,11 @@ export declare function ɵgetOrCreateAngularServerApp(options?: Readonly<Angular
  * @param invokeGetPrerenderParams - A boolean flag indicating whether to invoke `getPrerenderParams` for parameterized SSG routes
  * to handle prerendering paths. Defaults to `false`.
  * @param includePrerenderFallbackRoutes - A flag indicating whether to include fallback routes in the result. Defaults to `true`.
+ * @param entryPointToBrowserMapping - Maps the entry-point name to the associated JavaScript browser bundles.
  *
  * @returns A promise that resolves to an object of type `AngularRouterConfigResult` or errors.
  */
-export declare function ɵgetRoutesFromAngularRouterConfig(bootstrap: AngularBootstrap, document: string, url: URL, invokeGetPrerenderParams?: boolean, includePrerenderFallbackRoutes?: boolean): Promise<AngularRouterConfigResult>;
+export declare function ɵgetRoutesFromAngularRouterConfig(bootstrap: AngularBootstrap, document: string, url: URL, invokeGetPrerenderParams?: boolean, includePrerenderFallbackRoutes?: boolean, entryPointToBrowserMapping?: EntryPointToBrowserMapping | undefined): Promise<AngularRouterConfigResult>;
 
 export declare class ɵInlineCriticalCssProcessor extends BeastiesBase {
     readFile: (path: string) => Promise<string>;

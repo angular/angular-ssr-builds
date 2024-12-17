@@ -1265,8 +1265,7 @@ const CSP_MEDIA_ATTR = 'ngCspMedia';
  * - Removes the event listener when all relevant `<link>` tags have been processed.
  * - Uses event capturing (the `true` parameter) since load events do not bubble up the DOM.
  */
-const LINK_LOAD_SCRIPT_CONTENT = `
-(() => {
+const LINK_LOAD_SCRIPT_CONTENT = /* @__PURE__ */ (() => `(() => {
   const CSP_MEDIA_ATTR = '${CSP_MEDIA_ATTR}';
   const documentElement = document.documentElement;
 
@@ -1290,7 +1289,7 @@ const LINK_LOAD_SCRIPT_CONTENT = `
   };
 
   documentElement.addEventListener('load', listener, true);
-})();`;
+})();`)();
 class BeastiesBase extends Beasties {
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */

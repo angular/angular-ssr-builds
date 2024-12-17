@@ -1670,12 +1670,15 @@ class AngularServerApp {
         }
         const { redirectTo, status, renderMode } = matchedRoute;
         if (redirectTo !== undefined) {
-            return Response.redirect(new URL(buildPathWithParams(redirectTo, url.pathname), url), 
-            // Note: The status code is validated during route extraction.
-            // 302 Found is used by default for redirections
-            // See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            status ?? 302);
+            return new Response(null, {
+                // Note: The status code is validated during route extraction.
+                // 302 Found is used by default for redirections
+                // See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
+                status: status ?? 302,
+                headers: {
+                    'Location': buildPathWithParams(redirectTo, url.pathname),
+                },
+            });
         }
         if (renderMode === RenderMode.Prerender) {
             const response = await this.handleServe(request, matchedRoute);

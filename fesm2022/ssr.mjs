@@ -1,5 +1,5 @@
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
-import { ɵConsole as _Console, InjectionToken, makeEnvironmentProviders, runInInjectionContext, APP_INITIALIZER, inject, ApplicationRef, Compiler, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
+import { ɵConsole as _Console, InjectionToken, makeEnvironmentProviders, runInInjectionContext, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, ApplicationRef, Compiler, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
 import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule, renderApplication, platformServer, INITIAL_CONFIG } from '@angular/platform-server';
 import { ɵloadChildren as _loadChildren, Router } from '@angular/router';
 import Beasties from '../third_party/beasties/index.js';
@@ -951,16 +951,8 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
             useFactory: () => new Console(),
         },
         {
-            // We cannot replace `ApplicationRef` with a different provider here due to the dependency injection (DI) hierarchy.
-            // This code is running at the platform level, where `ApplicationRef` is provided in the root injector.
-            // As a result, any attempt to replace it will cause the root provider to override the platform provider.
-            // TODO(alanagius): investigate exporting the app config directly which would help with: https://github.com/angular/angular/issues/59144
-            provide: APP_INITIALIZER,
-            multi: true,
-            useFactory: () => () => {
-                const appRef = inject(ApplicationRef);
-                appRef.bootstrap = () => undefined;
-            },
+            provide: _ENABLE_ROOT_COMPONENT_BOOTSTRAP,
+            useValue: false,
         },
     ]);
     try {

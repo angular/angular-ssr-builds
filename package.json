@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "19.1.0-next.2+sha-86c8c52",
+  "version": "19.1.0-next.2+sha-07a8bce",
   "description": "Angular server side rendering utilities",
   "license": "MIT",
   "homepage": "https://github.com/angular/angular-cli",
@@ -27,12 +27,12 @@
     }
   },
   "devDependencies": {
-    "@angular/common": "19.1.0-next.3",
-    "@angular/compiler": "19.1.0-next.3",
-    "@angular/core": "19.1.0-next.3",
-    "@angular/platform-browser": "19.1.0-next.3",
-    "@angular/platform-server": "19.1.0-next.3",
-    "@angular/router": "19.1.0-next.3",
+    "@angular/common": "19.1.0-next.4",
+    "@angular/compiler": "19.1.0-next.4",
+    "@angular/core": "19.1.0-next.4",
+    "@angular/platform-browser": "19.1.0-next.4",
+    "@angular/platform-server": "19.1.0-next.4",
+    "@angular/router": "19.1.0-next.4",
     "@bazel/runfiles": "^5.8.1"
   },
   "sideEffects": false,

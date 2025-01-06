@@ -444,7 +444,6 @@ var PrerenderFallback;
  */
 const SERVER_ROUTES_CONFIG = new InjectionToken('SERVER_ROUTES_CONFIG');
 /**
-/**
  * Sets up the necessary providers for configuring server routes.
  * This function accepts an array of server routes and optional configuration
  * options, returning an `EnvironmentProviders` object that encapsulates

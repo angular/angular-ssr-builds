@@ -522,7 +522,6 @@ export declare enum PrerenderFallback {
 }
 
 /**
- /**
  * Sets up the necessary providers for configuring server routes.
  * This function accepts an array of server routes and optional configuration
  * options, returning an `EnvironmentProviders` object that encapsulates

@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "19.1.0-rc.0+sha-3d5f02d",
+  "version": "19.1.0-rc.0+sha-940ce56",
   "description": "Angular server side rendering utilities",
   "license": "MIT",
   "homepage": "https://github.com/angular/angular-cli",

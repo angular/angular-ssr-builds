@@ -1198,9 +1198,9 @@ function requireNode$1 () {
 	    if (opts.index) {
 	      pos = this.positionInside(opts.index);
 	    } else if (opts.word) {
-	      let stringRepresentation = this.source.input.css.slice(
-	        sourceOffset(this.source.input.css, this.source.start),
-	        sourceOffset(this.source.input.css, this.source.end)
+	      let stringRepresentation = this.source.input.document.slice(
+	        sourceOffset(this.source.input.document, this.source.start),
+	        sourceOffset(this.source.input.document, this.source.end)
 	      );
 	      let index = stringRepresentation.indexOf(opts.word);
 	      if (index !== -1) pos = this.positionInside(index);
@@ -1211,11 +1211,11 @@ function requireNode$1 () {
 	  positionInside(index) {
 	    let column = this.source.start.column;
 	    let line = this.source.start.line;
-	    let offset = sourceOffset(this.source.input.css, this.source.start);
+	    let offset = sourceOffset(this.source.input.document, this.source.start);
 	    let end = offset + index;
 
 	    for (let i = offset; i < end; i++) {
-	      if (this.source.input.css[i] === '\n') {
+	      if (this.source.input.document[i] === '\n') {
 	        column = 1;
 	        line += 1;
 	      } else {
@@ -1248,9 +1248,9 @@ function requireNode$1 () {
 	        };
 
 	    if (opts.word) {
-	      let stringRepresentation = this.source.input.css.slice(
-	        sourceOffset(this.source.input.css, this.source.start),
-	        sourceOffset(this.source.input.css, this.source.end)
+	      let stringRepresentation = this.source.input.document.slice(
+	        sourceOffset(this.source.input.document, this.source.start),
+	        sourceOffset(this.source.input.document, this.source.end)
 	      );
 	      let index = stringRepresentation.indexOf(opts.word);
 	      if (index !== -1) {
@@ -2231,6 +2231,9 @@ function requireInput () {
 	    } else {
 	      this.hasBOM = false;
 	    }
+
+	    this.document = this.css;
+	    if (opts.document) this.document = opts.document.toString();
 
 	    if (opts.from) {
 	      if (
@@ -4832,7 +4835,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.4.49';
+	    this.version = '8.5.0';
 	    this.plugins = this.normalize(plugins);
 	  }
 

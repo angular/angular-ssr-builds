@@ -682,15 +682,16 @@ async function* traverseRoutesConfig(options) {
         try {
             const { path = '', matcher, redirectTo, loadChildren, loadComponent, children, ɵentryName, } = route;
             const currentRoutePath = joinUrlParts(parentRoute, path);
-            if (matcher) {
-                yield {
-                    error: `The route '${stripLeadingSlash(currentRoutePath)}' uses a route matcher which is not supported.`,
-                };
-                continue;
-            }
             // Get route metadata from the server config route tree, if available
             let matchedMetaData;
             if (serverConfigRouteTree) {
+                if (matcher) {
+                    // Only issue this error when SSR routing is used.
+                    yield {
+                        error: `The route '${stripLeadingSlash(currentRoutePath)}' uses a route matcher that is not supported.`,
+                    };
+                    continue;
+                }
                 matchedMetaData = serverConfigRouteTree.match(currentRoutePath);
                 if (!matchedMetaData) {
                     yield {

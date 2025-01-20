@@ -1198,9 +1198,12 @@ function requireNode$1 () {
 	    if (opts.index) {
 	      pos = this.positionInside(opts.index);
 	    } else if (opts.word) {
-	      let stringRepresentation = this.source.input.document.slice(
-	        sourceOffset(this.source.input.document, this.source.start),
-	        sourceOffset(this.source.input.document, this.source.end)
+	      let inputString = ('document' in this.source.input)
+	        ? this.source.input.document
+	        : this.source.input.css;
+	      let stringRepresentation = inputString.slice(
+	        sourceOffset(inputString, this.source.start),
+	        sourceOffset(inputString, this.source.end)
 	      );
 	      let index = stringRepresentation.indexOf(opts.word);
 	      if (index !== -1) pos = this.positionInside(index);
@@ -1211,11 +1214,14 @@ function requireNode$1 () {
 	  positionInside(index) {
 	    let column = this.source.start.column;
 	    let line = this.source.start.line;
-	    let offset = sourceOffset(this.source.input.document, this.source.start);
+	    let inputString = ('document' in this.source.input)
+	      ? this.source.input.document
+	      : this.source.input.css;
+	    let offset = sourceOffset(inputString, this.source.start);
 	    let end = offset + index;
 
 	    for (let i = offset; i < end; i++) {
-	      if (this.source.input.document[i] === '\n') {
+	      if (inputString[i] === '\n') {
 	        column = 1;
 	        line += 1;
 	      } else {
@@ -1248,9 +1254,12 @@ function requireNode$1 () {
 	        };
 
 	    if (opts.word) {
-	      let stringRepresentation = this.source.input.document.slice(
-	        sourceOffset(this.source.input.document, this.source.start),
-	        sourceOffset(this.source.input.document, this.source.end)
+	      let inputString = ('document' in this.source.input)
+	        ? this.source.input.document
+	        : this.source.input.css;
+	      let stringRepresentation = inputString.slice(
+	        sourceOffset(inputString, this.source.start),
+	        sourceOffset(inputString, this.source.end)
 	      );
 	      let index = stringRepresentation.indexOf(opts.word);
 	      if (index !== -1) {
@@ -4835,7 +4844,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.0';
+	    this.version = '8.5.1';
 	    this.plugins = this.normalize(plugins);
 	  }
 

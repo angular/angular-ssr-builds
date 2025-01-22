@@ -657,10 +657,9 @@ declare class RouteTree<AdditionalMetadata extends Record<string, unknown> = {}>
      */
     private getHigherPriorityNode;
     /**
-     * Creates an empty route tree node with the specified segment.
+     * Creates an empty route tree node.
      * This helper function is used during the tree construction.
      *
-     * @param segment - The route segment that this node represents.
      * @returns A new, empty route tree node.
      */
     private createEmptyRouteTreeNode;
@@ -672,13 +671,6 @@ declare class RouteTree<AdditionalMetadata extends Record<string, unknown> = {}>
  * The `AdditionalMetadata` type parameter allows for extending the node metadata with custom data.
  */
 declare interface RouteTreeNode<AdditionalMetadata extends Record<string, unknown>> {
-    /**
-     * The segment value associated with this node.
-     * A segment is a single part of a route path, typically delimited by slashes (`/`).
-     * For example, in the route `/users/:id/profile`, the segments are `users`, `:id`, and `profile`.
-     * Segments can also be wildcards (`*`), which match any segment in that position of the route.
-     */
-    segment: string;
     /**
      * The index indicating the order in which the route was inserted into the tree.
      * This index helps determine the priority of routes during matching, with lower indexes

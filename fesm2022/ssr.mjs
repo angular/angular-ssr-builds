@@ -579,7 +579,7 @@ class RouteTree {
      * @returns An array of path segments.
      */
     getPathSegments(route) {
-        return route.split('/').filter(Boolean);
+        return stripTrailingSlash(route).split('/');
     }
     /**
      * Recursively traverses the route tree from a given node, attempting to match the remaining route segments.

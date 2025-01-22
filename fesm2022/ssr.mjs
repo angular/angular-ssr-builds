@@ -481,7 +481,7 @@ class RouteTree {
      * The root node of the route tree.
      * All routes are stored and accessed relative to this root node.
      */
-    root = this.createEmptyRouteTreeNode('<root>');
+    root = this.createEmptyRouteTreeNode();
     /**
      * A counter that tracks the order of route insertion.
      * This ensures that routes are matched in the order they were defined,
@@ -505,7 +505,7 @@ class RouteTree {
             const normalizedSegment = segment[0] === ':' ? '*' : segment;
             let childNode = node.children.get(normalizedSegment);
             if (!childNode) {
-                childNode = this.createEmptyRouteTreeNode(normalizedSegment);
+                childNode = this.createEmptyRouteTreeNode();
                 node.children.set(normalizedSegment, childNode);
             }
             node = childNode;
@@ -636,15 +636,13 @@ class RouteTree {
             : currentBestMatchNode;
     }
     /**
-     * Creates an empty route tree node with the specified segment.
+     * Creates an empty route tree node.
      * This helper function is used during the tree construction.
      *
-     * @param segment - The route segment that this node represents.
      * @returns A new, empty route tree node.
      */
-    createEmptyRouteTreeNode(segment) {
+    createEmptyRouteTreeNode() {
         return {
-            segment,
             insertionIndex: -1,
             children: new Map(),
         };

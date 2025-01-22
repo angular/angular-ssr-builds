@@ -481,7 +481,7 @@ class RouteTree {
      * The root node of the route tree.
      * All routes are stored and accessed relative to this root node.
      */
-    root = this.createEmptyRouteTreeNode('');
+    root = this.createEmptyRouteTreeNode('<root>');
     /**
      * A counter that tracks the order of route insertion.
      * This ensures that routes are matched in the order they were defined,
@@ -514,7 +514,7 @@ class RouteTree {
         // At the leaf node, store the full route and its associated metadata
         node.metadata = {
             ...metadata,
-            route: normalizedSegments.join('/'),
+            route: addLeadingSlash(normalizedSegments.join('/')),
         };
         node.insertionIndex = this.insertionIndexCounter++;
     }
@@ -579,7 +579,7 @@ class RouteTree {
      * @returns An array of path segments.
      */
     getPathSegments(route) {
-        return stripTrailingSlash(route).split('/');
+        return route.split('/').filter(Boolean);
     }
     /**
      * Recursively traverses the route tree from a given node, attempting to match the remaining route segments.
@@ -596,11 +596,8 @@ class RouteTree {
     traverseBySegments(remainingSegments, node = this.root) {
         const { metadata, children } = node;
         // If there are no remaining segments and the node has metadata, return this node
-        if (!remainingSegments?.length) {
-            if (metadata) {
-                return node;
-            }
-            return;
+        if (!remainingSegments.length) {
+            return metadata ? node : node.children.get('**');
         }
         // If the node has no children, end the traversal
         if (!children.size) {
@@ -1025,11 +1022,11 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
             await new Promise((resolve) => setTimeout(resolve, 0));
             if (serverConfigRouteTree) {
                 for (const { route, presentInClientRouter } of serverConfigRouteTree.traverse()) {
-                    if (presentInClientRouter || route === '**') {
+                    if (presentInClientRouter || route.endsWith('/**')) {
                         // Skip if matched or it's the catch-all route.
                         continue;
                     }
-                    errors.push(`The '${route}' server route does not match any routes defined in the Angular ` +
+                    errors.push(`The '${stripLeadingSlash(route)}' server route does not match any routes defined in the Angular ` +
                         `routing configuration (typically provided as a part of the 'provideRouter' call). ` +
                         'Please make sure that the mentioned server route is present in the Angular routing configuration.');
                 }

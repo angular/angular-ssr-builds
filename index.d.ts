@@ -577,12 +577,6 @@ declare class RouteTree<AdditionalMetadata extends Record<string, unknown> = {}>
      */
     private readonly root;
     /**
-     * A counter that tracks the order of route insertion.
-     * This ensures that routes are matched in the order they were defined,
-     * with earlier routes taking precedence.
-     */
-    private insertionIndexCounter;
-    /**
      * Inserts a new route into the route tree.
      * The route is broken down into segments, and each segment is added to the tree.
      * Parameterized segments (e.g., :id) are normalized to wildcards (*) for matching purposes.
@@ -641,21 +635,14 @@ declare class RouteTree<AdditionalMetadata extends Record<string, unknown> = {}>
      * This function prioritizes exact segment matches first, followed by wildcard matches (`*`),
      * and finally deep wildcard matches (`**`) that consume all segments.
      *
-     * @param remainingSegments - The remaining segments of the route path to match.
-     * @param node - The current node in the route tree to start traversal from.
+     * @param segments - The array of route path segments to match against the route tree.
+     * @param node - The current node in the route tree to start traversal from. Defaults to the root node.
+     * @param currentIndex - The index of the segment in `remainingSegments` currently being matched.
+     * Defaults to `0` (the first segment).
      *
      * @returns The node that best matches the remaining segments or `undefined` if no match is found.
      */
     private traverseBySegments;
-    /**
-     * Compares two nodes and returns the node with higher priority based on insertion index.
-     * A node with a lower insertion index is prioritized as it was defined earlier.
-     *
-     * @param currentBestMatchNode - The current best match node.
-     * @param candidateNode - The node being evaluated for higher priority based on insertion index.
-     * @returns The node with higher priority (i.e., lower insertion index). If one of the nodes is `undefined`, the other node is returned.
-     */
-    private getHigherPriorityNode;
     /**
      * Creates an empty route tree node.
      * This helper function is used during the tree construction.
@@ -671,12 +658,6 @@ declare class RouteTree<AdditionalMetadata extends Record<string, unknown> = {}>
  * The `AdditionalMetadata` type parameter allows for extending the node metadata with custom data.
  */
 declare interface RouteTreeNode<AdditionalMetadata extends Record<string, unknown>> {
-    /**
-     * The index indicating the order in which the route was inserted into the tree.
-     * This index helps determine the priority of routes during matching, with lower indexes
-     * indicating earlier inserted routes.
-     */
-    insertionIndex: number;
     /**
      * A map of child nodes, keyed by their corresponding route segment or wildcard.
      */

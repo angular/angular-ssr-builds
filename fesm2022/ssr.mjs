@@ -483,12 +483,6 @@ class RouteTree {
      */
     root = this.createEmptyRouteTreeNode();
     /**
-     * A counter that tracks the order of route insertion.
-     * This ensures that routes are matched in the order they were defined,
-     * with earlier routes taking precedence.
-     */
-    insertionIndexCounter = 0;
-    /**
      * Inserts a new route into the route tree.
      * The route is broken down into segments, and each segment is added to the tree.
      * Parameterized segments (e.g., :id) are normalized to wildcards (*) for matching purposes.
@@ -516,7 +510,6 @@ class RouteTree {
             ...metadata,
             route: addLeadingSlash(normalizedSegments.join('/')),
         };
-        node.insertionIndex = this.insertionIndexCounter++;
     }
     /**
      * Matches a given route against the route tree and returns the best matching route's metadata.
@@ -579,7 +572,7 @@ class RouteTree {
      * @returns An array of path segments.
      */
     getPathSegments(route) {
-        return stripTrailingSlash(route).split('/');
+        return route.split('/').filter(Boolean);
     }
     /**
      * Recursively traverses the route tree from a given node, attempting to match the remaining route segments.
@@ -588,52 +581,39 @@ class RouteTree {
      * This function prioritizes exact segment matches first, followed by wildcard matches (`*`),
      * and finally deep wildcard matches (`**`) that consume all segments.
      *
-     * @param remainingSegments - The remaining segments of the route path to match.
-     * @param node - The current node in the route tree to start traversal from.
+     * @param segments - The array of route path segments to match against the route tree.
+     * @param node - The current node in the route tree to start traversal from. Defaults to the root node.
+     * @param currentIndex - The index of the segment in `remainingSegments` currently being matched.
+     * Defaults to `0` (the first segment).
      *
      * @returns The node that best matches the remaining segments or `undefined` if no match is found.
      */
-    traverseBySegments(remainingSegments, node = this.root) {
-        const { metadata, children } = node;
-        // If there are no remaining segments and the node has metadata, return this node
-        if (!remainingSegments.length) {
-            return metadata ? node : node.children.get('**');
+    traverseBySegments(segments, node = this.root, currentIndex = 0) {
+        if (currentIndex >= segments.length) {
+            return node.metadata ? node : node.children.get('**');
         }
-        // If the node has no children, end the traversal
-        if (!children.size) {
-            return;
+        if (!node.children.size) {
+            return undefined;
         }
-        const [segment, ...restSegments] = remainingSegments;
-        let currentBestMatchNode;
-        // 1. Exact segment match
-        const exactMatchNode = node.children.get(segment);
-        currentBestMatchNode = this.getHigherPriorityNode(currentBestMatchNode, this.traverseBySegments(restSegments, exactMatchNode));
-        // 2. Wildcard segment match (`*`)
-        const wildcardNode = node.children.get('*');
-        currentBestMatchNode = this.getHigherPriorityNode(currentBestMatchNode, this.traverseBySegments(restSegments, wildcardNode));
-        // 3. Deep wildcard segment match (`**`)
-        const deepWildcardNode = node.children.get('**');
-        currentBestMatchNode = this.getHigherPriorityNode(currentBestMatchNode, deepWildcardNode);
-        return currentBestMatchNode;
-    }
-    /**
-     * Compares two nodes and returns the node with higher priority based on insertion index.
-     * A node with a lower insertion index is prioritized as it was defined earlier.
-     *
-     * @param currentBestMatchNode - The current best match node.
-     * @param candidateNode - The node being evaluated for higher priority based on insertion index.
-     * @returns The node with higher priority (i.e., lower insertion index). If one of the nodes is `undefined`, the other node is returned.
-     */
-    getHigherPriorityNode(currentBestMatchNode, candidateNode) {
-        if (!candidateNode) {
-            return currentBestMatchNode;
+        const segment = segments[currentIndex];
+        // 1. Attempt exact match with the current segment.
+        const exactMatch = node.children.get(segment);
+        if (exactMatch) {
+            const match = this.traverseBySegments(segments, exactMatch, currentIndex + 1);
+            if (match) {
+                return match;
+            }
         }
-        if (!currentBestMatchNode) {
-            return candidateNode;
+        // 2. Attempt wildcard match ('*').
+        const wildcardMatch = node.children.get('*');
+        if (wildcardMatch) {
+            const match = this.traverseBySegments(segments, wildcardMatch, currentIndex + 1);
+            if (match) {
+                return match;
+            }
         }
-        return candidateNode.insertionIndex < currentBestMatchNode.insertionIndex
-            ? candidateNode
-            : currentBestMatchNode;
+        // 3. Attempt double wildcard match ('**').
+        return node.children.get('**');
     }
     /**
      * Creates an empty route tree node.
@@ -643,7 +623,6 @@ class RouteTree {
      */
     createEmptyRouteTreeNode() {
         return {
-            insertionIndex: -1,
             children: new Map(),
         };
     }
@@ -712,7 +691,7 @@ async function* traverseRoutesConfig(options) {
             }
             if (metadata.renderMode === RenderMode.Prerender) {
                 // Handle SSG routes
-                yield* handleSSGRoute(typeof redirectTo === 'string' ? redirectTo : undefined, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
+                yield* handleSSGRoute(serverConfigRouteTree, typeof redirectTo === 'string' ? redirectTo : undefined, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
             }
             else if (typeof redirectTo === 'string') {
                 // Handle redirects
@@ -791,6 +770,7 @@ function appendPreloadToMetadata(entryName, entryPointToBrowserMapping, metadata
  * Handles SSG (Static Site Generation) routes by invoking `getPrerenderParams` and yielding
  * all parameterized paths, returning any errors encountered.
  *
+ * @param serverConfigRouteTree - The tree representing the server's routing setup.
  * @param redirectTo - Optional path to redirect to, if specified.
  * @param metadata - The metadata associated with the route tree node.
  * @param parentInjector - The dependency injection container for the parent route.
@@ -798,7 +778,7 @@ function appendPreloadToMetadata(entryName, entryPointToBrowserMapping, metadata
  * @param includePrerenderFallbackRoutes - A flag indicating whether to include fallback routes in the result.
  * @returns An async iterable iterator that yields route tree node metadata for each SSG path or errors.
  */
-async function* handleSSGRoute(redirectTo, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes) {
+async function* handleSSGRoute(serverConfigRouteTree, redirectTo, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes) {
     if (metadata.renderMode !== RenderMode.Prerender) {
         throw new Error(`'handleSSGRoute' was called for a route which rendering mode is not prerender.`);
     }
@@ -826,6 +806,18 @@ async function* handleSSGRoute(redirectTo, metadata, parentInjector, invokeGetPr
                     `or specify a different 'renderMode'.`,
             };
             return;
+        }
+        if (serverConfigRouteTree) {
+            // Automatically resolve dynamic parameters for nested routes.
+            const catchAllRoutePath = joinUrlParts(currentRoutePath, '**');
+            const match = serverConfigRouteTree.match(catchAllRoutePath);
+            if (match && match.renderMode === RenderMode.Prerender && !('getPrerenderParams' in match)) {
+                serverConfigRouteTree.insert(catchAllRoutePath, {
+                    ...match,
+                    presentInClientRouter: true,
+                    getPrerenderParams,
+                });
+            }
         }
         const parameters = await runInInjectionContext(parentInjector, () => getPrerenderParams());
         try {
@@ -910,6 +902,10 @@ function buildServerConfigRouteTree({ routes, appShellRoute }) {
     for (const { path, ...metadata } of serverRoutes) {
         if (path[0] === '/') {
             errors.push(`Invalid '${path}' route configuration: the path cannot start with a slash.`);
+            continue;
+        }
+        if (path.includes('*') && 'getPrerenderParams' in metadata) {
+            errors.push(`Invalid '${path}' route configuration: 'getPrerenderParams' cannot be used with a '*' or '**' route.`);
             continue;
         }
         serverConfigRouteTree.insert(path, metadata);

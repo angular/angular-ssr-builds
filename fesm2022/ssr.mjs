@@ -1,7 +1,7 @@
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import { ɵConsole as _Console, InjectionToken, makeEnvironmentProviders, runInInjectionContext, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, ApplicationRef, Compiler, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
 import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule, renderApplication, platformServer, INITIAL_CONFIG } from '@angular/platform-server';
-import { ɵloadChildren as _loadChildren, Router } from '@angular/router';
+import { ROUTES, ɵloadChildren as _loadChildren, Router } from '@angular/router';
 import Beasties from '../third_party/beasties/index.js';
 
 /**
@@ -400,8 +400,22 @@ function promiseWithAbort(promise, signal, errorMessagePrefix) {
 }
 
 /**
+ * The internal path used for the app shell route.
+ * @internal
+ */
+const APP_SHELL_ROUTE = 'ng-app-shell';
+/**
+ * Identifies a particular kind of `ServerRoutesFeatureKind`.
+ * @see {@link ServerRoutesFeature}
+ * @developerPreview
+ */
+var ServerRoutesFeatureKind;
+(function (ServerRoutesFeatureKind) {
+    ServerRoutesFeatureKind[ServerRoutesFeatureKind["AppShell"] = 0] = "AppShell";
+})(ServerRoutesFeatureKind || (ServerRoutesFeatureKind = {}));
+/**
  * Different rendering modes for server routes.
- * @see {@link provideServerRoutesConfig}
+ * @see {@link provideServerRouting}
  * @see {@link ServerRoute}
  * @developerPreview
  */
@@ -455,6 +469,8 @@ const SERVER_ROUTES_CONFIG = new InjectionToken('SERVER_ROUTES_CONFIG');
  *
  * @see {@link ServerRoute}
  * @see {@link ServerRoutesConfigOptions}
+ * @see {@link provideServerRouting}
+ * @deprecated use `provideServerRouting`. This will be removed in version 20.
  * @developerPreview
  */
 function provideServerRoutesConfig(routes, options) {
@@ -467,6 +483,75 @@ function provideServerRoutesConfig(routes, options) {
             useValue: { routes, ...options },
         },
     ]);
+}
+/**
+ * Sets up the necessary providers for configuring server routes.
+ * This function accepts an array of server routes and optional configuration
+ * options, returning an `EnvironmentProviders` object that encapsulates
+ * the server routes and configuration settings.
+ *
+ * @param routes - An array of server routes to be provided.
+ * @param features - (Optional) server routes features.
+ * @returns An `EnvironmentProviders` instance with the server routes configuration.
+ *
+ * @see {@link ServerRoute}
+ * @see {@link withAppShell}
+ * @developerPreview
+ */
+function provideServerRouting(routes, ...features) {
+    const config = { routes };
+    const hasAppShell = features.some((f) => f.ɵkind === ServerRoutesFeatureKind.AppShell);
+    if (hasAppShell) {
+        config.appShellRoute = APP_SHELL_ROUTE;
+    }
+    const providers = [
+        {
+            provide: SERVER_ROUTES_CONFIG,
+            useValue: config,
+        },
+    ];
+    for (const feature of features) {
+        providers.push(...feature.ɵproviders);
+    }
+    return makeEnvironmentProviders(providers);
+}
+/**
+ * Configures the app shell route with the provided component.
+ *
+ * The app shell serves as the main entry point for the application and is commonly used
+ * to enable server-side rendering (SSR) of the application shell. It handles requests
+ * that do not match any specific server route, providing a fallback mechanism and improving
+ * perceived performance during navigation.
+ *
+ * This configuration is particularly useful in applications leveraging Progressive Web App (PWA)
+ * patterns, such as service workers, to deliver a seamless user experience.
+ *
+ * @param component The Angular component to render for the app shell route.
+ * @returns A server routes feature configuration for the app shell.
+ *
+ * @see {@link provideServerRouting}
+ * @see {@link https://angular.dev/ecosystem/service-workers/app-shell | App shell pattern on Angular.dev}
+ */
+function withAppShell(component) {
+    const routeConfig = {
+        path: APP_SHELL_ROUTE,
+    };
+    if ('ɵcmp' in component) {
+        routeConfig.component = component;
+    }
+    else {
+        routeConfig.loadComponent = component;
+    }
+    return {
+        ɵkind: ServerRoutesFeatureKind.AppShell,
+        ɵproviders: [
+            {
+                provide: ROUTES,
+                useValue: routeConfig,
+                multi: true,
+            },
+        ],
+    };
 }
 
 /**
@@ -2268,5 +2353,5 @@ function createRequestHandler(handler) {
     return handler;
 }
 
-export { AngularAppEngine, PrerenderFallback, RenderMode, createRequestHandler, provideServerRoutesConfig, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
+export { AngularAppEngine, PrerenderFallback, RenderMode, createRequestHandler, provideServerRoutesConfig, provideServerRouting, withAppShell, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
 //# sourceMappingURL=ssr.mjs.map

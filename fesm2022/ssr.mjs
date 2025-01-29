@@ -2235,8 +2235,8 @@ class AngularAppEngine {
     redirectBasedOnAcceptLanguage(request) {
         const { basePath, supportedLocales } = this.manifest;
         // If the request is not for the base path, it's not our responsibility to handle it.
-        const url = new URL(request.url);
-        if (url.pathname !== basePath) {
+        const { pathname } = new URL(request.url);
+        if (pathname !== basePath) {
             return null;
         }
         // For requests to the base path (typically '/'), attempt to extract the preferred locale
@@ -2245,11 +2245,10 @@ class AngularAppEngine {
         if (preferredLocale) {
             const subPath = supportedLocales[preferredLocale];
             if (subPath !== undefined) {
-                url.pathname = joinUrlParts(url.pathname, subPath);
                 return new Response(null, {
                     status: 302, // Use a 302 redirect as language preference may change.
                     headers: {
-                        'Location': url.toString(),
+                        'Location': joinUrlParts(pathname, subPath),
                         'Vary': 'Accept-Language',
                     },
                 });

@@ -727,6 +727,73 @@ const URL_PARAMETER_REGEXP = /(?<!\\):([^/]+)/g;
  */
 const VALID_REDIRECT_RESPONSE_CODES = new Set([301, 302, 303, 307, 308]);
 /**
+ * Handles a single route within the route tree and yields metadata or errors.
+ *
+ * @param options - Configuration options for handling the route.
+ * @returns An async iterable iterator yielding `RouteTreeNodeMetadata` or an error object.
+ */
+async function* handleRoute(options) {
+    try {
+        const { metadata, currentRoutePath, route, compiler, parentInjector, serverConfigRouteTree, entryPointToBrowserMapping, invokeGetPrerenderParams, includePrerenderFallbackRoutes, } = options;
+        const { redirectTo, loadChildren, loadComponent, children, ɵentryName } = route;
+        if (ɵentryName && loadComponent) {
+            appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata, true);
+        }
+        if (metadata.renderMode === RenderMode.Prerender) {
+            yield* handleSSGRoute(serverConfigRouteTree, typeof redirectTo === 'string' ? redirectTo : undefined, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
+        }
+        else if (typeof redirectTo === 'string') {
+            if (metadata.status && !VALID_REDIRECT_RESPONSE_CODES.has(metadata.status)) {
+                yield {
+                    error: `The '${metadata.status}' status code is not a valid redirect response code. ` +
+                        `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`,
+                };
+            }
+            else {
+                yield { ...metadata, redirectTo: resolveRedirectTo(metadata.route, redirectTo) };
+            }
+        }
+        else {
+            yield metadata;
+        }
+        // Recursively process child routes
+        if (children?.length) {
+            yield* traverseRoutesConfig({
+                ...options,
+                routes: children,
+                parentRoute: currentRoutePath,
+                parentPreloads: metadata.preload,
+            });
+        }
+        // Load and process lazy-loaded child routes
+        if (loadChildren) {
+            if (ɵentryName) {
+                // When using `loadChildren`, the entire feature area (including multiple routes) is loaded.
+                // As a result, we do not want all dynamic-import dependencies to be preload, because it involves multiple dependencies
+                // across different child routes. In contrast, `loadComponent` only loads a single component, which allows
+                // for precise control over preloading, ensuring that the files preloaded are exactly those required for that specific route.
+                appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata, false);
+            }
+            const loadedChildRoutes = await _loadChildren(route, compiler, parentInjector).toPromise();
+            if (loadedChildRoutes) {
+                const { routes: childRoutes, injector = parentInjector } = loadedChildRoutes;
+                yield* traverseRoutesConfig({
+                    ...options,
+                    routes: childRoutes,
+                    parentInjector: injector,
+                    parentRoute: currentRoutePath,
+                    parentPreloads: metadata.preload,
+                });
+            }
+        }
+    }
+    catch (error) {
+        yield {
+            error: `Error in handleRoute for '${options.currentRoutePath}': ${error.message}`,
+        };
+    }
+}
+/**
  * Traverses an array of route configurations to generate route tree node metadata.
  *
  * This function processes each route and its children, handling redirects, SSG (Static Site Generation) settings,
@@ -736,32 +803,60 @@ const VALID_REDIRECT_RESPONSE_CODES = new Set([301, 302, 303, 307, 308]);
  * @returns An async iterable iterator yielding either route tree node metadata or an error object with an error message.
  */
 async function* traverseRoutesConfig(options) {
-    const { routes, compiler, parentInjector, parentRoute, serverConfigRouteTree, entryPointToBrowserMapping, parentPreloads, invokeGetPrerenderParams, includePrerenderFallbackRoutes, } = options;
-    for (const route of routes) {
-        try {
-            const { path = '', matcher, redirectTo, loadChildren, loadComponent, children, ɵentryName, } = route;
-            const currentRoutePath = joinUrlParts(parentRoute, path);
-            // Get route metadata from the server config route tree, if available
-            let matchedMetaData;
-            if (serverConfigRouteTree) {
-                if (matcher) {
-                    // Only issue this error when SSR routing is used.
-                    yield {
-                        error: `The route '${stripLeadingSlash(currentRoutePath)}' uses a route matcher that is not supported.`,
-                    };
+    const { routes: routeConfigs, parentPreloads, parentRoute, serverConfigRouteTree } = options;
+    for (const route of routeConfigs) {
+        const { matcher, path = matcher ? '**' : '' } = route;
+        const currentRoutePath = joinUrlParts(parentRoute, path);
+        if (matcher && serverConfigRouteTree) {
+            let foundMatch = false;
+            for (const matchedMetaData of serverConfigRouteTree.traverse()) {
+                if (!matchedMetaData.route.startsWith(currentRoutePath)) {
                     continue;
                 }
-                matchedMetaData = serverConfigRouteTree.match(currentRoutePath);
-                if (!matchedMetaData) {
-                    yield {
-                        error: `The '${stripLeadingSlash(currentRoutePath)}' route does not match any route defined in the server routing configuration. ` +
-                            'Please ensure this route is added to the server routing configuration.',
-                    };
-                    continue;
-                }
+                foundMatch = true;
                 matchedMetaData.presentInClientRouter = true;
+                if (matchedMetaData.renderMode === RenderMode.Prerender) {
+                    yield {
+                        error: `The route '${stripLeadingSlash(currentRoutePath)}' is set for prerendering but has a defined matcher. ` +
+                            `Routes with matchers cannot use prerendering. Please specify a different 'renderMode'.`,
+                    };
+                    continue;
+                }
+                yield* handleRoute({
+                    ...options,
+                    currentRoutePath,
+                    route,
+                    metadata: {
+                        ...matchedMetaData,
+                        preload: parentPreloads,
+                        route: matchedMetaData.route,
+                        presentInClientRouter: undefined,
+                    },
+                });
             }
-            const metadata = {
+            if (!foundMatch) {
+                yield {
+                    error: `The route '${stripLeadingSlash(currentRoutePath)}' has a defined matcher but does not ` +
+                        'match any route in the server routing configuration. Please ensure this route is added to the server routing configuration.',
+                };
+            }
+            continue;
+        }
+        let matchedMetaData;
+        if (serverConfigRouteTree) {
+            matchedMetaData = serverConfigRouteTree.match(currentRoutePath);
+            if (!matchedMetaData) {
+                yield {
+                    error: `The '${stripLeadingSlash(currentRoutePath)}' route does not match any route defined in the server routing configuration. ` +
+                        'Please ensure this route is added to the server routing configuration.',
+                };
+                continue;
+            }
+            matchedMetaData.presentInClientRouter = true;
+        }
+        yield* handleRoute({
+            ...options,
+            metadata: {
                 renderMode: RenderMode.Prerender,
                 ...matchedMetaData,
                 preload: parentPreloads,
@@ -770,64 +865,10 @@ async function* traverseRoutesConfig(options) {
                 // ['one', 'two', 'three'] -> 'one/two/three'
                 route: path === '' ? addTrailingSlash(currentRoutePath) : currentRoutePath,
                 presentInClientRouter: undefined,
-            };
-            if (ɵentryName && loadComponent) {
-                appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata, true);
-            }
-            if (metadata.renderMode === RenderMode.Prerender) {
-                // Handle SSG routes
-                yield* handleSSGRoute(serverConfigRouteTree, typeof redirectTo === 'string' ? redirectTo : undefined, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
-            }
-            else if (typeof redirectTo === 'string') {
-                // Handle redirects
-                if (metadata.status && !VALID_REDIRECT_RESPONSE_CODES.has(metadata.status)) {
-                    yield {
-                        error: `The '${metadata.status}' status code is not a valid redirect response code. ` +
-                            `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`,
-                    };
-                    continue;
-                }
-                yield { ...metadata, redirectTo: resolveRedirectTo(metadata.route, redirectTo) };
-            }
-            else {
-                yield metadata;
-            }
-            // Recursively process child routes
-            if (children?.length) {
-                yield* traverseRoutesConfig({
-                    ...options,
-                    routes: children,
-                    parentRoute: currentRoutePath,
-                    parentPreloads: metadata.preload,
-                });
-            }
-            // Load and process lazy-loaded child routes
-            if (loadChildren) {
-                if (ɵentryName) {
-                    // When using `loadChildren`, the entire feature area (including multiple routes) is loaded.
-                    // As a result, we do not want all dynamic-import dependencies to be preload, because it involves multiple dependencies
-                    // across different child routes. In contrast, `loadComponent` only loads a single component, which allows
-                    // for precise control over preloading, ensuring that the files preloaded are exactly those required for that specific route.
-                    appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata, false);
-                }
-                const loadedChildRoutes = await _loadChildren(route, compiler, parentInjector).toPromise();
-                if (loadedChildRoutes) {
-                    const { routes: childRoutes, injector = parentInjector } = loadedChildRoutes;
-                    yield* traverseRoutesConfig({
-                        ...options,
-                        routes: childRoutes,
-                        parentInjector: injector,
-                        parentRoute: currentRoutePath,
-                        parentPreloads: metadata.preload,
-                    });
-                }
-            }
-        }
-        catch (error) {
-            yield {
-                error: `Error processing route '${stripLeadingSlash(route.path ?? '')}': ${error.message}`,
-            };
-        }
+            },
+            currentRoutePath,
+            route,
+        });
     }
 }
 /**

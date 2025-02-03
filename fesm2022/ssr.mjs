@@ -1095,7 +1095,6 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
         router.navigationTransitions.afterPreactivation()?.next?.();
         // Wait until the application is stable.
         await applicationRef.whenStable();
-        const routesResults = [];
         const errors = [];
         let baseHref = injector.get(APP_BASE_HREF, null, { optional: true }) ??
             injector.get(PlatformLocation).getBaseHrefFromDOM();
@@ -1113,10 +1112,11 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
         if (errors.length) {
             return {
                 baseHref,
-                routes: routesResults,
+                routes: [],
                 errors,
             };
         }
+        const routesResults = [];
         if (router.config.length) {
             // Retrieve all routes from the Angular router configuration.
             const traverseRoutes = traverseRoutesConfig({
@@ -1129,12 +1129,18 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
                 includePrerenderFallbackRoutes,
                 entryPointToBrowserMapping,
             });
-            for await (const result of traverseRoutes) {
-                if ('error' in result) {
-                    errors.push(result.error);
+            const seenRoutes = new Set();
+            for await (const routeMetadata of traverseRoutes) {
+                if ('error' in routeMetadata) {
+                    errors.push(routeMetadata.error);
+                    continue;
                 }
-                else {
-                    routesResults.push(result);
+                // If a result already exists for the exact same route, subsequent matches should be ignored.
+                // This aligns with Angular's app router behavior, which prioritizes the first route.
+                const routePath = routeMetadata.route;
+                if (!seenRoutes.has(routePath)) {
+                    routesResults.push(routeMetadata);
+                    seenRoutes.add(routePath);
                 }
             }
             // This timeout is necessary to prevent 'adev' from hanging in production builds.

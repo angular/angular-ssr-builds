@@ -1063,11 +1063,9 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
         // Wait until the application is stable.
         await applicationRef.whenStable();
         const errors = [];
-        let baseHref = injector.get(APP_BASE_HREF, null, { optional: true }) ??
+        const rawBaseHref = injector.get(APP_BASE_HREF, null, { optional: true }) ??
             injector.get(PlatformLocation).getBaseHrefFromDOM();
-        if (baseHref.startsWith('./')) {
-            baseHref = baseHref.slice(2);
-        }
+        const { pathname: baseHref } = new URL(rawBaseHref, 'http://localhost');
         const compiler = injector.get(Compiler);
         const serverRoutesConfig = injector.get(SERVER_ROUTES_CONFIG, null, { optional: true });
         let serverConfigRouteTree;

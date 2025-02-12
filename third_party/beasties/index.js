@@ -3696,6 +3696,8 @@ function requireParser () {
 	      if (prev && prev.type === 'rule' && !prev.raws.ownSemicolon) {
 	        prev.raws.ownSemicolon = this.spaces;
 	        this.spaces = '';
+	        prev.source.end = this.getPosition(token[2]);
+	        prev.source.end.offset += prev.raws.ownSemicolon.length;
 	      }
 	    }
 	  }
@@ -4844,7 +4846,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.1';
+	    this.version = '8.5.2';
 	    this.plugins = this.normalize(plugins);
 	  }
 

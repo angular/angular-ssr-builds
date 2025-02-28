@@ -1052,6 +1052,10 @@ function requireNode$1 () {
 	}
 
 	class Node {
+	  get proxyOf() {
+	    return this
+	  }
+
 	  constructor(defaults = {}) {
 	    this.raws = {};
 	    this[isClean] = false;
@@ -1413,10 +1417,6 @@ function requireNode$1 () {
 	    for (let i in opts) data[i] = opts[i];
 	    return result.warn(text, data)
 	  }
-
-	  get proxyOf() {
-	    return this
-	  }
 	}
 
 	node = Node;
@@ -1455,6 +1455,10 @@ function requireDeclaration () {
 	let Node = requireNode$1();
 
 	class Declaration extends Node {
+	  get variable() {
+	    return this.prop.startsWith('--') || this.prop[0] === '$'
+	  }
+
 	  constructor(defaults) {
 	    if (
 	      defaults &&
@@ -1465,10 +1469,6 @@ function requireDeclaration () {
 	    }
 	    super(defaults);
 	    this.type = 'decl';
-	  }
-
-	  get variable() {
-	    return this.prop.startsWith('--') || this.prop[0] === '$'
 	  }
 	}
 
@@ -1509,6 +1509,16 @@ function requireContainer$1 () {
 	}
 
 	class Container extends Node {
+	  get first() {
+	    if (!this.proxyOf.nodes) return undefined
+	    return this.proxyOf.nodes[0]
+	  }
+
+	  get last() {
+	    if (!this.proxyOf.nodes) return undefined
+	    return this.proxyOf.nodes[this.proxyOf.nodes.length - 1]
+	  }
+
 	  append(...children) {
 	    for (let child of children) {
 	      let nodes = this.normalize(child, this.last);
@@ -1875,16 +1885,6 @@ function requireContainer$1 () {
 	      }
 	    })
 	  }
-
-	  get first() {
-	    if (!this.proxyOf.nodes) return undefined
-	    return this.proxyOf.nodes[0]
-	  }
-
-	  get last() {
-	    if (!this.proxyOf.nodes) return undefined
-	    return this.proxyOf.nodes[this.proxyOf.nodes.length - 1]
-	  }
 	}
 
 	Container.registerParse = dependant => {
@@ -2223,6 +2223,10 @@ function requireInput () {
 	let pathAvailable = Boolean(resolve && isAbsolute);
 
 	class Input {
+	  get from() {
+	    return this.file || this.id
+	  }
+
 	  constructor(css, opts = {}) {
 	    if (
 	      css === null ||
@@ -2445,10 +2449,6 @@ function requireInput () {
 	    }
 	    return json
 	  }
-
-	  get from() {
-	    return this.file || this.id
-	  }
 	}
 
 	input = Input;
@@ -2606,12 +2606,6 @@ function requireRule () {
 	let list = requireList();
 
 	class Rule extends Container {
-	  constructor(defaults) {
-	    super(defaults);
-	    this.type = 'rule';
-	    if (!this.nodes) this.nodes = [];
-	  }
-
 	  get selectors() {
 	    return list.comma(this.selector)
 	  }
@@ -2620,6 +2614,12 @@ function requireRule () {
 	    let match = this.selector ? this.selector.match(/,\s*/) : null;
 	    let sep = match ? match[0] : ',' + this.raw('between', 'beforeOpen');
 	    this.selector = values.join(sep);
+	  }
+
+	  constructor(defaults) {
+	    super(defaults);
+	    this.type = 'rule';
+	    if (!this.nodes) this.nodes = [];
 	  }
 	}
 
@@ -3942,7 +3942,7 @@ function requireParser () {
 
 	  unknownWord(tokens) {
 	    throw this.input.error(
-	      'Unknown word',
+	      'Unknown word ' + tokens[0][1],
 	      { offset: tokens[0][2] },
 	      { offset: tokens[0][2] + tokens[0][1].length }
 	    )
@@ -4066,6 +4066,10 @@ function requireResult () {
 	let Warning = requireWarning();
 
 	class Result {
+	  get content() {
+	    return this.css
+	  }
+
 	  constructor(processor, root, opts) {
 	    this.processor = processor;
 	    this.messages = [];
@@ -4094,10 +4098,6 @@ function requireResult () {
 
 	  warnings() {
 	    return this.messages.filter(i => i.type === 'warning')
-	  }
-
-	  get content() {
-	    return this.css
 	  }
 	}
 
@@ -4240,6 +4240,38 @@ function requireLazyResult () {
 	let postcss = {};
 
 	class LazyResult {
+	  get content() {
+	    return this.stringify().content
+	  }
+
+	  get css() {
+	    return this.stringify().css
+	  }
+
+	  get map() {
+	    return this.stringify().map
+	  }
+
+	  get messages() {
+	    return this.sync().messages
+	  }
+
+	  get opts() {
+	    return this.result.opts
+	  }
+
+	  get processor() {
+	    return this.result.processor
+	  }
+
+	  get root() {
+	    return this.sync().root
+	  }
+
+	  get [Symbol.toStringTag]() {
+	    return 'LazyResult'
+	  }
+
 	  constructor(processor, css, opts) {
 	    this.stringified = false;
 	    this.processed = false;
@@ -4640,38 +4672,6 @@ function requireLazyResult () {
 	  warnings() {
 	    return this.sync().warnings()
 	  }
-
-	  get content() {
-	    return this.stringify().content
-	  }
-
-	  get css() {
-	    return this.stringify().css
-	  }
-
-	  get map() {
-	    return this.stringify().map
-	  }
-
-	  get messages() {
-	    return this.sync().messages
-	  }
-
-	  get opts() {
-	    return this.result.opts
-	  }
-
-	  get processor() {
-	    return this.result.processor
-	  }
-
-	  get root() {
-	    return this.sync().root
-	  }
-
-	  get [Symbol.toStringTag]() {
-	    return 'LazyResult'
-	  }
 	}
 
 	LazyResult.registerPostcss = dependant => {
@@ -4700,6 +4700,56 @@ function requireNoWorkResult () {
 	let warnOnce = requireWarnOnce();
 
 	class NoWorkResult {
+	  get content() {
+	    return this.result.css
+	  }
+
+	  get css() {
+	    return this.result.css
+	  }
+
+	  get map() {
+	    return this.result.map
+	  }
+
+	  get messages() {
+	    return []
+	  }
+
+	  get opts() {
+	    return this.result.opts
+	  }
+
+	  get processor() {
+	    return this.result.processor
+	  }
+
+	  get root() {
+	    if (this._root) {
+	      return this._root
+	    }
+
+	    let root;
+	    let parser = parse;
+
+	    try {
+	      root = parser(this._css, this._opts);
+	    } catch (error) {
+	      this.error = error;
+	    }
+
+	    if (this.error) {
+	      throw this.error
+	    } else {
+	      this._root = root;
+	      return root
+	    }
+	  }
+
+	  get [Symbol.toStringTag]() {
+	    return 'NoWorkResult'
+	  }
+
 	  constructor(processor, css, opts) {
 	    css = css.toString();
 	    this.stringified = false;
@@ -4775,56 +4825,6 @@ function requireNoWorkResult () {
 	  warnings() {
 	    return []
 	  }
-
-	  get content() {
-	    return this.result.css
-	  }
-
-	  get css() {
-	    return this.result.css
-	  }
-
-	  get map() {
-	    return this.result.map
-	  }
-
-	  get messages() {
-	    return []
-	  }
-
-	  get opts() {
-	    return this.result.opts
-	  }
-
-	  get processor() {
-	    return this.result.processor
-	  }
-
-	  get root() {
-	    if (this._root) {
-	      return this._root
-	    }
-
-	    let root;
-	    let parser = parse;
-
-	    try {
-	      root = parser(this._css, this._opts);
-	    } catch (error) {
-	      this.error = error;
-	    }
-
-	    if (this.error) {
-	      throw this.error
-	    } else {
-	      this._root = root;
-	      return root
-	    }
-	  }
-
-	  get [Symbol.toStringTag]() {
-	    return 'NoWorkResult'
-	  }
 	}
 
 	noWorkResult = NoWorkResult;
@@ -4846,7 +4846,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.2';
+	    this.version = '8.5.3';
 	    this.plugins = this.normalize(plugins);
 	  }
 

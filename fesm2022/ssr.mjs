@@ -464,33 +464,6 @@ const SERVER_ROUTES_CONFIG = new InjectionToken('SERVER_ROUTES_CONFIG');
  * the server routes and configuration settings.
  *
  * @param routes - An array of server routes to be provided.
- * @param options - (Optional) An object containing additional configuration options for server routes.
- * @returns An `EnvironmentProviders` instance with the server routes configuration.
- *
- * @see {@link ServerRoute}
- * @see {@link ServerRoutesConfigOptions}
- * @see {@link provideServerRouting}
- * @deprecated use `provideServerRouting`. This will be removed in version 20.
- * @developerPreview
- */
-function provideServerRoutesConfig(routes, options) {
-    if (typeof ngServerMode === 'undefined' || !ngServerMode) {
-        throw new Error(`The 'provideServerRoutesConfig' function should not be invoked within the browser portion of the application.`);
-    }
-    return makeEnvironmentProviders([
-        {
-            provide: SERVER_ROUTES_CONFIG,
-            useValue: { routes, ...options },
-        },
-    ]);
-}
-/**
- * Sets up the necessary providers for configuring server routes.
- * This function accepts an array of server routes and optional configuration
- * options, returning an `EnvironmentProviders` object that encapsulates
- * the server routes and configuration settings.
- *
- * @param routes - An array of server routes to be provided.
  * @param features - (Optional) server routes features.
  * @returns An `EnvironmentProviders` instance with the server routes configuration.
  *
@@ -2398,5 +2371,5 @@ function createRequestHandler(handler) {
     return handler;
 }
 
-export { AngularAppEngine, PrerenderFallback, RenderMode, createRequestHandler, provideServerRoutesConfig, provideServerRouting, withAppShell, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
+export { AngularAppEngine, PrerenderFallback, RenderMode, createRequestHandler, provideServerRouting, withAppShell, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
 //# sourceMappingURL=ssr.mjs.map

@@ -386,6 +386,9 @@ async function writeResponseToNodeResponse(source, destination) {
             destination.setHeader(name, value);
         }
     }
+    if ('flushHeaders' in destination) {
+        destination.flushHeaders();
+    }
     if (!body) {
         destination.end();
         return;

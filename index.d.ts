@@ -273,6 +273,10 @@ declare class AngularServerApp {
      */
     private boostrap;
     /**
+     * Decorder used to convert a string to a Uint8Array.
+     */
+    private readonly textDecoder;
+    /**
      * Cache for storing critical CSS for pages.
      * Stores a maximum of MAX_INLINE_CSS_CACHE_ENTRIES entries.
      *

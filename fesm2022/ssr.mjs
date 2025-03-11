@@ -1,7 +1,7 @@
+import { ɵConsole as _Console, makeEnvironmentProviders, InjectionToken, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, ApplicationRef, Compiler, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
+import { ROUTES, Router, ɵloadChildren as _loadChildren } from '@angular/router';
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
-import { ɵConsole as _Console, InjectionToken, makeEnvironmentProviders, runInInjectionContext, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, ApplicationRef, Compiler, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID, ɵresetCompiledComponents as _resetCompiledComponents } from '@angular/core';
-import { ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule, renderApplication, platformServer, INITIAL_CONFIG } from '@angular/platform-server';
-import { ROUTES, ɵloadChildren as _loadChildren, Router } from '@angular/router';
+import { renderModule, renderApplication, ɵSERVER_CONTEXT as _SERVER_CONTEXT, platformServer, INITIAL_CONFIG } from '@angular/platform-server';
 import Beasties from '../third_party/beasties/index.js';
 
 /**
@@ -145,10 +145,6 @@ function getAngularAppEngineManifest() {
  * stripTrailingSlash(''); // ''
  * ```
  */
-function stripTrailingSlash(url) {
-    // Check if the last character of the URL is a slash
-    return url.length > 1 && url[url.length - 1] === '/' ? url.slice(0, -1) : url;
-}
 /**
  * Removes the leading slash from a URL if it exists.
  *
@@ -2039,8 +2035,6 @@ function appendPreloadHintsToHtml(html, preload) {
         html.slice(bodyCloseIdx),
     ].join('\n');
 }
-
-// ɵgetRoutesFromAngularRouterConfig is only used by the Webpack based server builder.
 
 /**
  * Extracts a potential locale ID from a given URL based on the specified base path.

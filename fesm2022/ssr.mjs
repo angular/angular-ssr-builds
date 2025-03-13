@@ -403,7 +403,6 @@ const APP_SHELL_ROUTE = 'ng-app-shell';
 /**
  * Identifies a particular kind of `ServerRoutesFeatureKind`.
  * @see {@link ServerRoutesFeature}
- * @developerPreview
  */
 var ServerRoutesFeatureKind;
 (function (ServerRoutesFeatureKind) {
@@ -413,7 +412,6 @@ var ServerRoutesFeatureKind;
  * Different rendering modes for server routes.
  * @see {@link provideServerRouting}
  * @see {@link ServerRoute}
- * @developerPreview
  */
 var RenderMode;
 (function (RenderMode) {
@@ -428,7 +426,6 @@ var RenderMode;
  * Defines the fallback strategies for Static Site Generation (SSG) routes when a pre-rendered path is not available.
  * This is particularly relevant for routes with parameterized URLs where some paths might not be pre-rendered at build time.
  * @see {@link ServerRoutePrerenderWithParams}
- * @developerPreview
  */
 var PrerenderFallback;
 (function (PrerenderFallback) {
@@ -465,7 +462,6 @@ const SERVER_ROUTES_CONFIG = new InjectionToken('SERVER_ROUTES_CONFIG');
  *
  * @see {@link ServerRoute}
  * @see {@link withAppShell}
- * @developerPreview
  */
 function provideServerRouting(routes, ...features) {
     const config = { routes };
@@ -2199,8 +2195,6 @@ function normalizeLocale(locale) {
  *
  * @remarks This class should be instantiated once and used as a singleton across the server-side
  * application to ensure consistent handling of rendering requests and resource management.
- *
- * @developerPreview
  */
 class AngularAppEngine {
     /**
@@ -2375,7 +2369,6 @@ class AngularAppEngine {
  * const handler = toWebHandler(app);
  * export default createRequestHandler(handler);
  * ```
- * @developerPreview
  */
 function createRequestHandler(handler) {
     handler['__ng_request_handler__'] = true;

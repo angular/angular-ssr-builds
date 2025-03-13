@@ -12,8 +12,6 @@ import { Type } from '@angular/core';
  *
  * @remarks This class should be instantiated once and used as a singleton across the server-side
  * application to ensure consistent handling of rendering requests and resource management.
- *
- * @developerPreview
  */
 export declare class AngularAppEngine {
     /**
@@ -392,7 +390,6 @@ declare class BeastiesBase extends default_2 {
  * const handler = toWebHandler(app);
  * export default createRequestHandler(handler);
  * ```
- * @developerPreview
  */
 export declare function createRequestHandler(handler: RequestHandlerFunction): RequestHandlerFunction;
 
@@ -507,7 +504,6 @@ declare interface PartialHTMLElement {
  * Defines the fallback strategies for Static Site Generation (SSG) routes when a pre-rendered path is not available.
  * This is particularly relevant for routes with parameterized URLs where some paths might not be pre-rendered at build time.
  * @see {@link ServerRoutePrerenderWithParams}
- * @developerPreview
  */
 export declare enum PrerenderFallback {
     /**
@@ -539,7 +535,6 @@ export declare enum PrerenderFallback {
  *
  * @see {@link ServerRoute}
  * @see {@link withAppShell}
- * @developerPreview
  */
 export declare function provideServerRouting(routes: ServerRoute[], ...features: ServerRoutesFeature<ServerRoutesFeatureKind>[]): EnvironmentProviders;
 
@@ -547,7 +542,6 @@ export declare function provideServerRouting(routes: ServerRoute[], ...features:
  * Different rendering modes for server routes.
  * @see {@link provideServerRouting}
  * @see {@link ServerRoute}
- * @developerPreview
  */
 export declare enum RenderMode {
     /** Server-Side Rendering (SSR) mode, where content is rendered on the server for each request. */
@@ -565,7 +559,6 @@ export declare enum RenderMode {
  * @param request - The incoming HTTP request object.
  * @returns A Promise resolving to a `Response` object, `null`, or directly a `Response`,
  * supporting both synchronous and asynchronous handling.
- * @developerPreview
  */
 export declare type RequestHandlerFunction = (request: Request) => Promise<Response | null> | null | Response;
 
@@ -755,14 +748,12 @@ declare interface ServerAsset {
 /**
  * Server route configuration.
  * @see {@link provideServerRouting}
- * @developerPreview
  */
 export declare type ServerRoute = ServerRouteClient | ServerRoutePrerender | ServerRoutePrerenderWithParams | ServerRouteServer;
 
 /**
  * A server route that uses Client-Side Rendering (CSR) mode.
  * @see {@link RenderMode}
- * @developerPreview
  */
 export declare interface ServerRouteClient extends ServerRouteCommon {
     /** Specifies that the route uses Client-Side Rendering (CSR) mode. */
@@ -771,7 +762,6 @@ export declare interface ServerRouteClient extends ServerRouteCommon {
 
 /**
  * Common interface for server routes, providing shared properties.
- * @developerPreview
  */
 export declare interface ServerRouteCommon {
     /** The path associated with this route. */
@@ -785,7 +775,6 @@ export declare interface ServerRouteCommon {
 /**
  * A server route that uses Static Site Generation (SSG) mode.
  * @see {@link RenderMode}
- * @developerPreview
  */
 export declare interface ServerRoutePrerender extends Omit<ServerRouteCommon, 'status'> {
     /** Specifies that the route uses Static Site Generation (SSG) mode. */
@@ -799,7 +788,6 @@ export declare interface ServerRoutePrerender extends Omit<ServerRouteCommon, 's
  * @see {@link RenderMode}
  * @see {@link ServerRoutePrerender}
  * @see {@link PrerenderFallback}
- * @developerPreview
  */
 export declare interface ServerRoutePrerenderWithParams extends Omit<ServerRoutePrerender, 'fallback'> {
     /**
@@ -843,7 +831,6 @@ export declare interface ServerRoutePrerenderWithParams extends Omit<ServerRoute
 /**
  * A server route that uses Server-Side Rendering (SSR) mode.
  * @see {@link RenderMode}
- * @developerPreview
  */
 export declare interface ServerRouteServer extends ServerRouteCommon {
     /** Specifies that the route uses Server-Side Rendering (SSR) mode. */
@@ -853,7 +840,6 @@ export declare interface ServerRouteServer extends ServerRouteCommon {
 /**
  * Helper type to represent a server routes feature.
  * @see {@link ServerRoutesFeatureKind}
- * @developerPreview
  */
 declare interface ServerRoutesFeature<FeatureKind extends ServerRoutesFeatureKind> {
     ɵkind: FeatureKind;
@@ -863,7 +849,6 @@ declare interface ServerRoutesFeature<FeatureKind extends ServerRoutesFeatureKin
 /**
  * Identifies a particular kind of `ServerRoutesFeatureKind`.
  * @see {@link ServerRoutesFeature}
- * @developerPreview
  */
 declare enum ServerRoutesFeatureKind {
     AppShell = 0

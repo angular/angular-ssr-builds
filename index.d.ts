@@ -524,23 +524,43 @@ export declare enum PrerenderFallback {
 }
 
 /**
- * Sets up the necessary providers for configuring server routes.
- * This function accepts an array of server routes and optional configuration
- * options, returning an `EnvironmentProviders` object that encapsulates
- * the server routes and configuration settings.
+ * Configures server-side rendering for an Angular application.
  *
- * @param routes - An array of server routes to be provided.
- * @param features - (Optional) server routes features.
- * @returns An `EnvironmentProviders` instance with the server routes configuration.
+ * This function sets up the necessary providers for server-side rendering, including
+ * support for server routes and app shell. It combines features configured using
+ * `withRoutes` and `withAppShell` to provide a comprehensive server-side rendering setup.
  *
- * @see {@link ServerRoute}
- * @see {@link withAppShell}
+ * @param features - Optional features to configure additional server rendering behaviors.
+ * @returns An `EnvironmentProviders` instance with the server-side rendering configuration.
+ *
+ * @example
+ * Basic example of how you can enable server-side rendering in your application
+ * when using the `bootstrapApplication` function:
+ *
+ * ```ts
+ * import { bootstrapApplication } from '@angular/platform-browser';
+ * import { provideServerRendering, withRoutes, withAppShell } from '@angular/ssr';
+ * import { AppComponent } from './app/app.component';
+ * import { SERVER_ROUTES } from './app/app.server.routes';
+ * import { AppShellComponent } from './app/app-shell.component';
+ *
+ * bootstrapApplication(AppComponent, {
+ *   providers: [
+ *      provideServerRendering(
+ *         withRoutes(SERVER_ROUTES),
+ *         withAppShell(AppShellComponent)
+ *      )
+ *   ]
+ * });
+ * ```
+ * @see {@link withRoutes} configures server-side routing
+ * @see {@link withAppShell} configures the application shell
  */
-export declare function provideServerRouting(routes: ServerRoute[], ...features: ServerRoutesFeature<ServerRoutesFeatureKind>[]): EnvironmentProviders;
+export declare function provideServerRendering(...features: ServerRenderingFeature<ServerRenderingFeatureKind>[]): EnvironmentProviders;
 
 /**
  * Different rendering modes for server routes.
- * @see {@link provideServerRouting}
+ * @see {@link withRoutes}
  * @see {@link ServerRoute}
  */
 export declare enum RenderMode {
@@ -746,8 +766,26 @@ declare interface ServerAsset {
 }
 
 /**
+ * Helper type to represent a server routes feature.
+ * @see {@link ServerRenderingFeatureKind}
+ */
+declare interface ServerRenderingFeature<FeatureKind extends ServerRenderingFeatureKind> {
+    ɵkind: FeatureKind;
+    ɵproviders: (Provider | EnvironmentProviders)[];
+}
+
+/**
+ * Identifies a particular kind of `ServerRenderingFeatureKind`.
+ * @see {@link ServerRenderingFeature}
+ */
+declare enum ServerRenderingFeatureKind {
+    AppShell = 0,
+    ServerRoutes = 1
+}
+
+/**
  * Server route configuration.
- * @see {@link provideServerRouting}
+ * @see {@link withRoutes}
  */
 export declare type ServerRoute = ServerRouteClient | ServerRoutePrerender | ServerRoutePrerenderWithParams | ServerRouteServer;
 
@@ -838,40 +876,87 @@ export declare interface ServerRouteServer extends ServerRouteCommon {
 }
 
 /**
- * Helper type to represent a server routes feature.
- * @see {@link ServerRoutesFeatureKind}
- */
-declare interface ServerRoutesFeature<FeatureKind extends ServerRoutesFeatureKind> {
-    ɵkind: FeatureKind;
-    ɵproviders: Provider[];
-}
-
-/**
- * Identifies a particular kind of `ServerRoutesFeatureKind`.
- * @see {@link ServerRoutesFeature}
- */
-declare enum ServerRoutesFeatureKind {
-    AppShell = 0
-}
-
-/**
- * Configures the app shell route with the provided component.
+ * Configures the shell of the application.
  *
- * The app shell serves as the main entry point for the application and is commonly used
- * to enable server-side rendering (SSR) of the application shell. It handles requests
- * that do not match any specific server route, providing a fallback mechanism and improving
- * perceived performance during navigation.
+ * The app shell is a minimal, static HTML page that is served immediately, while the
+ * full Angular application loads in the background. This improves perceived performance
+ * by providing instant feedback to the user.
  *
- * This configuration is particularly useful in applications leveraging Progressive Web App (PWA)
- * patterns, such as service workers, to deliver a seamless user experience.
+ * This function configures the app shell route, which serves the provided component for
+ * requests that do not match any defined server routes.
  *
- * @param component The Angular component to render for the app shell route.
- * @returns A server routes feature configuration for the app shell.
+ * @param component - The Angular component to render for the app shell. Can be a direct
+ * component type or a dynamic import function.
+ * @returns A `ServerRenderingFeature` object configuring the app shell.
  *
- * @see {@link provideServerRouting}
+ * @example
+ * ```ts
+ * import { provideServerRendering, withAppShell, withRoutes } from '@angular/ssr';
+ * import { AppShellComponent } from './app-shell.component';
+ *
+ * provideServerRendering(
+ *   withRoutes(serverRoutes),
+ *   withAppShell(AppShellComponent)
+ * );
+ * ```
+ *
+ * @example
+ * ```ts
+ * import { provideServerRendering, withAppShell, withRoutes } from '@angular/ssr';
+ *
+ * provideServerRendering(
+ *   withRoutes(serverRoutes),
+ *   withAppShell(() =>
+ *     import('./app-shell.component').then((m) => m.AppShellComponent)
+ *   )
+ * );
+ * ```
+ *
+ * @see {@link provideServerRendering}
  * @see {@link https://angular.dev/ecosystem/service-workers/app-shell | App shell pattern on Angular.dev}
  */
-export declare function withAppShell(component: Type<unknown> | (() => Promise<Type<unknown> | DefaultExport<Type<unknown>>>)): ServerRoutesFeature<ServerRoutesFeatureKind.AppShell>;
+export declare function withAppShell(component: Type<unknown> | (() => Promise<Type<unknown> | DefaultExport<Type<unknown>>>)): ServerRenderingFeature<ServerRenderingFeatureKind.AppShell>;
+
+/**
+ * Configures server-side routing for the application.
+ *
+ * This function registers an array of `ServerRoute` definitions, enabling server-side rendering
+ * for specific URL paths. These routes are used to pre-render content on the server, improving
+ * initial load performance and SEO.
+ *
+ * @param routes - An array of `ServerRoute` objects, each defining a server-rendered route.
+ * @returns A `ServerRenderingFeature` object configuring server-side routes.
+ *
+ * @example
+ * ```ts
+ * import { provideServerRendering, withRoutes, ServerRoute, RenderMode } from '@angular/ssr';
+ *
+ * const serverRoutes: ServerRoute[] = [
+ *   {
+ *     route: '', // This renders the "/" route on the client (CSR)
+ *     renderMode: RenderMode.Client,
+ *   },
+ *   {
+ *     route: 'about', // This page is static, so we prerender it (SSG)
+ *     renderMode: RenderMode.Prerender,
+ *   },
+ *   {
+ *     route: 'profile', // This page requires user-specific data, so we use SSR
+ *     renderMode: RenderMode.Server,
+ *   },
+ *   {
+ *     route: '**', // All other routes will be rendered on the server (SSR)
+ *     renderMode: RenderMode.Server,
+ *   },
+ * ];
+ *
+ * provideServerRendering(withRoutes(serverRoutes));
+ * ```
+ *
+ * @see {@link provideServerRendering}
+ * @see {@link ServerRoute}
+ */
+export declare function withRoutes(routes: ServerRoute[]): ServerRenderingFeature<ServerRenderingFeatureKind.ServerRoutes>;
 
 /**
  * Destroys the existing `AngularServerApp` instance, releasing associated resources and resetting the

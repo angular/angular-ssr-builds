@@ -1,4 +1,4 @@
-import type { ApplicationRef } from '@angular/core';
+import { ApplicationRef } from '@angular/core';
 import { default as default_2 } from 'beasties';
 import { DefaultExport } from '@angular/router';
 import { EnvironmentProviders } from '@angular/core';

@@ -1,5 +1,5 @@
-import { ɵConsole as _Console, makeEnvironmentProviders, provideEnvironmentInitializer, inject, InjectionToken, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, ApplicationRef, Compiler, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
-import { renderModule, renderApplication, ɵSERVER_CONTEXT as _SERVER_CONTEXT, provideServerRendering as provideServerRendering$1, platformServer, INITIAL_CONFIG } from '@angular/platform-server';
+import { ɵConsole as _Console, ApplicationRef, makeEnvironmentProviders, provideEnvironmentInitializer, inject, InjectionToken, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, Compiler, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
+import { platformServer, INITIAL_CONFIG, ɵSERVER_CONTEXT as _SERVER_CONTEXT, ɵrenderInternal as _renderInternal, provideServerRendering as provideServerRendering$1 } from '@angular/platform-server';
 import { ROUTES, Router, ɵloadChildren as _loadChildren } from '@angular/router';
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import Beasties from '../third_party/beasties/index.js';
@@ -318,10 +318,20 @@ function buildPathWithParams(toPath, fromPath) {
  *                             rendering process.
  * @param serverContext - A string representing the server context, used to provide additional
  *                        context or metadata during server-side rendering.
- * @returns A promise that resolves to a string containing the rendered HTML.
+ * @returns A promise resolving to an object containing a `content` method, which returns a
+ *          promise that resolves to the rendered HTML string.
  */
-function renderAngular(html, bootstrap, url, platformProviders, serverContext) {
-    const providers = [
+async function renderAngular(html, bootstrap, url, platformProviders, serverContext) {
+    // A request to `http://www.example.com/page/index.html` will render the Angular route corresponding to `http://www.example.com/page`.
+    const urlToRender = stripIndexHtmlFromURL(url).toString();
+    const platformRef = platformServer([
+        {
+            provide: INITIAL_CONFIG,
+            useValue: {
+                url: urlToRender,
+                document: html,
+            },
+        },
         {
             provide: _SERVER_CONTEXT,
             useValue: serverContext,
@@ -335,20 +345,33 @@ function renderAngular(html, bootstrap, url, platformProviders, serverContext) {
             useFactory: () => new Console(),
         },
         ...platformProviders,
-    ];
-    // A request to `http://www.example.com/page/index.html` will render the Angular route corresponding to `http://www.example.com/page`.
-    const urlToRender = stripIndexHtmlFromURL(url).toString();
-    return isNgModule(bootstrap)
-        ? renderModule(bootstrap, {
-            url: urlToRender,
-            document: html,
-            extraProviders: providers,
-        })
-        : renderApplication(bootstrap, {
-            url: urlToRender,
-            document: html,
-            platformProviders: providers,
-        });
+    ]);
+    try {
+        let applicationRef;
+        if (isNgModule(bootstrap)) {
+            const moduleRef = await platformRef.bootstrapModule(bootstrap);
+            applicationRef = moduleRef.injector.get(ApplicationRef);
+        }
+        else {
+            applicationRef = await bootstrap();
+        }
+        // Block until application is stable.
+        await applicationRef.whenStable();
+        return {
+            content: async () => {
+                try {
+                    return _renderInternal(platformRef, applicationRef);
+                }
+                finally {
+                    await asyncDestroyPlatform(platformRef);
+                }
+            },
+        };
+    }
+    catch (error) {
+        await asyncDestroyPlatform(platformRef);
+        throw error;
+    }
 }
 /**
  * Type guard to determine if a given value is an Angular module.
@@ -360,6 +383,20 @@ function renderAngular(html, bootstrap, url, platformProviders, serverContext) {
  */
 function isNgModule(value) {
     return 'ɵmod' in value;
+}
+/**
+ * Gracefully destroys the application in a macrotask, allowing pending promises to resolve
+ * and surfacing any potential errors to the user.
+ *
+ * @param platformRef - The platform reference to be destroyed.
+ */
+function asyncDestroyPlatform(platformRef) {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            platformRef.destroy();
+            resolve();
+        }, 0);
+    });
 }
 
 /**
@@ -1813,6 +1850,12 @@ class AngularServerApp {
         this.options = options;
         this.allowStaticRouteRender = this.options.allowStaticRouteRender ?? false;
         this.hooks = options.hooks ?? new Hooks();
+        if (this.manifest.inlineCriticalCss) {
+            this.inlineCriticalCssProcessor = new InlineCriticalCssProcessor((path) => {
+                const fileName = path.split('/').pop() ?? path;
+                return this.assets.getServerAsset(fileName).text();
+            });
+        }
     }
     /**
      * The manifest associated with this server application.
@@ -1941,7 +1984,7 @@ class AngularServerApp {
         }
         const url = new URL(request.url);
         const platformProviders = [];
-        const { manifest: { bootstrap, inlineCriticalCss, locale }, assets, } = this;
+        const { manifest: { bootstrap, locale }, assets, } = this;
         // Initialize the response with status and headers if available.
         const responseInit = {
             status,
@@ -1979,37 +2022,36 @@ class AngularServerApp {
         this.boostrap ??= await bootstrap();
         let html = await assets.getIndexServerHtml().text();
         html = await this.runTransformsOnHtml(html, url, preload);
-        html = await renderAngular(html, this.boostrap, url, platformProviders, SERVER_CONTEXT_VALUE[renderMode]);
-        if (!inlineCriticalCss) {
-            return new Response(html, responseInit);
-        }
-        this.inlineCriticalCssProcessor ??= new InlineCriticalCssProcessor((path) => {
-            const fileName = path.split('/').pop() ?? path;
-            return this.assets.getServerAsset(fileName).text();
-        });
+        const { content } = await renderAngular(html, this.boostrap, url, platformProviders, SERVER_CONTEXT_VALUE[renderMode]);
         const { inlineCriticalCssProcessor, criticalCssLRUCache, textDecoder } = this;
-        // Use a stream to send the response before inlining critical CSS, improving performance via header flushing.
+        // Use a stream to send the response before finishing rendering and inling critical CSS, improving performance via header flushing.
         const stream = new ReadableStream({
             async start(controller) {
+                const renderedHtml = await content();
+                if (!inlineCriticalCssProcessor) {
+                    controller.enqueue(textDecoder.encode(renderedHtml));
+                    controller.close();
+                    return;
+                }
                 let htmlWithCriticalCss;
                 try {
                     if (renderMode === RenderMode.Server) {
-                        const cacheKey = await sha256(html);
+                        const cacheKey = await sha256(renderedHtml);
                         htmlWithCriticalCss = criticalCssLRUCache.get(cacheKey);
                         if (!htmlWithCriticalCss) {
-                            htmlWithCriticalCss = await inlineCriticalCssProcessor.process(html);
+                            htmlWithCriticalCss = await inlineCriticalCssProcessor.process(renderedHtml);
                             criticalCssLRUCache.put(cacheKey, htmlWithCriticalCss);
                         }
                     }
                     else {
-                        htmlWithCriticalCss = await inlineCriticalCssProcessor.process(html);
+                        htmlWithCriticalCss = await inlineCriticalCssProcessor.process(renderedHtml);
                     }
                 }
                 catch (error) {
                     // eslint-disable-next-line no-console
                     console.error(`An error occurred while inlining critical CSS for: ${url}.`, error);
                 }
-                controller.enqueue(textDecoder.encode(htmlWithCriticalCss ?? html));
+                controller.enqueue(textDecoder.encode(htmlWithCriticalCss ?? renderedHtml));
                 controller.close();
             },
         });

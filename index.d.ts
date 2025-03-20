@@ -913,7 +913,7 @@ export declare interface ServerRouteServer extends ServerRouteCommon {
  * ```
  *
  * @see {@link provideServerRendering}
- * @see {@link https://angular.dev/ecosystem/service-workers/app-shell | App shell pattern on Angular.dev}
+ * @see {@link https://angular.dev/ecosystem/service-workers/app-shell App shell pattern on Angular.dev}
  */
 export declare function withAppShell(component: Type<unknown> | (() => Promise<Type<unknown> | DefaultExport<Type<unknown>>>)): ServerRenderingFeature<ServerRenderingFeatureKind.AppShell>;
 

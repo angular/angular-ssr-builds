@@ -540,7 +540,7 @@ function withRoutes(routes) {
  * ```
  *
  * @see {@link provideServerRendering}
- * @see {@link https://angular.dev/ecosystem/service-workers/app-shell | App shell pattern on Angular.dev}
+ * @see {@link https://angular.dev/ecosystem/service-workers/app-shell App shell pattern on Angular.dev}
  */
 function withAppShell(component) {
     const routeConfig = {

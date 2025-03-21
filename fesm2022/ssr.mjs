@@ -358,14 +358,15 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
         // Block until application is stable.
         await applicationRef.whenStable();
         return {
-            content: async () => {
-                try {
-                    return _renderInternal(platformRef, applicationRef);
-                }
-                finally {
-                    await asyncDestroyPlatform(platformRef);
-                }
-            },
+            content: () => new Promise((resolve, reject) => {
+                // Defer rendering to the next event loop iteration to avoid blocking, as most operations in `renderInternal` are synchronous.
+                setTimeout(() => {
+                    _renderInternal(platformRef, applicationRef)
+                        .then(resolve)
+                        .catch(reject)
+                        .finally(() => void asyncDestroyPlatform(platformRef));
+                }, 0);
+            }),
         };
     }
     catch (error) {

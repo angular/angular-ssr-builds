@@ -16,6 +16,7 @@ import { Type } from '@angular/core';
  */
 export declare class AngularNodeAppEngine {
     private readonly angularAppEngine;
+    constructor();
     /**
      * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
      * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.

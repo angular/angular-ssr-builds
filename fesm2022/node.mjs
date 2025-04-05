@@ -6,6 +6,36 @@ import { ɵInlineCriticalCssProcessor as _InlineCriticalCssProcessor, AngularApp
 import { readFile } from 'node:fs/promises';
 import { argv } from 'node:process';
 
+/**
+ * Attaches listeners to the Node.js process to capture and handle unhandled rejections and uncaught exceptions.
+ * Captured errors are logged to the console. This function logs errors to the console, preventing unhandled errors
+ * from crashing the server. It is particularly useful for Zoneless apps, ensuring error handling without relying on Zone.js.
+ *
+ * @remarks
+ * This function is a no-op if zone.js is available.
+ * For Zone-based apps, similar functionality is provided by Zone.js itself. See the Zone.js implementation here:
+ * https://github.com/angular/angular/blob/4a8d0b79001ec09bcd6f2d6b15117aa6aac1932c/packages/zone.js/lib/node/node.ts#L94%7C
+ *
+ * @internal
+ */
+function attachNodeGlobalErrorHandlers() {
+    if (typeof Zone !== 'undefined') {
+        return;
+    }
+    // Ensure that the listeners are registered only once.
+    // Otherwise, multiple instances may be registered during edit/refresh.
+    const gThis = globalThis;
+    if (gThis.ngAttachNodeGlobalErrorHandlersCalled) {
+        return;
+    }
+    gThis.ngAttachNodeGlobalErrorHandlersCalled = true;
+    process
+        // eslint-disable-next-line no-console
+        .on('unhandledRejection', (error) => console.error('unhandledRejection', error))
+        // eslint-disable-next-line no-console
+        .on('uncaughtException', (error) => console.error('uncaughtException', error));
+}
+
 class CommonEngineInlineCriticalCssProcessor {
     resourceCache = new Map();
     async process(html, outputPath) {
@@ -76,6 +106,7 @@ class CommonEngine {
     pageIsSSG = new Map();
     constructor(options) {
         this.options = options;
+        attachNodeGlobalErrorHandlers();
     }
     /**
      * Render an HTML document for a specific URL with specified
@@ -284,6 +315,9 @@ function getFirstHeaderValue(value) {
  */
 class AngularNodeAppEngine {
     angularAppEngine = new AngularAppEngine();
+    constructor() {
+        attachNodeGlobalErrorHandlers();
+    }
     /**
      * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
      * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.

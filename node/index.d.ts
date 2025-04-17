@@ -1,10 +1,54 @@
-import { ApplicationRef } from '@angular/core';
-import type { Http2ServerRequest } from 'node:http2';
-import type { Http2ServerResponse } from 'node:http2';
-import type { IncomingMessage } from 'node:http';
-import type { ServerResponse } from 'node:http';
-import { StaticProvider } from '@angular/core';
-import { Type } from '@angular/core';
+import { Type, ApplicationRef, StaticProvider } from '@angular/core';
+import { IncomingMessage, ServerResponse } from 'node:http';
+import { Http2ServerRequest, Http2ServerResponse } from 'node:http2';
+
+interface CommonEngineOptions {
+    /** A method that when invoked returns a promise that returns an `ApplicationRef` instance once resolved or an NgModule. */
+    bootstrap?: Type<{}> | (() => Promise<ApplicationRef>);
+    /** A set of platform level providers for all requests. */
+    providers?: StaticProvider[];
+    /** Enable request performance profiling data collection and printing the results in the server console. */
+    enablePerformanceProfiler?: boolean;
+}
+interface CommonEngineRenderOptions {
+    /** A method that when invoked returns a promise that returns an `ApplicationRef` instance once resolved or an NgModule. */
+    bootstrap?: Type<{}> | (() => Promise<ApplicationRef>);
+    /** A set of platform level providers for the current request. */
+    providers?: StaticProvider[];
+    url?: string;
+    document?: string;
+    documentFilePath?: string;
+    /**
+     * Reduce render blocking requests by inlining critical CSS.
+     * Defaults to true.
+     */
+    inlineCriticalCss?: boolean;
+    /**
+     * Base path location of index file.
+     * Defaults to the 'documentFilePath' dirname when not provided.
+     */
+    publicPath?: string;
+}
+/**
+ * A common engine to use to server render an application.
+ */
+declare class CommonEngine {
+    private options?;
+    private readonly templateCache;
+    private readonly inlineCriticalCssProcessor;
+    private readonly pageIsSSG;
+    constructor(options?: CommonEngineOptions | undefined);
+    /**
+     * Render an HTML document for a specific URL with specified
+     * render options
+     */
+    render(opts: CommonEngineRenderOptions): Promise<string>;
+    private inlineCriticalCss;
+    private retrieveSSGPage;
+    private renderApplication;
+    /** Retrieve the document from the cache or the filesystem */
+    private getDocument;
+}
 
 /**
  * Angular server application engine.
@@ -16,7 +60,7 @@ import { Type } from '@angular/core';
  *
  * @developerPreview
  */
-export declare class AngularNodeAppEngine {
+declare class AngularNodeAppEngine {
     private readonly angularAppEngine;
     /**
      * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
@@ -36,55 +80,16 @@ export declare class AngularNodeAppEngine {
 }
 
 /**
- * A common engine to use to server render an application.
+ * Represents a middleware function for handling HTTP requests in a Node.js environment.
+ *
+ * @param req - The incoming HTTP request object.
+ * @param res - The outgoing HTTP response object.
+ * @param next - A callback function that signals the completion of the middleware or forwards the error if provided.
+ *
+ * @returns A Promise that resolves to void or simply void. The handler can be asynchronous.
+ * @developerPreview
  */
-export declare class CommonEngine {
-    private options?;
-    private readonly templateCache;
-    private readonly inlineCriticalCssProcessor;
-    private readonly pageIsSSG;
-    constructor(options?: CommonEngineOptions | undefined);
-    /**
-     * Render an HTML document for a specific URL with specified
-     * render options
-     */
-    render(opts: CommonEngineRenderOptions): Promise<string>;
-    private inlineCriticalCss;
-    private retrieveSSGPage;
-    private renderApplication;
-    /** Retrieve the document from the cache or the filesystem */
-    private getDocument;
-}
-
-export declare interface CommonEngineOptions {
-    /** A method that when invoked returns a promise that returns an `ApplicationRef` instance once resolved or an NgModule. */
-    bootstrap?: Type<{}> | (() => Promise<ApplicationRef>);
-    /** A set of platform level providers for all requests. */
-    providers?: StaticProvider[];
-    /** Enable request performance profiling data collection and printing the results in the server console. */
-    enablePerformanceProfiler?: boolean;
-}
-
-export declare interface CommonEngineRenderOptions {
-    /** A method that when invoked returns a promise that returns an `ApplicationRef` instance once resolved or an NgModule. */
-    bootstrap?: Type<{}> | (() => Promise<ApplicationRef>);
-    /** A set of platform level providers for the current request. */
-    providers?: StaticProvider[];
-    url?: string;
-    document?: string;
-    documentFilePath?: string;
-    /**
-     * Reduce render blocking requests by inlining critical CSS.
-     * Defaults to true.
-     */
-    inlineCriticalCss?: boolean;
-    /**
-     * Base path location of index file.
-     * Defaults to the 'documentFilePath' dirname when not provided.
-     */
-    publicPath?: string;
-}
-
+type NodeRequestHandlerFunction = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => Promise<void> | void;
 /**
  * Attaches metadata to the handler function to mark it as a special handler for Node.js environments.
  *
@@ -129,7 +134,21 @@ export declare interface CommonEngineRenderOptions {
  * ```
  * @developerPreview
  */
-export declare function createNodeRequestHandler<T extends NodeRequestHandlerFunction>(handler: T): T;
+declare function createNodeRequestHandler<T extends NodeRequestHandlerFunction>(handler: T): T;
+
+/**
+ * Streams a web-standard `Response` into a Node.js `ServerResponse`
+ * or `Http2ServerResponse`.
+ *
+ * This function adapts the web `Response` object to write its content
+ * to a Node.js response object, handling both HTTP/1.1 and HTTP/2.
+ *
+ * @param source - The web-standard `Response` object to stream from.
+ * @param destination - The Node.js response object (`ServerResponse` or `Http2ServerResponse`) to stream into.
+ * @returns A promise that resolves once the streaming operation is complete.
+ * @developerPreview
+ */
+declare function writeResponseToNodeResponse(source: Response, destination: ServerResponse | Http2ServerResponse): Promise<void>;
 
 /**
  * Converts a Node.js `IncomingMessage` or `Http2ServerRequest` into a
@@ -142,8 +161,7 @@ export declare function createNodeRequestHandler<T extends NodeRequestHandlerFun
  * @returns A Web Standard `Request` object.
  * @developerPreview
  */
-export declare function createWebRequestFromNodeRequest(nodeRequest: IncomingMessage | Http2ServerRequest): Request;
-
+declare function createWebRequestFromNodeRequest(nodeRequest: IncomingMessage | Http2ServerRequest): Request;
 
 /**
  * Determines whether the provided URL represents the main entry point module.
@@ -161,32 +179,7 @@ export declare function createWebRequestFromNodeRequest(nodeRequest: IncomingMes
  * @returns `true` if the provided URL represents the main entry point, otherwise `false`.
  * @developerPreview
  */
-export declare function isMainModule(url: string): boolean;
+declare function isMainModule(url: string): boolean;
 
-/**
- * Represents a middleware function for handling HTTP requests in a Node.js environment.
- *
- * @param req - The incoming HTTP request object.
- * @param res - The outgoing HTTP response object.
- * @param next - A callback function that signals the completion of the middleware or forwards the error if provided.
- *
- * @returns A Promise that resolves to void or simply void. The handler can be asynchronous.
- * @developerPreview
- */
-export declare type NodeRequestHandlerFunction = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => Promise<void> | void;
-
-/**
- * Streams a web-standard `Response` into a Node.js `ServerResponse`
- * or `Http2ServerResponse`.
- *
- * This function adapts the web `Response` object to write its content
- * to a Node.js response object, handling both HTTP/1.1 and HTTP/2.
- *
- * @param source - The web-standard `Response` object to stream from.
- * @param destination - The Node.js response object (`ServerResponse` or `Http2ServerResponse`) to stream into.
- * @returns A promise that resolves once the streaming operation is complete.
- * @developerPreview
- */
-export declare function writeResponseToNodeResponse(source: Response, destination: ServerResponse | Http2ServerResponse): Promise<void>;
-
-export { }
+export { AngularNodeAppEngine, CommonEngine, createNodeRequestHandler, createWebRequestFromNodeRequest, isMainModule, writeResponseToNodeResponse };
+export type { CommonEngineOptions, CommonEngineRenderOptions, NodeRequestHandlerFunction };

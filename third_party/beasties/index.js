@@ -11348,7 +11348,8 @@ function isSubpath(basePath, currentPath) {
 }
 
 const removePseudoClassesAndElementsPattern = /(?<!\\)::?[a-z-]+(?:\(.+\))?/gi;
-const doubleNestingPattern = />\s*(?=>|$)/g;
+const implicitUniversalPattern = /([>+~])\s*(?!\1)([>+~])/g;
+const emptyCombinatorPattern = /([>+~])\s*(?=\1|$)/g;
 const removeTrailingCommasPattern = /\(\s*,|,\s*\)/g;
 class Beasties {
   #selectorCache = /* @__PURE__ */ new Map();
@@ -11739,9 +11740,7 @@ class Beasties {
     if (failedSelectors.length !== 0) {
       this.logger.warn?.(
         `${failedSelectors.length} rules skipped due to selector errors:
-  ${failedSelectors.join(
-          "\n  "
-        )}`
+  ${failedSelectors.join("\n  ")}`
       );
     }
     const preloadedFonts = /* @__PURE__ */ new Set();
@@ -11820,7 +11819,7 @@ class Beasties {
     if (normalizedSelector !== void 0) {
       return normalizedSelector;
     }
-    normalizedSelector = sel.replace(removePseudoClassesAndElementsPattern, "").replace(removeTrailingCommasPattern, (match) => match.includes("(") ? "(" : ")").replace(doubleNestingPattern, "> *").trim();
+    normalizedSelector = sel.replace(removePseudoClassesAndElementsPattern, "").replace(removeTrailingCommasPattern, (match) => match.includes("(") ? "(" : ")").replace(implicitUniversalPattern, "$1 * $2").replace(emptyCombinatorPattern, "$1 *").trim();
     this.#selectorCache.set(sel, normalizedSelector);
     return normalizedSelector;
   }

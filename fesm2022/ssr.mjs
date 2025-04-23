@@ -819,6 +819,11 @@ class RouteTree {
  */
 const MODULE_PRELOAD_MAX = 10;
 /**
+ * Regular expression to match a catch-all route pattern in a URL path,
+ * specifically one that ends with '/**'.
+ */
+const CATCH_ALL_REGEXP = /\/(\*\*)$/;
+/**
  * Regular expression to match segments preceded by a colon in a string.
  */
 const URL_PARAMETER_REGEXP = /(?<!\\):([^/]+)/g;
@@ -1024,7 +1029,9 @@ async function* handleSSGRoute(serverConfigRouteTree, redirectTo, metadata, pare
     if (redirectTo !== undefined) {
         meta.redirectTo = resolveRedirectTo(currentRoutePath, redirectTo);
     }
-    if (!URL_PARAMETER_REGEXP.test(currentRoutePath)) {
+    const isCatchAllRoute = CATCH_ALL_REGEXP.test(currentRoutePath);
+    if ((isCatchAllRoute && !getPrerenderParams) ||
+        (!isCatchAllRoute && !URL_PARAMETER_REGEXP.test(currentRoutePath))) {
         // Route has no parameters
         yield {
             ...meta,
@@ -1043,7 +1050,9 @@ async function* handleSSGRoute(serverConfigRouteTree, redirectTo, metadata, pare
         }
         if (serverConfigRouteTree) {
             // Automatically resolve dynamic parameters for nested routes.
-            const catchAllRoutePath = joinUrlParts(currentRoutePath, '**');
+            const catchAllRoutePath = isCatchAllRoute
+                ? currentRoutePath
+                : joinUrlParts(currentRoutePath, '**');
             const match = serverConfigRouteTree.match(catchAllRoutePath);
             if (match && match.renderMode === RenderMode.Prerender && !('getPrerenderParams' in match)) {
                 serverConfigRouteTree.insert(catchAllRoutePath, {
@@ -1056,17 +1065,10 @@ async function* handleSSGRoute(serverConfigRouteTree, redirectTo, metadata, pare
         const parameters = await runInInjectionContext(parentInjector, () => getPrerenderParams());
         try {
             for (const params of parameters) {
-                const routeWithResolvedParams = currentRoutePath.replace(URL_PARAMETER_REGEXP, (match) => {
-                    const parameterName = match.slice(1);
-                    const value = params[parameterName];
-                    if (typeof value !== 'string') {
-                        throw new Error(`The 'getPrerenderParams' function defined for the '${stripLeadingSlash(currentRoutePath)}' route ` +
-                            `returned a non-string value for parameter '${parameterName}'. ` +
-                            `Please make sure the 'getPrerenderParams' function returns values for all parameters ` +
-                            'specified in this route.');
-                    }
-                    return value;
-                });
+                const replacer = handlePrerenderParamsReplacement(params, currentRoutePath);
+                const routeWithResolvedParams = currentRoutePath
+                    .replace(URL_PARAMETER_REGEXP, replacer)
+                    .replace(CATCH_ALL_REGEXP, replacer);
                 yield {
                     ...meta,
                     route: routeWithResolvedParams,
@@ -1090,6 +1092,27 @@ async function* handleSSGRoute(serverConfigRouteTree, redirectTo, metadata, pare
             renderMode: fallback === PrerenderFallback.Client ? RenderMode.Client : RenderMode.Server,
         };
     }
+}
+/**
+ * Creates a replacer function used for substituting parameter placeholders in a route path
+ * with their corresponding values provided in the `params` object.
+ *
+ * @param params - An object mapping parameter names to their string values.
+ * @param currentRoutePath - The current route path, used for constructing error messages.
+ * @returns A function that replaces a matched parameter placeholder (e.g., ':id') with its corresponding value.
+ */
+function handlePrerenderParamsReplacement(params, currentRoutePath) {
+    return (match) => {
+        const parameterName = match.slice(1);
+        const value = params[parameterName];
+        if (typeof value !== 'string') {
+            throw new Error(`The 'getPrerenderParams' function defined for the '${stripLeadingSlash(currentRoutePath)}' route ` +
+                `returned a non-string value for parameter '${parameterName}'. ` +
+                `Please make sure the 'getPrerenderParams' function returns values for all parameters ` +
+                'specified in this route.');
+        }
+        return parameterName === '**' ? `/${value}` : value;
+    };
 }
 /**
  * Resolves the `redirectTo` property for a given route.
@@ -1138,8 +1161,8 @@ function buildServerConfigRouteTree({ routes, appShellRoute }) {
             errors.push(`Invalid '${path}' route configuration: the path cannot start with a slash.`);
             continue;
         }
-        if (path.includes('*') && 'getPrerenderParams' in metadata) {
-            errors.push(`Invalid '${path}' route configuration: 'getPrerenderParams' cannot be used with a '*' or '**' route.`);
+        if ('getPrerenderParams' in metadata && (path.includes('/*/') || path.endsWith('/*'))) {
+            errors.push(`Invalid '${path}' route configuration: 'getPrerenderParams' cannot be used with a '*' route.`);
             continue;
         }
         serverConfigRouteTree.insert(path, metadata);

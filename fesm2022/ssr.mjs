@@ -1,6 +1,6 @@
 import { ɵConsole as _Console, ApplicationRef, InjectionToken, provideEnvironmentInitializer, inject, makeEnvironmentProviders, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, Compiler, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
 import { platformServer, INITIAL_CONFIG, ɵSERVER_CONTEXT as _SERVER_CONTEXT, ɵrenderInternal as _renderInternal, provideServerRendering as provideServerRendering$1 } from '@angular/platform-server';
-import { ROUTES, Router, ɵloadChildren as _loadChildren } from '@angular/router';
+import { Router, ROUTES, ɵloadChildren as _loadChildren } from '@angular/router';
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import Beasties from '../third_party/beasties/index.js';
 
@@ -306,20 +306,17 @@ function buildPathWithParams(toPath, fromPath) {
  * Renders an Angular application or module to an HTML string.
  *
  * This function determines whether the provided `bootstrap` value is an Angular module
- * or a bootstrap function and calls the appropriate rendering method (`renderModule` or
- * `renderApplication`) based on that determination.
+ * or a bootstrap function and invokes the appropriate rendering method (`renderModule` or `renderApplication`).
  *
- * @param html - The HTML string to be used as the initial document content.
- * @param bootstrap - Either an Angular module type or a function that returns a promise
- *                    resolving to an `ApplicationRef`.
- * @param url - The URL of the application. This is used for server-side rendering to
- *              correctly handle route-based rendering.
- * @param platformProviders - An array of platform providers to be used during the
- *                             rendering process.
- * @param serverContext - A string representing the server context, used to provide additional
- *                        context or metadata during server-side rendering.
- * @returns A promise resolving to an object containing a `content` method, which returns a
- *          promise that resolves to the rendered HTML string.
+ * @param html - The initial HTML document content.
+ * @param bootstrap - An Angular module type or a function returning a promise that resolves to an `ApplicationRef`.
+ * @param url - The application URL, used for route-based rendering in SSR.
+ * @param platformProviders - An array of platform providers for the rendering process.
+ * @param serverContext - A string representing the server context, providing additional metadata for SSR.
+ * @returns A promise resolving to an object containing:
+ *          - `hasNavigationError`: Indicates if a navigation error occurred.
+ *          - `redirectTo`: (Optional) The redirect URL if a navigation redirect occurred.
+ *          - `content`: A function returning a promise that resolves to the rendered HTML string.
  */
 async function renderAngular(html, bootstrap, url, platformProviders, serverContext) {
     // A request to `http://www.example.com/page/index.html` will render the Angular route corresponding to `http://www.example.com/page`.
@@ -346,6 +343,8 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
         },
         ...platformProviders,
     ]);
+    let redirectTo;
+    let hasNavigationError = true;
     try {
         let applicationRef;
         if (isNgModule(bootstrap)) {
@@ -357,7 +356,23 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
         }
         // Block until application is stable.
         await applicationRef.whenStable();
+        // TODO(alanagius): Find a way to avoid rendering here especially for redirects as any output will be discarded.
+        const envInjector = applicationRef.injector;
+        const router = envInjector.get(Router);
+        const lastSuccessfulNavigation = router.lastSuccessfulNavigation;
+        if (lastSuccessfulNavigation?.finalUrl) {
+            hasNavigationError = false;
+            const { finalUrl, initialUrl } = lastSuccessfulNavigation;
+            const finalUrlStringified = finalUrl.toString();
+            if (initialUrl.toString() !== finalUrlStringified) {
+                const baseHref = envInjector.get(APP_BASE_HREF, null, { optional: true }) ??
+                    envInjector.get(PlatformLocation).getBaseHrefFromDOM();
+                redirectTo = joinUrlParts(baseHref, finalUrlStringified);
+            }
+        }
         return {
+            hasNavigationError,
+            redirectTo,
             content: () => new Promise((resolve, reject) => {
                 // Defer rendering to the next event loop iteration to avoid blocking, as most operations in `renderInternal` are synchronous.
                 setTimeout(() => {
@@ -372,6 +387,11 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
     catch (error) {
         await asyncDestroyPlatform(platformRef);
         throw error;
+    }
+    finally {
+        if (hasNavigationError || redirectTo) {
+            void asyncDestroyPlatform(platformRef);
+        }
     }
 }
 /**
@@ -394,7 +414,9 @@ function isNgModule(value) {
 function asyncDestroyPlatform(platformRef) {
     return new Promise((resolve) => {
         setTimeout(() => {
-            platformRef.destroy();
+            if (!platformRef.destroyed) {
+                platformRef.destroy();
+            }
             resolve();
         }, 0);
     });
@@ -847,15 +869,21 @@ async function* handleRoute(options) {
         if (metadata.renderMode === RenderMode.Prerender) {
             yield* handleSSGRoute(serverConfigRouteTree, typeof redirectTo === 'string' ? redirectTo : undefined, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
         }
-        else if (typeof redirectTo === 'string') {
+        else if (redirectTo !== undefined) {
             if (metadata.status && !VALID_REDIRECT_RESPONSE_CODES.has(metadata.status)) {
                 yield {
                     error: `The '${metadata.status}' status code is not a valid redirect response code. ` +
                         `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`,
                 };
             }
+            else if (typeof redirectTo === 'string') {
+                yield {
+                    ...metadata,
+                    redirectTo: resolveRedirectTo(metadata.route, redirectTo),
+                };
+            }
             else {
-                yield { ...metadata, redirectTo: resolveRedirectTo(metadata.route, redirectTo) };
+                yield metadata;
             }
         }
         else {
@@ -1934,15 +1962,7 @@ class AngularServerApp {
         }
         const { redirectTo, status, renderMode } = matchedRoute;
         if (redirectTo !== undefined) {
-            return new Response(null, {
-                // Note: The status code is validated during route extraction.
-                // 302 Found is used by default for redirections
-                // See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
-                status: status ?? 302,
-                headers: {
-                    'Location': buildPathWithParams(redirectTo, url.pathname),
-                },
-            });
+            return createRedirectResponse(buildPathWithParams(redirectTo, url.pathname), status);
         }
         if (renderMode === RenderMode.Prerender) {
             const response = await this.handleServe(request, matchedRoute);
@@ -2046,12 +2066,18 @@ class AngularServerApp {
         this.boostrap ??= await bootstrap();
         let html = await assets.getIndexServerHtml().text();
         html = await this.runTransformsOnHtml(html, url, preload);
-        const { content } = await renderAngular(html, this.boostrap, url, platformProviders, SERVER_CONTEXT_VALUE[renderMode]);
+        const result = await renderAngular(html, this.boostrap, url, platformProviders, SERVER_CONTEXT_VALUE[renderMode]);
+        if (result.hasNavigationError) {
+            return null;
+        }
+        if (result.redirectTo) {
+            return createRedirectResponse(result.redirectTo, status);
+        }
         const { inlineCriticalCssProcessor, criticalCssLRUCache, textDecoder } = this;
         // Use a stream to send the response before finishing rendering and inling critical CSS, improving performance via header flushing.
         const stream = new ReadableStream({
             async start(controller) {
-                const renderedHtml = await content();
+                const renderedHtml = await result.content();
                 if (!inlineCriticalCssProcessor) {
                     controller.enqueue(textDecoder.encode(renderedHtml));
                     controller.close();
@@ -2176,6 +2202,22 @@ function appendPreloadHintsToHtml(html, preload) {
         ...preload.map((val) => `<link rel="modulepreload" href="${val}">`),
         html.slice(bodyCloseIdx),
     ].join('\n');
+}
+/**
+ * Creates an HTTP redirect response with a specified location and status code.
+ *
+ * @param location - The URL to which the response should redirect.
+ * @param status - The HTTP status code for the redirection. Defaults to 302 (Found).
+ *                 See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
+ * @returns A `Response` object representing the HTTP redirect.
+ */
+function createRedirectResponse(location, status = 302) {
+    return new Response(null, {
+        status,
+        headers: {
+            'Location': location,
+        },
+    });
 }
 
 /**

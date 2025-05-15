@@ -1,6 +1,6 @@
 import { ɵConsole as _Console, ApplicationRef, InjectionToken, provideEnvironmentInitializer, inject, makeEnvironmentProviders, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, Compiler, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
 import { platformServer, INITIAL_CONFIG, ɵSERVER_CONTEXT as _SERVER_CONTEXT, ɵrenderInternal as _renderInternal, provideServerRendering as provideServerRendering$1 } from '@angular/platform-server';
-import { Router, ROUTES, ɵloadChildren as _loadChildren } from '@angular/router';
+import { ActivatedRoute, Router, ROUTES, ɵloadChildren as _loadChildren } from '@angular/router';
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import Beasties from '../third_party/beasties/index.js';
 
@@ -358,9 +358,13 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
         await applicationRef.whenStable();
         // TODO(alanagius): Find a way to avoid rendering here especially for redirects as any output will be discarded.
         const envInjector = applicationRef.injector;
+        const routerIsProvided = !!envInjector.get(ActivatedRoute, null);
         const router = envInjector.get(Router);
         const lastSuccessfulNavigation = router.lastSuccessfulNavigation;
-        if (lastSuccessfulNavigation?.finalUrl) {
+        if (!routerIsProvided) {
+            hasNavigationError = false;
+        }
+        else if (lastSuccessfulNavigation?.finalUrl) {
             hasNavigationError = false;
             const { finalUrl, initialUrl } = lastSuccessfulNavigation;
             const finalUrlStringified = finalUrl.toString();

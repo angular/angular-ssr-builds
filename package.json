@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "20.1.0-next.0+sha-1a235e0",
+  "version": "20.1.0-next.0+sha-42cdb28",
   "description": "Angular server side rendering utilities",
   "type": "module",
   "license": "MIT",
@@ -17,10 +17,10 @@
     "tslib": "^2.3.0"
   },
   "peerDependencies": {
-    "@angular/common": "^20.0.0 || ^20.0.0-next.0",
-    "@angular/core": "^20.0.0 || ^20.0.0-next.0",
-    "@angular/platform-server": "^20.0.0 || ^20.0.0-next.0",
-    "@angular/router": "^20.0.0 || ^20.0.0-next.0"
+    "@angular/common": "^20.0.0 || ^20.1.0-next.0",
+    "@angular/core": "^20.0.0 || ^20.1.0-next.0",
+    "@angular/platform-server": "^20.0.0 || ^20.1.0-next.0",
+    "@angular/router": "^20.0.0 || ^20.1.0-next.0"
   },
   "peerDependenciesMeta": {
     "@angular/platform-server": {

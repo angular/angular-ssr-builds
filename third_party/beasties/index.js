@@ -4875,7 +4875,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.4';
+	    this.version = '8.5.5';
 	    this.plugins = this.normalize(plugins);
 	  }
 

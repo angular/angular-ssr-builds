@@ -868,7 +868,7 @@ async function* handleRoute(options) {
         const { metadata, currentRoutePath, route, compiler, parentInjector, serverConfigRouteTree, entryPointToBrowserMapping, invokeGetPrerenderParams, includePrerenderFallbackRoutes, } = options;
         const { redirectTo, loadChildren, loadComponent, children, ɵentryName } = route;
         if (ɵentryName && loadComponent) {
-            appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata, true);
+            appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata);
         }
         if (metadata.renderMode === RenderMode.Prerender) {
             yield* handleSSGRoute(serverConfigRouteTree, typeof redirectTo === 'string' ? redirectTo : undefined, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
@@ -905,11 +905,7 @@ async function* handleRoute(options) {
         // Load and process lazy-loaded child routes
         if (loadChildren) {
             if (ɵentryName) {
-                // When using `loadChildren`, the entire feature area (including multiple routes) is loaded.
-                // As a result, we do not want all dynamic-import dependencies to be preload, because it involves multiple dependencies
-                // across different child routes. In contrast, `loadComponent` only loads a single component, which allows
-                // for precise control over preloading, ensuring that the files preloaded are exactly those required for that specific route.
-                appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata, false);
+                appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata);
             }
             const loadedChildRoutes = await _loadChildren(route, compiler, parentInjector).toPromise();
             if (loadedChildRoutes) {
@@ -1015,7 +1011,7 @@ async function* traverseRoutesConfig(options) {
  * corresponding browser bundles to the metadata's preload list, ensuring no duplicates and limiting the total
  * preloads to a predefined maximum.
  */
-function appendPreloadToMetadata(entryName, entryPointToBrowserMapping, metadata, includeDynamicImports) {
+function appendPreloadToMetadata(entryName, entryPointToBrowserMapping, metadata) {
     const existingPreloads = metadata.preload ?? [];
     if (!entryPointToBrowserMapping || existingPreloads.length >= MODULE_PRELOAD_MAX) {
         return;
@@ -1026,11 +1022,8 @@ function appendPreloadToMetadata(entryName, entryPointToBrowserMapping, metadata
     }
     // Merge existing preloads with new ones, ensuring uniqueness and limiting the total to the maximum allowed.
     const combinedPreloads = new Set(existingPreloads);
-    for (const { dynamicImport, path } of preload) {
-        if (dynamicImport && !includeDynamicImports) {
-            continue;
-        }
-        combinedPreloads.add(path);
+    for (const href of preload) {
+        combinedPreloads.add(href);
         if (combinedPreloads.size === MODULE_PRELOAD_MAX) {
             break;
         }

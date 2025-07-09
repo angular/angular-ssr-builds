@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "20.1.0-rc.0+sha-aea3ed8",
+  "version": "20.1.0-rc.0+sha-bf6823d",
   "description": "Angular server side rendering utilities",
   "type": "module",
   "license": "MIT",
@@ -17,10 +17,10 @@
     "tslib": "^2.3.0"
   },
   "peerDependencies": {
-    "@angular/common": "^20.0.0 || ^20.1.0-next.0",
-    "@angular/core": "^20.0.0 || ^20.1.0-next.0",
-    "@angular/platform-server": "^20.0.0 || ^20.1.0-next.0",
-    "@angular/router": "^20.0.0 || ^20.1.0-next.0"
+    "@angular/common": "^20.0.0",
+    "@angular/core": "^20.0.0",
+    "@angular/platform-server": "^20.0.0",
+    "@angular/router": "^20.0.0"
   },
   "peerDependenciesMeta": {
     "@angular/platform-server": {
@@ -29,12 +29,12 @@
   },
   "devDependencies": {
     "@angular-devkit/schematics": "workspace:*",
-    "@angular/common": "20.1.0-next.3",
-    "@angular/compiler": "20.1.0-next.3",
-    "@angular/core": "20.1.0-next.3",
-    "@angular/platform-browser": "20.1.0-next.3",
-    "@angular/platform-server": "20.1.0-next.3",
-    "@angular/router": "20.1.0-next.3",
+    "@angular/common": "20.1.0",
+    "@angular/compiler": "20.1.0",
+    "@angular/core": "20.1.0",
+    "@angular/platform-browser": "20.1.0",
+    "@angular/platform-server": "20.1.0",
+    "@angular/router": "20.1.0",
     "@schematics/angular": "workspace:*"
   },
   "sideEffects": false,

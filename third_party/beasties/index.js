@@ -33,7 +33,7 @@ const utimes = notImplemented("fs.utimes");
 const lutimes = notImplemented("fs.lutimes");
 const realpath = notImplemented("fs.realpath");
 const mkdtemp = notImplemented("fs.mkdtemp");
-const writeFile = notImplemented("fs.writeFile");
+const writeFile$1 = notImplemented("fs.writeFile");
 const appendFile = notImplemented("fs.appendFile");
 const readFile$1 = notImplemented("fs.readFile");
 notImplemented("fs.watch");
@@ -81,7 +81,7 @@ callbackify(symlink);
 callbackify(truncate);
 callbackify(unlink);
 callbackify(utimes);
-callbackify(writeFile);
+const writeFile = callbackify(writeFile$1);
 callbackify(statfs);
 notImplementedAsync("fs.close");
 notImplementedAsync(
@@ -5640,6 +5640,538 @@ function requireDist () {
 var distExports = requireDist();
 var mediaParser = /*@__PURE__*/getDefaultExportFromCjs(distExports);
 
+var boolbase$1;
+var hasRequiredBoolbase;
+
+function requireBoolbase () {
+	if (hasRequiredBoolbase) return boolbase$1;
+	hasRequiredBoolbase = 1;
+	boolbase$1 = {
+		trueFunc: function trueFunc(){
+			return true;
+		},
+		falseFunc: function falseFunc(){
+			return false;
+		}
+	};
+	return boolbase$1;
+}
+
+var boolbaseExports = requireBoolbase();
+var boolbase = /*@__PURE__*/getDefaultExportFromCjs(boolbaseExports);
+
+var SelectorType;
+(function (SelectorType) {
+    SelectorType["Attribute"] = "attribute";
+    SelectorType["Pseudo"] = "pseudo";
+    SelectorType["PseudoElement"] = "pseudo-element";
+    SelectorType["Tag"] = "tag";
+    SelectorType["Universal"] = "universal";
+    // Traversals
+    SelectorType["Adjacent"] = "adjacent";
+    SelectorType["Child"] = "child";
+    SelectorType["Descendant"] = "descendant";
+    SelectorType["Parent"] = "parent";
+    SelectorType["Sibling"] = "sibling";
+    SelectorType["ColumnCombinator"] = "column-combinator";
+})(SelectorType || (SelectorType = {}));
+var AttributeAction;
+(function (AttributeAction) {
+    AttributeAction["Any"] = "any";
+    AttributeAction["Element"] = "element";
+    AttributeAction["End"] = "end";
+    AttributeAction["Equals"] = "equals";
+    AttributeAction["Exists"] = "exists";
+    AttributeAction["Hyphen"] = "hyphen";
+    AttributeAction["Not"] = "not";
+    AttributeAction["Start"] = "start";
+})(AttributeAction || (AttributeAction = {}));
+
+const reName = /^[^#\\]?(?:\\(?:[\da-f]{1,6}\s?|.)|[\w\u00B0-\uFFFF-])+/;
+const reEscape = /\\([\da-f]{1,6}\s?|(\s)|.)/gi;
+var CharCode;
+(function (CharCode) {
+    CharCode[CharCode["LeftParenthesis"] = 40] = "LeftParenthesis";
+    CharCode[CharCode["RightParenthesis"] = 41] = "RightParenthesis";
+    CharCode[CharCode["LeftSquareBracket"] = 91] = "LeftSquareBracket";
+    CharCode[CharCode["RightSquareBracket"] = 93] = "RightSquareBracket";
+    CharCode[CharCode["Comma"] = 44] = "Comma";
+    CharCode[CharCode["Period"] = 46] = "Period";
+    CharCode[CharCode["Colon"] = 58] = "Colon";
+    CharCode[CharCode["SingleQuote"] = 39] = "SingleQuote";
+    CharCode[CharCode["DoubleQuote"] = 34] = "DoubleQuote";
+    CharCode[CharCode["Plus"] = 43] = "Plus";
+    CharCode[CharCode["Tilde"] = 126] = "Tilde";
+    CharCode[CharCode["QuestionMark"] = 63] = "QuestionMark";
+    CharCode[CharCode["ExclamationMark"] = 33] = "ExclamationMark";
+    CharCode[CharCode["Slash"] = 47] = "Slash";
+    CharCode[CharCode["Equal"] = 61] = "Equal";
+    CharCode[CharCode["Dollar"] = 36] = "Dollar";
+    CharCode[CharCode["Pipe"] = 124] = "Pipe";
+    CharCode[CharCode["Circumflex"] = 94] = "Circumflex";
+    CharCode[CharCode["Asterisk"] = 42] = "Asterisk";
+    CharCode[CharCode["GreaterThan"] = 62] = "GreaterThan";
+    CharCode[CharCode["LessThan"] = 60] = "LessThan";
+    CharCode[CharCode["Hash"] = 35] = "Hash";
+    CharCode[CharCode["LowerI"] = 105] = "LowerI";
+    CharCode[CharCode["LowerS"] = 115] = "LowerS";
+    CharCode[CharCode["BackSlash"] = 92] = "BackSlash";
+    // Whitespace
+    CharCode[CharCode["Space"] = 32] = "Space";
+    CharCode[CharCode["Tab"] = 9] = "Tab";
+    CharCode[CharCode["NewLine"] = 10] = "NewLine";
+    CharCode[CharCode["FormFeed"] = 12] = "FormFeed";
+    CharCode[CharCode["CarriageReturn"] = 13] = "CarriageReturn";
+})(CharCode || (CharCode = {}));
+const actionTypes = new Map([
+    [CharCode.Tilde, AttributeAction.Element],
+    [CharCode.Circumflex, AttributeAction.Start],
+    [CharCode.Dollar, AttributeAction.End],
+    [CharCode.Asterisk, AttributeAction.Any],
+    [CharCode.ExclamationMark, AttributeAction.Not],
+    [CharCode.Pipe, AttributeAction.Hyphen],
+]);
+// Pseudos, whose data property is parsed as well.
+const unpackPseudos = new Set([
+    "has",
+    "not",
+    "matches",
+    "is",
+    "where",
+    "host",
+    "host-context",
+]);
+/**
+ * Pseudo elements defined in CSS Level 1 and CSS Level 2 can be written with
+ * a single colon; eg. :before will turn into ::before.
+ *
+ * @see {@link https://www.w3.org/TR/2018/WD-selectors-4-20181121/#pseudo-element-syntax}
+ */
+const pseudosToPseudoElements = new Set([
+    "before",
+    "after",
+    "first-line",
+    "first-letter",
+]);
+/**
+ * Checks whether a specific selector is a traversal.
+ * This is useful eg. in swapping the order of elements that
+ * are not traversals.
+ *
+ * @param selector Selector to check.
+ */
+function isTraversal$1(selector) {
+    switch (selector.type) {
+        case SelectorType.Adjacent:
+        case SelectorType.Child:
+        case SelectorType.Descendant:
+        case SelectorType.Parent:
+        case SelectorType.Sibling:
+        case SelectorType.ColumnCombinator: {
+            return true;
+        }
+        default: {
+            return false;
+        }
+    }
+}
+const stripQuotesFromPseudos = new Set(["contains", "icontains"]);
+// Unescape function taken from https://github.com/jquery/sizzle/blob/master/src/sizzle.js#L152
+function funescape(_, escaped, escapedWhitespace) {
+    const high = Number.parseInt(escaped, 16) - 65536;
+    // NaN means non-codepoint
+    return high !== high || escapedWhitespace
+        ? escaped
+        : high < 0
+            ? // BMP codepoint
+                String.fromCharCode(high + 65536)
+            : // Supplemental Plane codepoint (surrogate pair)
+                String.fromCharCode((high >> 10) | 55296, (high & 1023) | 56320);
+}
+function unescapeCSS(cssString) {
+    return cssString.replace(reEscape, funescape);
+}
+function isQuote(c) {
+    return c === CharCode.SingleQuote || c === CharCode.DoubleQuote;
+}
+function isWhitespace$1(c) {
+    return (c === CharCode.Space ||
+        c === CharCode.Tab ||
+        c === CharCode.NewLine ||
+        c === CharCode.FormFeed ||
+        c === CharCode.CarriageReturn);
+}
+/**
+ * Parses `selector`.
+ *
+ * @param selector Selector to parse.
+ * @returns Returns a two-dimensional array.
+ * The first dimension represents selectors separated by commas (eg. `sub1, sub2`),
+ * the second contains the relevant tokens for that selector.
+ */
+function parse$1(selector) {
+    const subselects = [];
+    const endIndex = parseSelector(subselects, `${selector}`, 0);
+    if (endIndex < selector.length) {
+        throw new Error(`Unmatched selector: ${selector.slice(endIndex)}`);
+    }
+    return subselects;
+}
+function parseSelector(subselects, selector, selectorIndex) {
+    let tokens = [];
+    function getName(offset) {
+        const match = selector.slice(selectorIndex + offset).match(reName);
+        if (!match) {
+            throw new Error(`Expected name, found ${selector.slice(selectorIndex)}`);
+        }
+        const [name] = match;
+        selectorIndex += offset + name.length;
+        return unescapeCSS(name);
+    }
+    function stripWhitespace(offset) {
+        selectorIndex += offset;
+        while (selectorIndex < selector.length &&
+            isWhitespace$1(selector.charCodeAt(selectorIndex))) {
+            selectorIndex++;
+        }
+    }
+    function readValueWithParenthesis() {
+        selectorIndex += 1;
+        const start = selectorIndex;
+        for (let counter = 1; selectorIndex < selector.length; selectorIndex++) {
+            switch (selector.charCodeAt(selectorIndex)) {
+                case CharCode.BackSlash: {
+                    // Skip next character
+                    selectorIndex += 1;
+                    break;
+                }
+                case CharCode.LeftParenthesis: {
+                    counter += 1;
+                    break;
+                }
+                case CharCode.RightParenthesis: {
+                    counter -= 1;
+                    if (counter === 0) {
+                        return unescapeCSS(selector.slice(start, selectorIndex++));
+                    }
+                    break;
+                }
+            }
+        }
+        throw new Error("Parenthesis not matched");
+    }
+    function ensureNotTraversal() {
+        if (tokens.length > 0 && isTraversal$1(tokens[tokens.length - 1])) {
+            throw new Error("Did not expect successive traversals.");
+        }
+    }
+    function addTraversal(type) {
+        if (tokens.length > 0 &&
+            tokens[tokens.length - 1].type === SelectorType.Descendant) {
+            tokens[tokens.length - 1].type = type;
+            return;
+        }
+        ensureNotTraversal();
+        tokens.push({ type });
+    }
+    function addSpecialAttribute(name, action) {
+        tokens.push({
+            type: SelectorType.Attribute,
+            name,
+            action,
+            value: getName(1),
+            namespace: null,
+            ignoreCase: "quirks",
+        });
+    }
+    /**
+     * We have finished parsing the current part of the selector.
+     *
+     * Remove descendant tokens at the end if they exist,
+     * and return the last index, so that parsing can be
+     * picked up from here.
+     */
+    function finalizeSubselector() {
+        if (tokens.length > 0 &&
+            tokens[tokens.length - 1].type === SelectorType.Descendant) {
+            tokens.pop();
+        }
+        if (tokens.length === 0) {
+            throw new Error("Empty sub-selector");
+        }
+        subselects.push(tokens);
+    }
+    stripWhitespace(0);
+    if (selector.length === selectorIndex) {
+        return selectorIndex;
+    }
+    loop: while (selectorIndex < selector.length) {
+        const firstChar = selector.charCodeAt(selectorIndex);
+        switch (firstChar) {
+            // Whitespace
+            case CharCode.Space:
+            case CharCode.Tab:
+            case CharCode.NewLine:
+            case CharCode.FormFeed:
+            case CharCode.CarriageReturn: {
+                if (tokens.length === 0 ||
+                    tokens[0].type !== SelectorType.Descendant) {
+                    ensureNotTraversal();
+                    tokens.push({ type: SelectorType.Descendant });
+                }
+                stripWhitespace(1);
+                break;
+            }
+            // Traversals
+            case CharCode.GreaterThan: {
+                addTraversal(SelectorType.Child);
+                stripWhitespace(1);
+                break;
+            }
+            case CharCode.LessThan: {
+                addTraversal(SelectorType.Parent);
+                stripWhitespace(1);
+                break;
+            }
+            case CharCode.Tilde: {
+                addTraversal(SelectorType.Sibling);
+                stripWhitespace(1);
+                break;
+            }
+            case CharCode.Plus: {
+                addTraversal(SelectorType.Adjacent);
+                stripWhitespace(1);
+                break;
+            }
+            // Special attribute selectors: .class, #id
+            case CharCode.Period: {
+                addSpecialAttribute("class", AttributeAction.Element);
+                break;
+            }
+            case CharCode.Hash: {
+                addSpecialAttribute("id", AttributeAction.Equals);
+                break;
+            }
+            case CharCode.LeftSquareBracket: {
+                stripWhitespace(1);
+                // Determine attribute name and namespace
+                let name;
+                let namespace = null;
+                if (selector.charCodeAt(selectorIndex) === CharCode.Pipe) {
+                    // Equivalent to no namespace
+                    name = getName(1);
+                }
+                else if (selector.startsWith("*|", selectorIndex)) {
+                    namespace = "*";
+                    name = getName(2);
+                }
+                else {
+                    name = getName(0);
+                    if (selector.charCodeAt(selectorIndex) === CharCode.Pipe &&
+                        selector.charCodeAt(selectorIndex + 1) !==
+                            CharCode.Equal) {
+                        namespace = name;
+                        name = getName(1);
+                    }
+                }
+                stripWhitespace(0);
+                // Determine comparison operation
+                let action = AttributeAction.Exists;
+                const possibleAction = actionTypes.get(selector.charCodeAt(selectorIndex));
+                if (possibleAction) {
+                    action = possibleAction;
+                    if (selector.charCodeAt(selectorIndex + 1) !==
+                        CharCode.Equal) {
+                        throw new Error("Expected `=`");
+                    }
+                    stripWhitespace(2);
+                }
+                else if (selector.charCodeAt(selectorIndex) === CharCode.Equal) {
+                    action = AttributeAction.Equals;
+                    stripWhitespace(1);
+                }
+                // Determine value
+                let value = "";
+                let ignoreCase = null;
+                if (action !== "exists") {
+                    if (isQuote(selector.charCodeAt(selectorIndex))) {
+                        const quote = selector.charCodeAt(selectorIndex);
+                        selectorIndex += 1;
+                        const sectionStart = selectorIndex;
+                        while (selectorIndex < selector.length &&
+                            selector.charCodeAt(selectorIndex) !== quote) {
+                            selectorIndex +=
+                                // Skip next character if it is escaped
+                                selector.charCodeAt(selectorIndex) ===
+                                    CharCode.BackSlash
+                                    ? 2
+                                    : 1;
+                        }
+                        if (selector.charCodeAt(selectorIndex) !== quote) {
+                            throw new Error("Attribute value didn't end");
+                        }
+                        value = unescapeCSS(selector.slice(sectionStart, selectorIndex));
+                        selectorIndex += 1;
+                    }
+                    else {
+                        const valueStart = selectorIndex;
+                        while (selectorIndex < selector.length &&
+                            !isWhitespace$1(selector.charCodeAt(selectorIndex)) &&
+                            selector.charCodeAt(selectorIndex) !==
+                                CharCode.RightSquareBracket) {
+                            selectorIndex +=
+                                // Skip next character if it is escaped
+                                selector.charCodeAt(selectorIndex) ===
+                                    CharCode.BackSlash
+                                    ? 2
+                                    : 1;
+                        }
+                        value = unescapeCSS(selector.slice(valueStart, selectorIndex));
+                    }
+                    stripWhitespace(0);
+                    // See if we have a force ignore flag
+                    switch (selector.charCodeAt(selectorIndex) | 0x20) {
+                        // If the forceIgnore flag is set (either `i` or `s`), use that value
+                        case CharCode.LowerI: {
+                            ignoreCase = true;
+                            stripWhitespace(1);
+                            break;
+                        }
+                        case CharCode.LowerS: {
+                            ignoreCase = false;
+                            stripWhitespace(1);
+                            break;
+                        }
+                    }
+                }
+                if (selector.charCodeAt(selectorIndex) !==
+                    CharCode.RightSquareBracket) {
+                    throw new Error("Attribute selector didn't terminate");
+                }
+                selectorIndex += 1;
+                const attributeSelector = {
+                    type: SelectorType.Attribute,
+                    name,
+                    action,
+                    value,
+                    namespace,
+                    ignoreCase,
+                };
+                tokens.push(attributeSelector);
+                break;
+            }
+            case CharCode.Colon: {
+                if (selector.charCodeAt(selectorIndex + 1) === CharCode.Colon) {
+                    tokens.push({
+                        type: SelectorType.PseudoElement,
+                        name: getName(2).toLowerCase(),
+                        data: selector.charCodeAt(selectorIndex) ===
+                            CharCode.LeftParenthesis
+                            ? readValueWithParenthesis()
+                            : null,
+                    });
+                    break;
+                }
+                const name = getName(1).toLowerCase();
+                if (pseudosToPseudoElements.has(name)) {
+                    tokens.push({
+                        type: SelectorType.PseudoElement,
+                        name,
+                        data: null,
+                    });
+                    break;
+                }
+                let data = null;
+                if (selector.charCodeAt(selectorIndex) ===
+                    CharCode.LeftParenthesis) {
+                    if (unpackPseudos.has(name)) {
+                        if (isQuote(selector.charCodeAt(selectorIndex + 1))) {
+                            throw new Error(`Pseudo-selector ${name} cannot be quoted`);
+                        }
+                        data = [];
+                        selectorIndex = parseSelector(data, selector, selectorIndex + 1);
+                        if (selector.charCodeAt(selectorIndex) !==
+                            CharCode.RightParenthesis) {
+                            throw new Error(`Missing closing parenthesis in :${name} (${selector})`);
+                        }
+                        selectorIndex += 1;
+                    }
+                    else {
+                        data = readValueWithParenthesis();
+                        if (stripQuotesFromPseudos.has(name)) {
+                            const quot = data.charCodeAt(0);
+                            if (quot === data.charCodeAt(data.length - 1) &&
+                                isQuote(quot)) {
+                                data = data.slice(1, -1);
+                            }
+                        }
+                        data = unescapeCSS(data);
+                    }
+                }
+                tokens.push({ type: SelectorType.Pseudo, name, data });
+                break;
+            }
+            case CharCode.Comma: {
+                finalizeSubselector();
+                tokens = [];
+                stripWhitespace(1);
+                break;
+            }
+            default: {
+                if (selector.startsWith("/*", selectorIndex)) {
+                    const endIndex = selector.indexOf("*/", selectorIndex + 2);
+                    if (endIndex < 0) {
+                        throw new Error("Comment was not terminated");
+                    }
+                    selectorIndex = endIndex + 2;
+                    // Remove leading whitespace
+                    if (tokens.length === 0) {
+                        stripWhitespace(0);
+                    }
+                    break;
+                }
+                let namespace = null;
+                let name;
+                if (firstChar === CharCode.Asterisk) {
+                    selectorIndex += 1;
+                    name = "*";
+                }
+                else if (firstChar === CharCode.Pipe) {
+                    name = "";
+                    if (selector.charCodeAt(selectorIndex + 1) === CharCode.Pipe) {
+                        addTraversal(SelectorType.ColumnCombinator);
+                        stripWhitespace(2);
+                        break;
+                    }
+                }
+                else if (reName.test(selector.slice(selectorIndex))) {
+                    name = getName(0);
+                }
+                else {
+                    break loop;
+                }
+                if (selector.charCodeAt(selectorIndex) === CharCode.Pipe &&
+                    selector.charCodeAt(selectorIndex + 1) !== CharCode.Pipe) {
+                    namespace = name;
+                    if (selector.charCodeAt(selectorIndex + 1) ===
+                        CharCode.Asterisk) {
+                        name = "*";
+                        selectorIndex += 2;
+                    }
+                    else {
+                        name = getName(1);
+                    }
+                }
+                tokens.push(name === "*"
+                    ? { type: SelectorType.Universal, namespace }
+                    : { type: SelectorType.Tag, name, namespace });
+            }
+        }
+    }
+    finalizeSubselector();
+    return selectorIndex;
+}
+
 /** Types of elements found in htmlparser2's DOM */
 var ElementType;
 (function (ElementType) {
@@ -6955,7 +7487,7 @@ function findOneChild(test, nodes) {
  * @param recurse Also consider child nodes.
  * @returns The first node that passes `test`.
  */
-function findOne(test, nodes, recurse = true) {
+function findOne$1(test, nodes, recurse = true) {
     const searchedNodes = Array.isArray(nodes) ? nodes : [nodes];
     for (let i = 0; i < searchedNodes.length; i++) {
         const node = searchedNodes[i];
@@ -6963,7 +7495,7 @@ function findOne(test, nodes, recurse = true) {
             return node;
         }
         if (recurse && hasChildren(node) && node.children.length > 0) {
-            const found = findOne(test, node.children, true);
+            const found = findOne$1(test, node.children, true);
             if (found)
                 return found;
         }
@@ -6992,7 +7524,7 @@ function existsOne(test, nodes) {
  * @param nodes Array of nodes to search.
  * @returns All nodes passing `test`.
  */
-function findAll(test, nodes) {
+function findAll$1(test, nodes) {
     const result = [];
     const nodeStack = [Array.isArray(nodes) ? nodes : [nodes]];
     const indexStack = [0];
@@ -7125,7 +7657,7 @@ function getElements(options, nodes, recurse, limit = Infinity) {
 function getElementById(id, nodes, recurse = true) {
     if (!Array.isArray(nodes))
         nodes = [nodes];
-    return findOne(getAttribCheck("id", id), nodes, recurse);
+    return findOne$1(getAttribCheck("id", id), nodes, recurse);
 }
 /**
  * Returns all nodes with the supplied `tagName`.
@@ -7492,8 +8024,8 @@ var DomUtils = /*#__PURE__*/Object.freeze({
   existsOne: existsOne,
   filter: filter,
   find: find,
-  findAll: findAll,
-  findOne: findOne,
+  findAll: findAll$1,
+  findOne: findOne$1,
   findOneChild: findOneChild,
   getAttributeValue: getAttributeValue,
   getChildren: getChildren,
@@ -7528,551 +8060,6 @@ var DomUtils = /*#__PURE__*/Object.freeze({
   textContent: textContent,
   uniqueSort: uniqueSort
 });
-
-var boolbase$1;
-var hasRequiredBoolbase;
-
-function requireBoolbase () {
-	if (hasRequiredBoolbase) return boolbase$1;
-	hasRequiredBoolbase = 1;
-	boolbase$1 = {
-		trueFunc: function trueFunc(){
-			return true;
-		},
-		falseFunc: function falseFunc(){
-			return false;
-		}
-	};
-	return boolbase$1;
-}
-
-var boolbaseExports = requireBoolbase();
-var boolbase = /*@__PURE__*/getDefaultExportFromCjs(boolbaseExports);
-
-var SelectorType;
-(function (SelectorType) {
-    SelectorType["Attribute"] = "attribute";
-    SelectorType["Pseudo"] = "pseudo";
-    SelectorType["PseudoElement"] = "pseudo-element";
-    SelectorType["Tag"] = "tag";
-    SelectorType["Universal"] = "universal";
-    // Traversals
-    SelectorType["Adjacent"] = "adjacent";
-    SelectorType["Child"] = "child";
-    SelectorType["Descendant"] = "descendant";
-    SelectorType["Parent"] = "parent";
-    SelectorType["Sibling"] = "sibling";
-    SelectorType["ColumnCombinator"] = "column-combinator";
-})(SelectorType || (SelectorType = {}));
-var AttributeAction;
-(function (AttributeAction) {
-    AttributeAction["Any"] = "any";
-    AttributeAction["Element"] = "element";
-    AttributeAction["End"] = "end";
-    AttributeAction["Equals"] = "equals";
-    AttributeAction["Exists"] = "exists";
-    AttributeAction["Hyphen"] = "hyphen";
-    AttributeAction["Not"] = "not";
-    AttributeAction["Start"] = "start";
-})(AttributeAction || (AttributeAction = {}));
-
-const reName = /^[^\\#]?(?:\\(?:[\da-f]{1,6}\s?|.)|[\w\-\u00b0-\uFFFF])+/;
-const reEscape = /\\([\da-f]{1,6}\s?|(\s)|.)/gi;
-const actionTypes = new Map([
-    [126 /* Tilde */, AttributeAction.Element],
-    [94 /* Circumflex */, AttributeAction.Start],
-    [36 /* Dollar */, AttributeAction.End],
-    [42 /* Asterisk */, AttributeAction.Any],
-    [33 /* ExclamationMark */, AttributeAction.Not],
-    [124 /* Pipe */, AttributeAction.Hyphen],
-]);
-// Pseudos, whose data property is parsed as well.
-const unpackPseudos = new Set([
-    "has",
-    "not",
-    "matches",
-    "is",
-    "where",
-    "host",
-    "host-context",
-]);
-/**
- * Checks whether a specific selector is a traversal.
- * This is useful eg. in swapping the order of elements that
- * are not traversals.
- *
- * @param selector Selector to check.
- */
-function isTraversal$1(selector) {
-    switch (selector.type) {
-        case SelectorType.Adjacent:
-        case SelectorType.Child:
-        case SelectorType.Descendant:
-        case SelectorType.Parent:
-        case SelectorType.Sibling:
-        case SelectorType.ColumnCombinator:
-            return true;
-        default:
-            return false;
-    }
-}
-const stripQuotesFromPseudos = new Set(["contains", "icontains"]);
-// Unescape function taken from https://github.com/jquery/sizzle/blob/master/src/sizzle.js#L152
-function funescape(_, escaped, escapedWhitespace) {
-    const high = parseInt(escaped, 16) - 0x10000;
-    // NaN means non-codepoint
-    return high !== high || escapedWhitespace
-        ? escaped
-        : high < 0
-            ? // BMP codepoint
-                String.fromCharCode(high + 0x10000)
-            : // Supplemental Plane codepoint (surrogate pair)
-                String.fromCharCode((high >> 10) | 0xd800, (high & 0x3ff) | 0xdc00);
-}
-function unescapeCSS(str) {
-    return str.replace(reEscape, funescape);
-}
-function isQuote(c) {
-    return c === 39 /* SingleQuote */ || c === 34 /* DoubleQuote */;
-}
-function isWhitespace$1(c) {
-    return (c === 32 /* Space */ ||
-        c === 9 /* Tab */ ||
-        c === 10 /* NewLine */ ||
-        c === 12 /* FormFeed */ ||
-        c === 13 /* CarriageReturn */);
-}
-/**
- * Parses `selector`, optionally with the passed `options`.
- *
- * @param selector Selector to parse.
- * @param options Options for parsing.
- * @returns Returns a two-dimensional array.
- * The first dimension represents selectors separated by commas (eg. `sub1, sub2`),
- * the second contains the relevant tokens for that selector.
- */
-function parse$1(selector) {
-    const subselects = [];
-    const endIndex = parseSelector(subselects, `${selector}`, 0);
-    if (endIndex < selector.length) {
-        throw new Error(`Unmatched selector: ${selector.slice(endIndex)}`);
-    }
-    return subselects;
-}
-function parseSelector(subselects, selector, selectorIndex) {
-    let tokens = [];
-    function getName(offset) {
-        const match = selector.slice(selectorIndex + offset).match(reName);
-        if (!match) {
-            throw new Error(`Expected name, found ${selector.slice(selectorIndex)}`);
-        }
-        const [name] = match;
-        selectorIndex += offset + name.length;
-        return unescapeCSS(name);
-    }
-    function stripWhitespace(offset) {
-        selectorIndex += offset;
-        while (selectorIndex < selector.length &&
-            isWhitespace$1(selector.charCodeAt(selectorIndex))) {
-            selectorIndex++;
-        }
-    }
-    function readValueWithParenthesis() {
-        selectorIndex += 1;
-        const start = selectorIndex;
-        let counter = 1;
-        for (; counter > 0 && selectorIndex < selector.length; selectorIndex++) {
-            if (selector.charCodeAt(selectorIndex) ===
-                40 /* LeftParenthesis */ &&
-                !isEscaped(selectorIndex)) {
-                counter++;
-            }
-            else if (selector.charCodeAt(selectorIndex) ===
-                41 /* RightParenthesis */ &&
-                !isEscaped(selectorIndex)) {
-                counter--;
-            }
-        }
-        if (counter) {
-            throw new Error("Parenthesis not matched");
-        }
-        return unescapeCSS(selector.slice(start, selectorIndex - 1));
-    }
-    function isEscaped(pos) {
-        let slashCount = 0;
-        while (selector.charCodeAt(--pos) === 92 /* BackSlash */)
-            slashCount++;
-        return (slashCount & 1) === 1;
-    }
-    function ensureNotTraversal() {
-        if (tokens.length > 0 && isTraversal$1(tokens[tokens.length - 1])) {
-            throw new Error("Did not expect successive traversals.");
-        }
-    }
-    function addTraversal(type) {
-        if (tokens.length > 0 &&
-            tokens[tokens.length - 1].type === SelectorType.Descendant) {
-            tokens[tokens.length - 1].type = type;
-            return;
-        }
-        ensureNotTraversal();
-        tokens.push({ type });
-    }
-    function addSpecialAttribute(name, action) {
-        tokens.push({
-            type: SelectorType.Attribute,
-            name,
-            action,
-            value: getName(1),
-            namespace: null,
-            ignoreCase: "quirks",
-        });
-    }
-    /**
-     * We have finished parsing the current part of the selector.
-     *
-     * Remove descendant tokens at the end if they exist,
-     * and return the last index, so that parsing can be
-     * picked up from here.
-     */
-    function finalizeSubselector() {
-        if (tokens.length &&
-            tokens[tokens.length - 1].type === SelectorType.Descendant) {
-            tokens.pop();
-        }
-        if (tokens.length === 0) {
-            throw new Error("Empty sub-selector");
-        }
-        subselects.push(tokens);
-    }
-    stripWhitespace(0);
-    if (selector.length === selectorIndex) {
-        return selectorIndex;
-    }
-    loop: while (selectorIndex < selector.length) {
-        const firstChar = selector.charCodeAt(selectorIndex);
-        switch (firstChar) {
-            // Whitespace
-            case 32 /* Space */:
-            case 9 /* Tab */:
-            case 10 /* NewLine */:
-            case 12 /* FormFeed */:
-            case 13 /* CarriageReturn */: {
-                if (tokens.length === 0 ||
-                    tokens[0].type !== SelectorType.Descendant) {
-                    ensureNotTraversal();
-                    tokens.push({ type: SelectorType.Descendant });
-                }
-                stripWhitespace(1);
-                break;
-            }
-            // Traversals
-            case 62 /* GreaterThan */: {
-                addTraversal(SelectorType.Child);
-                stripWhitespace(1);
-                break;
-            }
-            case 60 /* LessThan */: {
-                addTraversal(SelectorType.Parent);
-                stripWhitespace(1);
-                break;
-            }
-            case 126 /* Tilde */: {
-                addTraversal(SelectorType.Sibling);
-                stripWhitespace(1);
-                break;
-            }
-            case 43 /* Plus */: {
-                addTraversal(SelectorType.Adjacent);
-                stripWhitespace(1);
-                break;
-            }
-            // Special attribute selectors: .class, #id
-            case 46 /* Period */: {
-                addSpecialAttribute("class", AttributeAction.Element);
-                break;
-            }
-            case 35 /* Hash */: {
-                addSpecialAttribute("id", AttributeAction.Equals);
-                break;
-            }
-            case 91 /* LeftSquareBracket */: {
-                stripWhitespace(1);
-                // Determine attribute name and namespace
-                let name;
-                let namespace = null;
-                if (selector.charCodeAt(selectorIndex) === 124 /* Pipe */) {
-                    // Equivalent to no namespace
-                    name = getName(1);
-                }
-                else if (selector.startsWith("*|", selectorIndex)) {
-                    namespace = "*";
-                    name = getName(2);
-                }
-                else {
-                    name = getName(0);
-                    if (selector.charCodeAt(selectorIndex) === 124 /* Pipe */ &&
-                        selector.charCodeAt(selectorIndex + 1) !==
-                            61 /* Equal */) {
-                        namespace = name;
-                        name = getName(1);
-                    }
-                }
-                stripWhitespace(0);
-                // Determine comparison operation
-                let action = AttributeAction.Exists;
-                const possibleAction = actionTypes.get(selector.charCodeAt(selectorIndex));
-                if (possibleAction) {
-                    action = possibleAction;
-                    if (selector.charCodeAt(selectorIndex + 1) !==
-                        61 /* Equal */) {
-                        throw new Error("Expected `=`");
-                    }
-                    stripWhitespace(2);
-                }
-                else if (selector.charCodeAt(selectorIndex) === 61 /* Equal */) {
-                    action = AttributeAction.Equals;
-                    stripWhitespace(1);
-                }
-                // Determine value
-                let value = "";
-                let ignoreCase = null;
-                if (action !== "exists") {
-                    if (isQuote(selector.charCodeAt(selectorIndex))) {
-                        const quote = selector.charCodeAt(selectorIndex);
-                        let sectionEnd = selectorIndex + 1;
-                        while (sectionEnd < selector.length &&
-                            (selector.charCodeAt(sectionEnd) !== quote ||
-                                isEscaped(sectionEnd))) {
-                            sectionEnd += 1;
-                        }
-                        if (selector.charCodeAt(sectionEnd) !== quote) {
-                            throw new Error("Attribute value didn't end");
-                        }
-                        value = unescapeCSS(selector.slice(selectorIndex + 1, sectionEnd));
-                        selectorIndex = sectionEnd + 1;
-                    }
-                    else {
-                        const valueStart = selectorIndex;
-                        while (selectorIndex < selector.length &&
-                            ((!isWhitespace$1(selector.charCodeAt(selectorIndex)) &&
-                                selector.charCodeAt(selectorIndex) !==
-                                    93 /* RightSquareBracket */) ||
-                                isEscaped(selectorIndex))) {
-                            selectorIndex += 1;
-                        }
-                        value = unescapeCSS(selector.slice(valueStart, selectorIndex));
-                    }
-                    stripWhitespace(0);
-                    // See if we have a force ignore flag
-                    const forceIgnore = selector.charCodeAt(selectorIndex) | 0x20;
-                    // If the forceIgnore flag is set (either `i` or `s`), use that value
-                    if (forceIgnore === 115 /* LowerS */) {
-                        ignoreCase = false;
-                        stripWhitespace(1);
-                    }
-                    else if (forceIgnore === 105 /* LowerI */) {
-                        ignoreCase = true;
-                        stripWhitespace(1);
-                    }
-                }
-                if (selector.charCodeAt(selectorIndex) !==
-                    93 /* RightSquareBracket */) {
-                    throw new Error("Attribute selector didn't terminate");
-                }
-                selectorIndex += 1;
-                const attributeSelector = {
-                    type: SelectorType.Attribute,
-                    name,
-                    action,
-                    value,
-                    namespace,
-                    ignoreCase,
-                };
-                tokens.push(attributeSelector);
-                break;
-            }
-            case 58 /* Colon */: {
-                if (selector.charCodeAt(selectorIndex + 1) === 58 /* Colon */) {
-                    tokens.push({
-                        type: SelectorType.PseudoElement,
-                        name: getName(2).toLowerCase(),
-                        data: selector.charCodeAt(selectorIndex) ===
-                            40 /* LeftParenthesis */
-                            ? readValueWithParenthesis()
-                            : null,
-                    });
-                    continue;
-                }
-                const name = getName(1).toLowerCase();
-                let data = null;
-                if (selector.charCodeAt(selectorIndex) ===
-                    40 /* LeftParenthesis */) {
-                    if (unpackPseudos.has(name)) {
-                        if (isQuote(selector.charCodeAt(selectorIndex + 1))) {
-                            throw new Error(`Pseudo-selector ${name} cannot be quoted`);
-                        }
-                        data = [];
-                        selectorIndex = parseSelector(data, selector, selectorIndex + 1);
-                        if (selector.charCodeAt(selectorIndex) !==
-                            41 /* RightParenthesis */) {
-                            throw new Error(`Missing closing parenthesis in :${name} (${selector})`);
-                        }
-                        selectorIndex += 1;
-                    }
-                    else {
-                        data = readValueWithParenthesis();
-                        if (stripQuotesFromPseudos.has(name)) {
-                            const quot = data.charCodeAt(0);
-                            if (quot === data.charCodeAt(data.length - 1) &&
-                                isQuote(quot)) {
-                                data = data.slice(1, -1);
-                            }
-                        }
-                        data = unescapeCSS(data);
-                    }
-                }
-                tokens.push({ type: SelectorType.Pseudo, name, data });
-                break;
-            }
-            case 44 /* Comma */: {
-                finalizeSubselector();
-                tokens = [];
-                stripWhitespace(1);
-                break;
-            }
-            default: {
-                if (selector.startsWith("/*", selectorIndex)) {
-                    const endIndex = selector.indexOf("*/", selectorIndex + 2);
-                    if (endIndex < 0) {
-                        throw new Error("Comment was not terminated");
-                    }
-                    selectorIndex = endIndex + 2;
-                    // Remove leading whitespace
-                    if (tokens.length === 0) {
-                        stripWhitespace(0);
-                    }
-                    break;
-                }
-                let namespace = null;
-                let name;
-                if (firstChar === 42 /* Asterisk */) {
-                    selectorIndex += 1;
-                    name = "*";
-                }
-                else if (firstChar === 124 /* Pipe */) {
-                    name = "";
-                    if (selector.charCodeAt(selectorIndex + 1) === 124 /* Pipe */) {
-                        addTraversal(SelectorType.ColumnCombinator);
-                        stripWhitespace(2);
-                        break;
-                    }
-                }
-                else if (reName.test(selector.slice(selectorIndex))) {
-                    name = getName(0);
-                }
-                else {
-                    break loop;
-                }
-                if (selector.charCodeAt(selectorIndex) === 124 /* Pipe */ &&
-                    selector.charCodeAt(selectorIndex + 1) !== 124 /* Pipe */) {
-                    namespace = name;
-                    if (selector.charCodeAt(selectorIndex + 1) ===
-                        42 /* Asterisk */) {
-                        name = "*";
-                        selectorIndex += 2;
-                    }
-                    else {
-                        name = getName(1);
-                    }
-                }
-                tokens.push(name === "*"
-                    ? { type: SelectorType.Universal, namespace }
-                    : { type: SelectorType.Tag, name, namespace });
-            }
-        }
-    }
-    finalizeSubselector();
-    return selectorIndex;
-}
-
-const procedure = new Map([
-    [SelectorType.Universal, 50],
-    [SelectorType.Tag, 30],
-    [SelectorType.Attribute, 1],
-    [SelectorType.Pseudo, 0],
-]);
-function isTraversal(token) {
-    return !procedure.has(token.type);
-}
-const attributes = new Map([
-    [AttributeAction.Exists, 10],
-    [AttributeAction.Equals, 8],
-    [AttributeAction.Not, 7],
-    [AttributeAction.Start, 6],
-    [AttributeAction.End, 6],
-    [AttributeAction.Any, 5],
-]);
-/**
- * Sort the parts of the passed selector,
- * as there is potential for optimization
- * (some types of selectors are faster than others)
- *
- * @param arr Selector to sort
- */
-function sortByProcedure(arr) {
-    const procs = arr.map(getProcedure);
-    for (let i = 1; i < arr.length; i++) {
-        const procNew = procs[i];
-        if (procNew < 0)
-            continue;
-        for (let j = i - 1; j >= 0 && procNew < procs[j]; j--) {
-            const token = arr[j + 1];
-            arr[j + 1] = arr[j];
-            arr[j] = token;
-            procs[j + 1] = procs[j];
-            procs[j] = procNew;
-        }
-    }
-}
-function getProcedure(token) {
-    var _a, _b;
-    let proc = (_a = procedure.get(token.type)) !== null && _a !== void 0 ? _a : -1;
-    if (token.type === SelectorType.Attribute) {
-        proc = (_b = attributes.get(token.action)) !== null && _b !== void 0 ? _b : 4;
-        if (token.action === AttributeAction.Equals && token.name === "id") {
-            // Prefer ID selectors (eg. #ID)
-            proc = 9;
-        }
-        if (token.ignoreCase) {
-            /*
-             * IgnoreCase adds some overhead, prefer "normal" token
-             * this is a binary operation, to ensure it's still an int
-             */
-            proc >>= 1;
-        }
-    }
-    else if (token.type === SelectorType.Pseudo) {
-        if (!token.data) {
-            proc = 3;
-        }
-        else if (token.name === "has" || token.name === "contains") {
-            proc = 0; // Expensive in any case
-        }
-        else if (Array.isArray(token.data)) {
-            // Eg. :matches, :not
-            proc = Math.min(...token.data.map((d) => Math.min(...d.map(getProcedure))));
-            // If we have traversals, try to avoid executing this selector
-            if (proc < 0) {
-                proc = 0;
-            }
-        }
-        else {
-            proc = 2;
-        }
-    }
-    return proc;
-}
 
 /**
  * All reserved characters in a regex, used for escaping.
@@ -8192,7 +8179,7 @@ const attributeRules = {
         const { adapter } = options;
         const { name, value } = data;
         if (/\s/.test(value)) {
-            return boolbase.falseFunc;
+            return boolbaseExports.falseFunc;
         }
         const regex = new RegExp(`(?:^|\\s)${escapeRegex(value)}(?:$|\\s)`, shouldIgnoreCase(data, options) ? "i" : "");
         return function element(elem) {
@@ -8212,7 +8199,7 @@ const attributeRules = {
         let { value } = data;
         const len = value.length;
         if (len === 0) {
-            return boolbase.falseFunc;
+            return boolbaseExports.falseFunc;
         }
         if (shouldIgnoreCase(data, options)) {
             value = value.toLowerCase();
@@ -8224,11 +8211,8 @@ const attributeRules = {
                     next(elem));
             };
         }
-        return (elem) => {
-            var _a;
-            return !!((_a = adapter.getAttributeValue(elem, name)) === null || _a === void 0 ? void 0 : _a.startsWith(value)) &&
-                next(elem);
-        };
+        return (elem) => !!adapter.getAttributeValue(elem, name)?.startsWith(value) &&
+            next(elem);
     },
     end(next, data, options) {
         const { adapter } = options;
@@ -8236,27 +8220,23 @@ const attributeRules = {
         let { value } = data;
         const len = -value.length;
         if (len === 0) {
-            return boolbase.falseFunc;
+            return boolbaseExports.falseFunc;
         }
         if (shouldIgnoreCase(data, options)) {
             value = value.toLowerCase();
-            return (elem) => {
-                var _a;
-                return ((_a = adapter
-                    .getAttributeValue(elem, name)) === null || _a === void 0 ? void 0 : _a.substr(len).toLowerCase()) === value && next(elem);
-            };
+            return (elem) => adapter
+                .getAttributeValue(elem, name)
+                ?.substr(len)
+                .toLowerCase() === value && next(elem);
         }
-        return (elem) => {
-            var _a;
-            return !!((_a = adapter.getAttributeValue(elem, name)) === null || _a === void 0 ? void 0 : _a.endsWith(value)) &&
-                next(elem);
-        };
+        return (elem) => !!adapter.getAttributeValue(elem, name)?.endsWith(value) &&
+            next(elem);
     },
     any(next, data, options) {
         const { adapter } = options;
         const { name, value } = data;
         if (value === "") {
-            return boolbase.falseFunc;
+            return boolbaseExports.falseFunc;
         }
         if (shouldIgnoreCase(data, options)) {
             const regex = new RegExp(escapeRegex(value), "i");
@@ -8268,11 +8248,8 @@ const attributeRules = {
                     next(elem));
             };
         }
-        return (elem) => {
-            var _a;
-            return !!((_a = adapter.getAttributeValue(elem, name)) === null || _a === void 0 ? void 0 : _a.includes(value)) &&
-                next(elem);
-        };
+        return (elem) => !!adapter.getAttributeValue(elem, name)?.includes(value) &&
+            next(elem);
     },
     not(next, data, options) {
         const { adapter } = options;
@@ -8281,7 +8258,7 @@ const attributeRules = {
         if (value === "") {
             return (elem) => !!adapter.getAttributeValue(elem, name) && next(elem);
         }
-        else if (shouldIgnoreCase(data, options)) {
+        if (shouldIgnoreCase(data, options)) {
             value = value.toLowerCase();
             return (elem) => {
                 const attr = adapter.getAttributeValue(elem, name);
@@ -8293,6 +8270,169 @@ const attributeRules = {
         }
         return (elem) => adapter.getAttributeValue(elem, name) !== value && next(elem);
     },
+};
+
+/**
+ * Find all elements matching the query. If not in XML mode, the query will ignore
+ * the contents of `<template>` elements.
+ *
+ * @param query - Function that returns true if the element matches the query.
+ * @param elems - Nodes to query. If a node is an element, its children will be queried.
+ * @param options - Options for querying the document.
+ * @returns All matching elements.
+ */
+function findAll(query, elems, options) {
+    const { adapter, xmlMode = false } = options;
+    const result = [];
+    /** Stack of the arrays we are looking at. */
+    const nodeStack = [elems];
+    /** Stack of the indices within the arrays. */
+    const indexStack = [0];
+    for (;;) {
+        // First, check if the current array has any more elements to look at.
+        if (indexStack[0] >= nodeStack[0].length) {
+            // If we have no more arrays to look at, we are done.
+            if (nodeStack.length === 1) {
+                return result;
+            }
+            nodeStack.shift();
+            indexStack.shift();
+            // Loop back to the start to continue with the next array.
+            continue;
+        }
+        const elem = nodeStack[0][indexStack[0]++];
+        if (!adapter.isTag(elem)) {
+            continue;
+        }
+        if (query(elem)) {
+            result.push(elem);
+        }
+        if (xmlMode || adapter.getName(elem) !== "template") {
+            /*
+             * Add the children to the stack. We are depth-first, so this is
+             * the next array we look at.
+             */
+            const children = adapter.getChildren(elem);
+            if (children.length > 0) {
+                nodeStack.unshift(children);
+                indexStack.unshift(0);
+            }
+        }
+    }
+}
+/**
+ * Find the first element matching the query. If not in XML mode, the query will ignore
+ * the contents of `<template>` elements.
+ *
+ * @param query - Function that returns true if the element matches the query.
+ * @param elems - Nodes to query. If a node is an element, its children will be queried.
+ * @param options - Options for querying the document.
+ * @returns The first matching element, or null if there was no match.
+ */
+function findOne(query, elems, options) {
+    const { adapter, xmlMode = false } = options;
+    /** Stack of the arrays we are looking at. */
+    const nodeStack = [elems];
+    /** Stack of the indices within the arrays. */
+    const indexStack = [0];
+    for (;;) {
+        // First, check if the current array has any more elements to look at.
+        if (indexStack[0] >= nodeStack[0].length) {
+            // If we have no more arrays to look at, we are done.
+            if (nodeStack.length === 1) {
+                return null;
+            }
+            nodeStack.shift();
+            indexStack.shift();
+            // Loop back to the start to continue with the next array.
+            continue;
+        }
+        const elem = nodeStack[0][indexStack[0]++];
+        if (!adapter.isTag(elem)) {
+            continue;
+        }
+        if (query(elem)) {
+            return elem;
+        }
+        if (xmlMode || adapter.getName(elem) !== "template") {
+            /*
+             * Add the children to the stack. We are depth-first, so this is
+             * the next array we look at.
+             */
+            const children = adapter.getChildren(elem);
+            if (children.length > 0) {
+                nodeStack.unshift(children);
+                indexStack.unshift(0);
+            }
+        }
+    }
+}
+function getNextSiblings(elem, adapter) {
+    const siblings = adapter.getSiblings(elem);
+    if (siblings.length <= 1) {
+        return [];
+    }
+    const elemIndex = siblings.indexOf(elem);
+    if (elemIndex < 0 || elemIndex === siblings.length - 1) {
+        return [];
+    }
+    return siblings.slice(elemIndex + 1).filter(adapter.isTag);
+}
+function getElementParent(node, adapter) {
+    const parent = adapter.getParent(node);
+    return parent != null && adapter.isTag(parent) ? parent : null;
+}
+
+/**
+ * Only text controls can be made read-only, since for other controls (such
+ * as checkboxes and buttons) there is no useful distinction between being
+ * read-only and being disabled.
+ *
+ * @see {@link https://html.spec.whatwg.org/multipage/input.html#attr-input-readonly}
+ */
+const textControl = "input:is([type=text i],[type=search i],[type=url i],[type=tel i],[type=email i],[type=password i],[type=date i],[type=month i],[type=week i],[type=time i],[type=datetime-local i],[type=number i])";
+/**
+ * Aliases are pseudos that are expressed as selectors.
+ */
+const aliases = {
+    // Links
+    "any-link": ":is(a, area, link)[href]",
+    link: ":any-link:not(:visited)",
+    // Forms
+    // https://html.spec.whatwg.org/multipage/scripting.html#disabled-elements
+    disabled: `:is(
+        :is(button, input, select, textarea, optgroup, option)[disabled],
+        optgroup[disabled] > option,
+        fieldset[disabled]:not(fieldset[disabled] legend:first-of-type *)
+    )`,
+    enabled: ":not(:disabled)",
+    checked: ":is(:is(input[type=radio], input[type=checkbox])[checked], :selected)",
+    required: ":is(input, select, textarea)[required]",
+    optional: ":is(input, select, textarea):not([required])",
+    "read-only": `[readonly]:is(textarea, ${textControl})`,
+    "read-write": `:not([readonly]):is(textarea, ${textControl})`,
+    // JQuery extensions
+    /**
+     * `:selected` matches option elements that have the `selected` attribute,
+     * or are the first option element in a select element that does not have
+     * the `multiple` attribute and does not have any option elements with the
+     * `selected` attribute.
+     *
+     * @see https://html.spec.whatwg.org/multipage/form-elements.html#concept-option-selectedness
+     */
+    selected: "option:is([selected], select:not([multiple]):not(:has(> option[selected])) > :first-of-type)",
+    checkbox: "[type=checkbox]",
+    file: "[type=file]",
+    password: "[type=password]",
+    radio: "[type=radio]",
+    reset: "[type=reset]",
+    image: "[type=image]",
+    submit: "[type=submit]",
+    parent: ":not(:empty)",
+    header: ":is(h1, h2, h3, h4, h5, h6)",
+    button: ":is(button, input[type=button])",
+    input: ":is(input, textarea, select, button)",
+    text: "input:is(:not([type!='']), [type=text])",
 };
 
 // Following http://www.w3.org/TR/css3-selectors/#nth-child-pseudo
@@ -8449,38 +8589,73 @@ function nthCheck(formula) {
     return compile(parse(formula));
 }
 
-function getChildFunc(next, adapter) {
-    return (elem) => {
-        const parent = adapter.getParent(elem);
-        return parent != null && adapter.isTag(parent) && next(elem);
+/**
+ * Some selectors such as `:contains` and (non-relative) `:has` will only be
+ * able to match elements if their parents match the selector (as they contain
+ * a subset of the elements that the parent contains).
+ *
+ * This function wraps the given `matches` function in a function that caches
+ * the results of the parent elements, so that the `matches` function only
+ * needs to be called once for each subtree.
+ */
+function cacheParentResults(next, { adapter, cacheResults }, matches) {
+    if (cacheResults === false || typeof WeakMap === "undefined") {
+        return (elem) => next(elem) && matches(elem);
+    }
+    // Use a cache to avoid re-checking children of an element.
+    // @ts-expect-error `Node` is not extending object
+    const resultCache = new WeakMap();
+    function addResultToCache(elem) {
+        const result = matches(elem);
+        resultCache.set(elem, result);
+        return result;
+    }
+    return function cachedMatcher(elem) {
+        if (!next(elem)) {
+            return false;
+        }
+        if (resultCache.has(elem)) {
+            return resultCache.get(elem);
+        }
+        // Check all of the element's parents.
+        let node = elem;
+        do {
+            const parent = getElementParent(node, adapter);
+            if (parent === null) {
+                return addResultToCache(elem);
+            }
+            node = parent;
+        } while (!resultCache.has(node));
+        return resultCache.get(node) && addResultToCache(elem);
     };
 }
+
 const filters = {
-    contains(next, text, { adapter }) {
-        return function contains(elem) {
-            return next(elem) && adapter.getText(elem).includes(text);
-        };
+    contains(next, text, options) {
+        const { getText } = options.adapter;
+        return cacheParentResults(next, options, (elem) => getText(elem).includes(text));
     },
-    icontains(next, text, { adapter }) {
+    icontains(next, text, options) {
         const itext = text.toLowerCase();
-        return function icontains(elem) {
-            return (next(elem) &&
-                adapter.getText(elem).toLowerCase().includes(itext));
-        };
+        const { getText } = options.adapter;
+        return cacheParentResults(next, options, (elem) => getText(elem).toLowerCase().includes(itext));
     },
     // Location specific methods
     "nth-child"(next, rule, { adapter, equals }) {
         const func = nthCheck(rule);
-        if (func === boolbase.falseFunc)
-            return boolbase.falseFunc;
-        if (func === boolbase.trueFunc)
-            return getChildFunc(next, adapter);
+        if (func === boolbaseExports.falseFunc) {
+            return boolbaseExports.falseFunc;
+        }
+        if (func === boolbaseExports.trueFunc) {
+            return (elem) => getElementParent(elem, adapter) !== null && next(elem);
+        }
         return function nthChild(elem) {
             const siblings = adapter.getSiblings(elem);
             let pos = 0;
             for (let i = 0; i < siblings.length; i++) {
-                if (equals(elem, siblings[i]))
+                if (equals(elem, siblings[i])) {
                     break;
+                }
                 if (adapter.isTag(siblings[i])) {
                     pos++;
                 }
@@ -8490,16 +8665,19 @@ const filters = {
     },
     "nth-last-child"(next, rule, { adapter, equals }) {
         const func = nthCheck(rule);
-        if (func === boolbase.falseFunc)
-            return boolbase.falseFunc;
-        if (func === boolbase.trueFunc)
-            return getChildFunc(next, adapter);
+        if (func === boolbaseExports.falseFunc) {
+            return boolbaseExports.falseFunc;
+        }
+        if (func === boolbaseExports.trueFunc) {
+            return (elem) => getElementParent(elem, adapter) !== null && next(elem);
+        }
         return function nthLastChild(elem) {
             const siblings = adapter.getSiblings(elem);
             let pos = 0;
             for (let i = siblings.length - 1; i >= 0; i--) {
-                if (equals(elem, siblings[i]))
+                if (equals(elem, siblings[i])) {
                     break;
+                }
                 if (adapter.isTag(siblings[i])) {
                     pos++;
                 }
@@ -8509,17 +8687,20 @@ const filters = {
     },
     "nth-of-type"(next, rule, { adapter, equals }) {
         const func = nthCheck(rule);
-        if (func === boolbase.falseFunc)
-            return boolbase.falseFunc;
-        if (func === boolbase.trueFunc)
-            return getChildFunc(next, adapter);
+        if (func === boolbaseExports.falseFunc) {
+            return boolbaseExports.falseFunc;
+        }
+        if (func === boolbaseExports.trueFunc) {
+            return (elem) => getElementParent(elem, adapter) !== null && next(elem);
+        }
         return function nthOfType(elem) {
             const siblings = adapter.getSiblings(elem);
             let pos = 0;
             for (let i = 0; i < siblings.length; i++) {
                 const currentSibling = siblings[i];
-                if (equals(elem, currentSibling))
+                if (equals(elem, currentSibling)) {
                     break;
+                }
                 if (adapter.isTag(currentSibling) &&
                     adapter.getName(currentSibling) === adapter.getName(elem)) {
                     pos++;
@@ -8530,17 +8711,20 @@ const filters = {
     },
     "nth-last-of-type"(next, rule, { adapter, equals }) {
         const func = nthCheck(rule);
-        if (func === boolbase.falseFunc)
-            return boolbase.falseFunc;
-        if (func === boolbase.trueFunc)
-            return getChildFunc(next, adapter);
+        if (func === boolbaseExports.falseFunc) {
+            return boolbaseExports.falseFunc;
+        }
+        if (func === boolbaseExports.trueFunc) {
+            return (elem) => getElementParent(elem, adapter) !== null && next(elem);
+        }
         return function nthLastOfType(elem) {
             const siblings = adapter.getSiblings(elem);
             let pos = 0;
             for (let i = siblings.length - 1; i >= 0; i--) {
                 const currentSibling = siblings[i];
-                if (equals(elem, currentSibling))
+                if (equals(elem, currentSibling)) {
                     break;
+                }
                 if (adapter.isTag(currentSibling) &&
                     adapter.getName(currentSibling) === adapter.getName(elem)) {
                     pos++;
@@ -8551,10 +8735,7 @@ const filters = {
     },
     // TODO determine the actual root element
     root(next, _rule, { adapter }) {
-        return (elem) => {
-            const parent = adapter.getParent(elem);
-            return (parent == null || !adapter.isTag(parent)) && next(elem);
-        };
+        return (elem) => getElementParent(elem, adapter) === null && next(elem);
     },
     scope(next, rule, options, context) {
         const { equals } = options;
@@ -8582,7 +8763,7 @@ function dynamicStatePseudo(name) {
     return function dynamicPseudo(next, _rule, { adapter }) {
         const func = adapter[name];
         if (typeof func !== "function") {
-            return boolbase.falseFunc;
+            return boolbaseExports.falseFunc;
         }
         return function active(elem) {
             return func(elem) && next(elem);
@@ -8590,12 +8771,25 @@ function dynamicStatePseudo(name) {
     };
 }
 
+/**
+ * CSS limits the characters considered as whitespace to space, tab & line
+ * feed. We add carriage returns as htmlparser2 doesn't normalize them to
+ * line feeds.
+ *
+ * @see {@link https://www.w3.org/TR/css-text-3/#white-space}
+ */
+const isDocumentWhiteSpace = /^[ \t\r\n]*$/;
 // While filters are precompiled, pseudos get called when they are needed
 const pseudos = {
     empty(elem, { adapter }) {
-        return !adapter.getChildren(elem).some((elem) => 
-        // FIXME: `getText` call is potentially expensive.
-        adapter.isTag(elem) || adapter.getText(elem) !== "");
+        const children = adapter.getChildren(elem);
+        return (
+        // First, make sure the tag does not have any element children.
+        children.every((elem) => !adapter.isTag(elem)) &&
+            // Then, check that the text content is only whitespace.
+            children.every((elem) => 
+            // FIXME: `getText` call is potentially expensive.
+            isDocumentWhiteSpace.test(adapter.getText(elem))));
     },
     "first-child"(elem, { adapter, equals }) {
         if (adapter.prevElementSibling) {
@@ -8609,10 +8803,12 @@ const pseudos = {
     "last-child"(elem, { adapter, equals }) {
         const siblings = adapter.getSiblings(elem);
         for (let i = siblings.length - 1; i >= 0; i--) {
-            if (equals(elem, siblings[i]))
+            if (equals(elem, siblings[i])) {
                 return true;
-            if (adapter.isTag(siblings[i]))
+            }
+            if (adapter.isTag(siblings[i])) {
                 break;
+            }
         }
         return false;
     },
@@ -8621,8 +8817,9 @@ const pseudos = {
         const elemName = adapter.getName(elem);
         for (let i = 0; i < siblings.length; i++) {
             const currentSibling = siblings[i];
-            if (equals(elem, currentSibling))
+            if (equals(elem, currentSibling)) {
                 return true;
+            }
             if (adapter.isTag(currentSibling) &&
                 adapter.getName(currentSibling) === elemName) {
                 break;
@@ -8635,8 +8832,9 @@ const pseudos = {
         const elemName = adapter.getName(elem);
         for (let i = siblings.length - 1; i >= 0; i--) {
             const currentSibling = siblings[i];
-            if (equals(elem, currentSibling))
+            if (equals(elem, currentSibling)) {
                 return true;
+            }
             if (adapter.isTag(currentSibling) &&
                 adapter.getName(currentSibling) === elemName) {
                 break;
@@ -8669,56 +8867,123 @@ function verifyPseudoArgs(func, name, subselect, argIndex) {
     }
 }
 
+function isTraversal(token) {
+    return token.type === "_flexibleDescendant" || isTraversal$1(token);
+}
 /**
- * Aliases are pseudos that are expressed as selectors.
+ * Sort the parts of the passed selector, as there is potential for
+ * optimization (some types of selectors are faster than others).
+ *
+ * @param arr Selector to sort
  */
-const aliases = {
-    // Links
-    "any-link": ":is(a, area, link)[href]",
-    link: ":any-link:not(:visited)",
-    // Forms
-    // https://html.spec.whatwg.org/multipage/scripting.html#disabled-elements
-    disabled: `:is(
-        :is(button, input, select, textarea, optgroup, option)[disabled],
-        optgroup[disabled] > option,
-        fieldset[disabled]:not(fieldset[disabled] legend:first-of-type *)
-    )`,
-    enabled: ":not(:disabled)",
-    checked: ":is(:is(input[type=radio], input[type=checkbox])[checked], option:selected)",
-    required: ":is(input, select, textarea)[required]",
-    optional: ":is(input, select, textarea):not([required])",
-    // JQuery extensions
-    // https://html.spec.whatwg.org/multipage/form-elements.html#concept-option-selectedness
-    selected: "option:is([selected], select:not([multiple]):not(:has(> option[selected])) > :first-of-type)",
-    checkbox: "[type=checkbox]",
-    file: "[type=file]",
-    password: "[type=password]",
-    radio: "[type=radio]",
-    reset: "[type=reset]",
-    image: "[type=image]",
-    submit: "[type=submit]",
-    parent: ":not(:empty)",
-    header: ":is(h1, h2, h3, h4, h5, h6)",
-    button: ":is(button, input[type=button])",
-    input: ":is(input, textarea, select, button)",
-    text: "input:is(:not([type!='']), [type=text])",
-};
+function sortRules(arr) {
+    const ratings = arr.map(getQuality);
+    for (let i = 1; i < arr.length; i++) {
+        const procNew = ratings[i];
+        if (procNew < 0) {
+            continue;
+        }
+        // Use insertion sort to move the token to the correct position.
+        for (let j = i; j > 0 && procNew < ratings[j - 1]; j--) {
+            const token = arr[j];
+            arr[j] = arr[j - 1];
+            arr[j - 1] = token;
+            ratings[j] = ratings[j - 1];
+            ratings[j - 1] = procNew;
+        }
+    }
+}
+function getAttributeQuality(token) {
+    switch (token.action) {
+        case AttributeAction.Exists: {
+            return 10;
+        }
+        case AttributeAction.Equals: {
+            // Prefer ID selectors (eg. #ID)
+            return token.name === "id" ? 9 : 8;
+        }
+        case AttributeAction.Not: {
+            return 7;
+        }
+        case AttributeAction.Start: {
+            return 6;
+        }
+        case AttributeAction.End: {
+            return 6;
+        }
+        case AttributeAction.Any: {
+            return 5;
+        }
+        case AttributeAction.Hyphen: {
+            return 4;
+        }
+        case AttributeAction.Element: {
+            return 3;
+        }
+    }
+}
+/**
+ * Determine the quality of the passed token. The higher the number, the
+ * faster the token is to execute.
+ *
+ * @param token Token to get the quality of.
+ * @returns The token's quality.
+ */
+function getQuality(token) {
+    switch (token.type) {
+        case SelectorType.Universal: {
+            return 50;
+        }
+        case SelectorType.Tag: {
+            return 30;
+        }
+        case SelectorType.Attribute: {
+            return Math.floor(getAttributeQuality(token) /
+                // `ignoreCase` adds some overhead, half the result if applicable.
+                (token.ignoreCase ? 2 : 1));
+        }
+        case SelectorType.Pseudo: {
+            return !token.data
+                ? 3
+                : token.name === "has" ||
+                    token.name === "contains" ||
+                    token.name === "icontains"
+                    ? // Expensive in any case — run as late as possible.
+                        0
+                    : Array.isArray(token.data)
+                        ? // Eg. `:is`, `:not`
+                            Math.max(
+                            // If we have traversals, try to avoid executing this selector
+                            0, Math.min(...token.data.map((d) => Math.min(...d.map(getQuality)))))
+                        : 2;
+        }
+        default: {
+            return -1;
+        }
+    }
+}
+function includesScopePseudo(t) {
+    return (t.type === SelectorType.Pseudo &&
+        (t.name === "scope" ||
+            (Array.isArray(t.data) &&
+                t.data.some((data) => data.some(includesScopePseudo)))));
+}
 
 /** Used as a placeholder for :has. Will be replaced with the actual element. */
 const PLACEHOLDER_ELEMENT = {};
-function ensureIsTag(next, adapter) {
-    if (next === boolbase.falseFunc)
-        return boolbase.falseFunc;
-    return (elem) => adapter.isTag(elem) && next(elem);
-}
-function getNextSiblings(elem, adapter) {
-    const siblings = adapter.getSiblings(elem);
-    if (siblings.length <= 1)
-        return [];
-    const elemIndex = siblings.indexOf(elem);
-    if (elemIndex < 0 || elemIndex === siblings.length - 1)
-        return [];
-    return siblings.slice(elemIndex + 1).filter(adapter.isTag);
+/**
+ * Check if the selector has any properties that rely on the current element.
+ * If not, we can cache the result of the selector.
+ *
+ * We can't cache selectors that start with a traversal (e.g. `>`, `+`, `~`),
+ * or include a `:scope`.
+ *
+ * @param selector - The selector to check.
+ * @returns Whether the selector has any properties that rely on the current element.
+ */
+function hasDependsOnCurrentElement(selector) {
+    return selector.some((sel) => sel.length > 0 &&
+        (isTraversal(sel[0]) || sel.some(includesScopePseudo)));
 }
 function copyOptions(options) {
     // Not copied: context, rootFunc
@@ -8735,10 +9000,10 @@ function copyOptions(options) {
 }
 const is = (next, token, options, context, compileToken) => {
     const func = compileToken(token, copyOptions(options), context);
-    return func === boolbase.trueFunc
+    return func === boolbaseExports.trueFunc
         ? next
-        : func === boolbase.falseFunc
-            ? boolbase.falseFunc
+        : func === boolbaseExports.falseFunc
+            ? boolbaseExports.falseFunc
             : (elem) => func(elem) && next(elem);
 };
 /*
@@ -8755,10 +9020,10 @@ const subselects = {
     where: is,
     not(next, token, options, context, compileToken) {
         const func = compileToken(token, copyOptions(options), context);
-        return func === boolbase.falseFunc
+        return func === boolbaseExports.falseFunc
             ? next
-            : func === boolbase.trueFunc
-                ? boolbase.falseFunc
+            : func === boolbaseExports.trueFunc
+                ? boolbaseExports.falseFunc
                 : (elem) => !func(elem) && next(elem);
     },
     has(next, subselect, options, _context, compileToken) {
@@ -8769,35 +9034,54 @@ const subselects = {
             ? // Used as a placeholder. Will be replaced with the actual element.
                 [PLACEHOLDER_ELEMENT]
             : undefined;
+        const skipCache = hasDependsOnCurrentElement(subselect);
         const compiled = compileToken(subselect, opts, context);
-        if (compiled === boolbase.falseFunc)
-            return boolbase.falseFunc;
-        const hasElement = ensureIsTag(compiled, adapter);
-        // If `compiled` is `trueFunc`, we can skip this.
-        if (context && compiled !== boolbase.trueFunc) {
-            /*
-             * `shouldTestNextSiblings` will only be true if the query starts with
-             * a traversal (sibling or adjacent). That means we will always have a context.
-             */
-            const { shouldTestNextSiblings = false } = compiled;
-            return (elem) => {
-                if (!next(elem))
-                    return false;
-                context[0] = elem;
-                const childs = adapter.getChildren(elem);
-                const nextElements = shouldTestNextSiblings
-                    ? [...childs, ...getNextSiblings(elem, adapter)]
-                    : childs;
-                return adapter.existsOne(hasElement, nextElements);
-            };
+        if (compiled === boolbaseExports.falseFunc) {
+            return boolbaseExports.falseFunc;
         }
-        return (elem) => next(elem) &&
-            adapter.existsOne(hasElement, adapter.getChildren(elem));
+        // If `compiled` is `trueFunc`, we can skip this.
+        if (context && compiled !== boolbaseExports.trueFunc) {
+            return skipCache
+                ? (elem) => {
+                    if (!next(elem)) {
+                        return false;
+                    }
+                    context[0] = elem;
+                    const childs = adapter.getChildren(elem);
+                    return (findOne(compiled, compiled.shouldTestNextSiblings
+                        ? [
+                            ...childs,
+                            ...getNextSiblings(elem, adapter),
+                        ]
+                        : childs, options) !== null);
+                }
+                : cacheParentResults(next, options, (elem) => {
+                    context[0] = elem;
+                    return (findOne(compiled, adapter.getChildren(elem), options) !== null);
+                });
+        }
+        const hasOne = (elem) => findOne(compiled, adapter.getChildren(elem), options) !== null;
+        return skipCache
+            ? (elem) => next(elem) && hasOne(elem)
+            : cacheParentResults(next, options, hasOne);
     },
 };
 
+/*
+ * Pseudo selectors
+ *
+ * Pseudo selectors are available in three forms:
+ *
+ * 1. Filters are called when the selector is compiled and return a function
+ *  that has to return either false, or the results of `next()`.
+ * 2. Pseudos are called on execution. They have to return a boolean.
+ * 3. Subselects work like filters, but have an embedded selector that will be run separately.
+ *
+ * Filters are great if you want to do some pre-processing, or change the call order
+ * of `next()` and your code.
+ * Pseudos should be used to implement simple checks.
+ */
 function compilePseudoSelector(next, selector, options, context, compileToken) {
-    var _a;
     const { name, data } = selector;
     if (Array.isArray(data)) {
         if (!(name in subselects)) {
@@ -8805,7 +9089,7 @@ function compilePseudoSelector(next, selector, options, context, compileToken) {
         }
         return subselects[name](next, data, options, context, compileToken);
     }
-    const userPseudo = (_a = options.pseudos) === null || _a === void 0 ? void 0 : _a[name];
+    const userPseudo = options.pseudos?.[name];
     const stringPseudo = typeof userPseudo === "string" ? userPseudo : aliases[name];
     if (typeof stringPseudo === "string") {
         if (data != null) {
@@ -8830,18 +9114,11 @@ function compilePseudoSelector(next, selector, options, context, compileToken) {
     throw new Error(`Unknown pseudo-class :${name}`);
 }
 
-function getElementParent(node, adapter) {
-    const parent = adapter.getParent(node);
-    if (parent && adapter.isTag(parent)) {
-        return parent;
-    }
-    return null;
-}
 /*
  * All available rules
  */
-function compileGeneralSelector(next, selector, options, context, compileToken) {
-    const { adapter, equals } = options;
+function compileGeneralSelector(next, selector, options, context, compileToken, hasExpensiveSubselector) {
+    const { adapter, equals, cacheResults } = options;
     switch (selector.type) {
         case SelectorType.PseudoElement: {
             throw new Error("Pseudo-elements are not supported by css-select");
@@ -8876,10 +9153,12 @@ function compileGeneralSelector(next, selector, options, context, compileToken) 
         }
         // Traversal
         case SelectorType.Descendant: {
-            if (options.cacheResults === false ||
-                typeof WeakSet === "undefined") {
+            if (!hasExpensiveSubselector ||
+                cacheResults === false ||
+                typeof WeakMap === "undefined") {
                 return function descendant(elem) {
                     let current = elem;
+                    // biome-ignore lint/suspicious/noAssignInExpressions: TODO
                     while ((current = getElementParent(current, adapter))) {
                         if (next(current)) {
                             return true;
@@ -8888,16 +9167,26 @@ function compileGeneralSelector(next, selector, options, context, compileToken) 
                     return false;
                 };
             }
-            // @ts-expect-error `ElementNode` is not extending object
-            const isFalseCache = new WeakSet();
+            const resultCache = new WeakMap();
             return function cachedDescendant(elem) {
                 let current = elem;
+                let result;
+                // biome-ignore lint/suspicious/noAssignInExpressions: TODO
                 while ((current = getElementParent(current, adapter))) {
-                    if (!isFalseCache.has(current)) {
-                        if (adapter.isTag(current) && next(current)) {
+                    const cached = resultCache.get(current);
+                    if (cached === undefined) {
+                        result ?? (result = { matches: false });
+                        result.matches = next(current);
+                        resultCache.set(current, result);
+                        if (result.matches) {
                             return true;
                         }
-                        isFalseCache.add(current);
+                    }
+                    else {
+                        if (result) {
+                            result.matches = cached.matches;
+                        }
+                        return cached.matches;
                     }
                 }
                 return false;
@@ -8908,9 +9197,11 @@ function compileGeneralSelector(next, selector, options, context, compileToken) 
             return function flexibleDescendant(elem) {
                 let current = elem;
                 do {
-                    if (next(current))
+                    if (next(current)) {
                         return true;
-                } while ((current = getElementParent(current, adapter)));
+                    }
+                    current = getElementParent(current, adapter);
+                } while (current);
                 return false;
             };
         }
@@ -8923,8 +9214,8 @@ function compileGeneralSelector(next, selector, options, context, compileToken) 
         }
         case SelectorType.Child: {
             return function child(elem) {
-                const parent = adapter.getParent(elem);
-                return parent != null && adapter.isTag(parent) && next(parent);
+                const parent = getElementParent(elem, adapter);
+                return parent !== null && next(parent);
             };
         }
         case SelectorType.Sibling: {
@@ -8932,8 +9223,9 @@ function compileGeneralSelector(next, selector, options, context, compileToken) 
                 const siblings = adapter.getSiblings(elem);
                 for (let i = 0; i < siblings.length; i++) {
                     const currentSibling = siblings[i];
-                    if (equals(elem, currentSibling))
+                    if (equals(elem, currentSibling)) {
                         break;
+                    }
                     if (adapter.isTag(currentSibling) && next(currentSibling)) {
                         return true;
                     }
@@ -8953,8 +9245,9 @@ function compileGeneralSelector(next, selector, options, context, compileToken) 
                 let lastElement;
                 for (let i = 0; i < siblings.length; i++) {
                     const currentSibling = siblings[i];
-                    if (equals(elem, currentSibling))
+                    if (equals(elem, currentSibling)) {
                         break;
+                    }
                     if (adapter.isTag(currentSibling)) {
                         lastElement = currentSibling;
                     }
@@ -8971,16 +9264,6 @@ function compileGeneralSelector(next, selector, options, context, compileToken) 
     }
 }
 
-function compileUnsafe(selector, options, context) {
-    const token = typeof selector === "string" ? parse$1(selector) : selector;
-    return compileToken(token, options, context);
-}
-function includesScopePseudo(t) {
-    return (t.type === SelectorType.Pseudo &&
-        (t.name === "scope" ||
-            (Array.isArray(t.data) &&
-                t.data.some((data) => data.some(includesScopePseudo)))));
-}
 const DESCENDANT_TOKEN = { type: SelectorType.Descendant };
 const FLEXIBLE_DESCENDANT_TOKEN = {
     type: "_flexibleDescendant",
@@ -8996,10 +9279,8 @@ const SCOPE_TOKEN = {
  */
 function absolutize(token, { adapter }, context) {
     // TODO Use better check if the context is a document
-    const hasContext = !!(context === null || context === void 0 ? void 0 : context.every((e) => {
-        const parent = adapter.isTag(e) && adapter.getParent(e);
-        return e === PLACEHOLDER_ELEMENT || (parent && adapter.isTag(parent));
-    }));
+    const hasContext = !!context?.every((e) => e === PLACEHOLDER_ELEMENT ||
+        (adapter.isTag(e) && getElementParent(e, adapter) !== null));
     for (const t of token) {
         if (t.length > 0 &&
             isTraversal(t[0]) &&
@@ -9013,10 +9294,9 @@ function absolutize(token, { adapter }, context) {
         t.unshift(SCOPE_TOKEN);
     }
 }
-function compileToken(token, options, context) {
-    var _a;
-    token.forEach(sortByProcedure);
-    context = (_a = options.context) !== null && _a !== void 0 ? _a : context;
+function compileToken(token, options, ctx) {
+    token.forEach(sortRules);
+    const { context = ctx, rootFunc = boolbaseExports.trueFunc } = options;
     const isArrayContext = Array.isArray(context);
     const finalContext = context && (Array.isArray(context) ? context : [context]);
     // Check if the selector is relative
@@ -9027,12 +9307,11 @@ function compileToken(token, options, context) {
         throw new Error("Relative selectors are not allowed when the `relativeSelector` option is disabled");
     }
     let shouldTestNextSiblings = false;
-    const query = token
-        .map((rules) => {
+    let query = boolbaseExports.falseFunc;
+    combineLoop: for (const rules of token) {
         if (rules.length >= 2) {
             const [first, second] = rules;
-            if (first.type !== SelectorType.Pseudo ||
-                first.name !== "scope") ;
+            if (first.type !== SelectorType.Pseudo || first.name !== "scope") ;
             else if (isArrayContext &&
                 second.type === SelectorType.Descendant) {
                 rules[1] = FLEXIBLE_DESCENDANT_TOKEN;
@@ -9042,28 +9321,30 @@ function compileToken(token, options, context) {
                 shouldTestNextSiblings = true;
             }
         }
-        return compileRules(rules, options, finalContext);
-    })
-        .reduce(reduceRules, boolbase.falseFunc);
+        let next = rootFunc;
+        let hasExpensiveSubselector = false;
+        for (const rule of rules) {
+            next = compileGeneralSelector(next, rule, options, finalContext, compileToken, hasExpensiveSubselector);
+            const quality = getQuality(rule);
+            if (quality === 0) {
+                hasExpensiveSubselector = true;
+            }
+            // If the sub-selector won't match any elements, skip it.
+            if (next === boolbaseExports.falseFunc) {
+                continue combineLoop;
+            }
+        }
+        // If we have a function that always returns true, we can stop here.
+        if (next === rootFunc) {
+            return rootFunc;
+        }
+        query = query === boolbaseExports.falseFunc ? next : or(query, next);
+    }
     query.shouldTestNextSiblings = shouldTestNextSiblings;
     return query;
 }
-function compileRules(rules, options, context) {
-    var _a;
-    return rules.reduce((previous, rule) => previous === boolbase.falseFunc
-        ? boolbase.falseFunc
-        : compileGeneralSelector(previous, rule, options, context, compileToken), (_a = options.rootFunc) !== null && _a !== void 0 ? _a : boolbase.trueFunc);
-}
-function reduceRules(a, b) {
-    if (b === boolbase.falseFunc || a === boolbase.trueFunc) {
-        return a;
-    }
-    if (a === boolbase.falseFunc || b === boolbase.trueFunc) {
-        return b;
-    }
-    return function combine(elem) {
-        return a(elem) || b(elem);
-    };
+function or(a, b) {
+    return (elem) => a(elem) || b(elem);
 }
 
 const defaultEquals = (a, b) => a === b;
@@ -9072,23 +9353,34 @@ const defaultOptions = {
     equals: defaultEquals,
 };
 function convertOptionFormats(options) {
-    var _a, _b, _c, _d;
     /*
      * We force one format of options to the other one.
      */
     // @ts-expect-error Default options may have incompatible `Node` / `ElementNode`.
-    const opts = options !== null && options !== void 0 ? options : defaultOptions;
+    const opts = options ?? defaultOptions;
     // @ts-expect-error Same as above.
-    (_a = opts.adapter) !== null && _a !== void 0 ? _a : (opts.adapter = DomUtils);
+    opts.adapter ?? (opts.adapter = DomUtils);
     // @ts-expect-error `equals` does not exist on `Options`
-    (_b = opts.equals) !== null && _b !== void 0 ? _b : (opts.equals = (_d = (_c = opts.adapter) === null || _c === void 0 ? void 0 : _c.equals) !== null && _d !== void 0 ? _d : defaultEquals);
+    opts.equals ?? (opts.equals = opts.adapter?.equals ?? defaultEquals);
     return opts;
+}
+/**
+ * Like `compile`, but does not add a check if elements are tags.
+ */
+function _compileUnsafe(selector, options, context) {
+    return _compileToken(typeof selector === "string" ? parse$1(selector) : selector, options, context);
+}
+/**
+ * @deprecated Use `_compileUnsafe` instead.
+ */
+function _compileToken(selector, options, context) {
+    return compileToken(selector, convertOptionFormats(options), context);
 }
 function getSelectorFunc(searchFunc) {
     return function select(query, elements, options) {
         const opts = convertOptionFormats(options);
         if (typeof query !== "function") {
-            query = compileUnsafe(query, opts, elements);
+            query = _compileUnsafe(query, opts, elements);
         }
         const filteredElements = prepareContext(elements, opts.adapter, query.shouldTestNextSiblings);
         return searchFunc(query, filteredElements, opts);
@@ -9119,28 +9411,28 @@ function appendNextSiblings(elem, adapter) {
 /**
  * @template Node The generic Node type for the DOM adapter being used.
  * @template ElementNode The Node type for elements for the DOM adapter being used.
- * @param elems Elements to query. If it is an element, its children will be queried..
+ * @param elems Elements to query. If it is an element, its children will be queried.
  * @param query can be either a CSS selector string or a compiled query function.
  * @param [options] options for querying the document.
  * @see compile for supported selector queries.
  * @returns All matching elements.
  *
  */
-const selectAll = getSelectorFunc((query, elems, options) => query === boolbase.falseFunc || !elems || elems.length === 0
+const selectAll = getSelectorFunc((query, elems, options) => query === boolbaseExports.falseFunc || !elems || elems.length === 0
     ? []
-    : options.adapter.findAll(query, elems));
+    : findAll(query, elems, options));
 /**
  * @template Node The generic Node type for the DOM adapter being used.
  * @template ElementNode The Node type for elements for the DOM adapter being used.
- * @param elems Elements to query. If it is an element, its children will be queried..
+ * @param elems Elements to query. If it is an element, its children will be queried.
  * @param query can be either a CSS selector string or a compiled query function.
  * @param [options] options for querying the document.
  * @see compile for supported selector queries.
  * @returns the first match, or null if there was no match.
  */
-const selectOne = getSelectorFunc((query, elems, options) => query === boolbase.falseFunc || !elems || elems.length === 0
+const selectOne = getSelectorFunc((query, elems, options) => query === boolbaseExports.falseFunc || !elems || elems.length === 0
     ? null
-    : options.adapter.findOne(query, elems));
+    : findOne(query, elems, options));
 
 // Generated using scripts/write-decode-map.ts
 const htmlDecodeTree = /* #__PURE__ */ new Uint16Array(
@@ -11420,6 +11712,24 @@ class Beasties {
     });
   }
   /**
+   * Write content to a file
+   */
+  writeFile(filename, data) {
+    const fs = this.fs;
+    return new Promise((resolve, reject) => {
+      const callback = (err) => {
+        if (err)
+          reject(err);
+        else resolve();
+      };
+      if (fs && fs.writeFile) {
+        fs.writeFile(filename, data, callback);
+      } else {
+        writeFile(filename, data, callback);
+      }
+    });
+  }
+  /**
    * Apply critical CSS processing to the html
    */
   async process(html) {
@@ -11838,6 +12148,8 @@ class Beasties {
         const percent2 = sheetInverse.length / before.length * 100;
         afterText = `, reducing non-inlined size ${percent2 | 0}% to ${formatSize(sheetInverse.length)}`;
       }
+      const cssFilePath = _pathModule.resolve(this.options.path, name);
+      this.writeFile(cssFilePath, sheetInverse).then(() => this.logger.info?.(`${name} was successfully updated`)).catch((err) => this.logger.error?.(err));
     }
     if (!styleInlinedCompletely) {
       style.textContent = sheet;

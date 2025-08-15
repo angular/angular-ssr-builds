@@ -360,7 +360,13 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
         const envInjector = applicationRef.injector;
         const routerIsProvided = !!envInjector.get(ActivatedRoute, null);
         const router = envInjector.get(Router);
-        const lastSuccessfulNavigation = router.lastSuccessfulNavigation;
+        // TODO(alanagius): Remove the below check when version 21.0.0-next.0 is on NPM
+        // Workaround for breaking change that landed on angular/angular main too early
+        // https://github.com/angular/angular/pull/63057
+        const lastSuccessfulNavigation = typeof router.lastSuccessfulNavigation === 'function'
+            ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                router.lastSuccessfulNavigation()
+            : router.lastSuccessfulNavigation;
         if (!routerIsProvided) {
             hasNavigationError = false;
         }

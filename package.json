@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "21.0.0-next.0+sha-0505f95",
+  "version": "21.0.0-next.0+sha-f54cdff-with-local-changes",
   "description": "Angular server side rendering utilities",
   "type": "module",
   "license": "MIT",
@@ -35,7 +35,8 @@
     "@angular/platform-browser": "20.2.0-rc.1",
     "@angular/platform-server": "20.2.0-rc.1",
     "@angular/router": "20.2.0-rc.1",
-    "@schematics/angular": "workspace:*"
+    "@schematics/angular": "workspace:*",
+    "beasties": "0.3.5"
   },
   "sideEffects": false,
   "schematics": "./schematics/collection.json",

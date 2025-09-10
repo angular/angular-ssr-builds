@@ -1,5 +1,6 @@
 import { Type, EnvironmentProviders, Provider, ApplicationRef } from '@angular/core';
 import { DefaultExport } from '@angular/router';
+import { BootstrapContext } from '@angular/platform-browser';
 import Beasties from './third_party/beasties';
 
 /**
@@ -249,20 +250,23 @@ declare function withAppShell(component: Type<unknown> | (() => Promise<Type<unk
  * when using the `bootstrapApplication` function:
  *
  * ```ts
- * import { bootstrapApplication } from '@angular/platform-browser';
+ * import { bootstrapApplication, BootstrapContext } from '@angular/platform-browser';
  * import { provideServerRendering, withRoutes, withAppShell } from '@angular/ssr';
  * import { AppComponent } from './app/app.component';
  * import { SERVER_ROUTES } from './app/app.server.routes';
  * import { AppShellComponent } from './app/app-shell.component';
  *
- * bootstrapApplication(AppComponent, {
- *   providers: [
- *      provideServerRendering(
- *         withRoutes(SERVER_ROUTES),
- *         withAppShell(AppShellComponent)
- *      )
- *   ]
- * });
+ * const bootstrap = (context: BootstrapContext) =>
+ *     bootstrapApplication(AppComponent, {
+ *       providers: [
+ *         provideServerRendering(
+ *           withRoutes(SERVER_ROUTES),
+ *           withAppShell(AppShellComponent),
+ *         ),
+ *       ],
+ *     }, context);
+ *
+ * export default bootstrap;
  * ```
  * @see {@link withRoutes} configures server-side routing
  * @see {@link withAppShell} configures the application shell
@@ -435,7 +439,7 @@ declare class RouteTree<AdditionalMetadata extends Record<string, unknown> = {}>
  * - A reference to an Angular component or module (`Type<unknown>`) that serves as the root of the application.
  * - A function that returns a `Promise<ApplicationRef>`, which resolves with the root application reference.
  */
-type AngularBootstrap = Type<unknown> | (() => Promise<ApplicationRef>);
+type AngularBootstrap = Type<unknown> | ((context: BootstrapContext) => Promise<ApplicationRef>);
 
 /**
  * Represents a server asset stored in the manifest.

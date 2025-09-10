@@ -352,7 +352,7 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
             applicationRef = moduleRef.injector.get(ApplicationRef);
         }
         else {
-            applicationRef = await bootstrap();
+            applicationRef = await bootstrap({ platformRef });
         }
         // Block until application is stable.
         await applicationRef.whenStable();
@@ -646,20 +646,23 @@ function withAppShell(component) {
  * when using the `bootstrapApplication` function:
  *
  * ```ts
- * import { bootstrapApplication } from '@angular/platform-browser';
+ * import { bootstrapApplication, BootstrapContext } from '@angular/platform-browser';
  * import { provideServerRendering, withRoutes, withAppShell } from '@angular/ssr';
  * import { AppComponent } from './app/app.component';
  * import { SERVER_ROUTES } from './app/app.server.routes';
  * import { AppShellComponent } from './app/app-shell.component';
  *
- * bootstrapApplication(AppComponent, {
- *   providers: [
- *      provideServerRendering(
- *         withRoutes(SERVER_ROUTES),
- *         withAppShell(AppShellComponent)
- *      )
- *   ]
- * });
+ * const bootstrap = (context: BootstrapContext) =>
+ *     bootstrapApplication(AppComponent, {
+ *       providers: [
+ *         provideServerRendering(
+ *           withRoutes(SERVER_ROUTES),
+ *           withAppShell(AppShellComponent),
+ *         ),
+ *       ],
+ *     }, context);
+ *
+ * export default bootstrap;
  * ```
  * @see {@link withRoutes} configures server-side routing
  * @see {@link withAppShell} configures the application shell
@@ -1244,7 +1247,7 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
             applicationRef = moduleRef.injector.get(ApplicationRef);
         }
         else {
-            applicationRef = await bootstrap();
+            applicationRef = await bootstrap({ platformRef });
         }
         const injector = applicationRef.injector;
         const router = injector.get(Router);

@@ -829,6 +829,15 @@ declare class AngularServerApp {
      */
     private handleRendering;
     /**
+     * Inlines critical CSS into the given HTML content.
+     *
+     * @param html - The HTML content to process.
+     * @param url - The URL associated with the request, for logging purposes.
+     * @param cache - A flag to indicate if the result should be cached.
+     * @returns A promise that resolves to the HTML with inlined critical CSS.
+     */
+    private inlineCriticalCss;
+    /**
      * Constructs the asset path on the server based on the provided HTTP request.
      *
      * This method processes the incoming request URL to derive a path corresponding

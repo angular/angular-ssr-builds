@@ -786,11 +786,10 @@ declare class AngularServerApp {
      */
     private readonly textDecoder;
     /**
-     * Cache for storing critical CSS for pages.
-     * Stores a maximum of MAX_INLINE_CSS_CACHE_ENTRIES entries.
+     * A cache that stores critical CSS to avoid re-processing for every request, improving performance.
+     * This cache uses a Least Recently Used (LRU) eviction policy.
      *
-     * Uses an LRU (Least Recently Used) eviction policy, meaning that when the cache is full,
-     * the least recently accessed page's critical CSS will be removed to make space for new entries.
+     * @see {@link MAX_INLINE_CSS_CACHE_ENTRIES} for the maximum number of entries this cache can hold.
      */
     private readonly criticalCssLRUCache;
     /**
@@ -812,7 +811,6 @@ declare class AngularServerApp {
      *
      * @param request - The incoming HTTP request for serving a static page.
      * @param matchedRoute - The metadata of the matched route for rendering.
-     * If not provided, the method attempts to find a matching route based on the request URL.
      * @returns A promise that resolves to a `Response` object if the prerendered page is found, or `null`.
      */
     private handleServe;
@@ -822,7 +820,6 @@ declare class AngularServerApp {
      *
      * @param request - The incoming HTTP request to be processed.
      * @param matchedRoute - The metadata of the matched route for rendering.
-     * If not provided, the method attempts to find a matching route based on the request URL.
      * @param requestContext - Optional additional context for rendering, such as request metadata.
      *
      * @returns A promise that resolves to the rendered response, or null if no matching route is found.
@@ -831,12 +828,20 @@ declare class AngularServerApp {
     /**
      * Inlines critical CSS into the given HTML content.
      *
-     * @param html - The HTML content to process.
-     * @param url - The URL associated with the request, for logging purposes.
-     * @param cache - A flag to indicate if the result should be cached.
+     * @param html The HTML content to process.
+     * @param url The URL associated with the request, for logging purposes.
      * @returns A promise that resolves to the HTML with inlined critical CSS.
      */
     private inlineCriticalCss;
+    /**
+     * Inlines critical CSS into the given HTML content.
+     * This method uses a cache to avoid reprocessing the same HTML content multiple times.
+     *
+     * @param html The HTML content to process.
+     * @param url The URL associated with the request, for logging purposes.
+     * @returns A promise that resolves to the HTML with inlined critical CSS.
+     */
+    private inlineCriticalCssWithCache;
     /**
      * Constructs the asset path on the server based on the provided HTTP request.
      *

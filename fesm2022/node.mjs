@@ -369,7 +369,7 @@ class AngularNodeAppEngine {
  *   } catch (error) {
  *     next(error);
  *   }
- * }));
+ * });
  * ```
  *
  * @example
@@ -379,8 +379,7 @@ class AngularNodeAppEngine {
  * export default createNodeRequestHandler(async (req, res) => {
  *   await app.ready();
  *   app.server.emit('request', req, res);
- *   res.send('Hello from Fastify with Node Next Handler!');
- * }));
+ * });
  * ```
  */
 function createNodeRequestHandler(handler) {

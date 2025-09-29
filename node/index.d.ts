@@ -118,7 +118,7 @@ type NodeRequestHandlerFunction = (req: IncomingMessage, res: ServerResponse, ne
  *   } catch (error) {
  *     next(error);
  *   }
- * }));
+ * });
  * ```
  *
  * @example
@@ -128,8 +128,7 @@ type NodeRequestHandlerFunction = (req: IncomingMessage, res: ServerResponse, ne
  * export default createNodeRequestHandler(async (req, res) => {
  *   await app.ready();
  *   app.server.emit('request', req, res);
- *   res.send('Hello from Fastify with Node Next Handler!');
- * }));
+ * });
  * ```
  */
 declare function createNodeRequestHandler<T extends NodeRequestHandlerFunction>(handler: T): T;

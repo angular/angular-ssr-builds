@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "21.0.0-next.5+sha-756649a",
+  "version": "21.0.0-next.5+sha-041a822",
   "description": "Angular server side rendering utilities",
   "type": "module",
   "license": "MIT",
@@ -45,17 +45,17 @@
     "url": "https://github.com/angular/angular-cli.git"
   },
   "module": "./fesm2022/ssr.mjs",
-  "typings": "./index.d.ts",
+  "typings": "./types/ssr.d.ts",
   "exports": {
     "./package.json": {
       "default": "./package.json"
     },
     ".": {
-      "types": "./index.d.ts",
+      "types": "./types/ssr.d.ts",
       "default": "./fesm2022/ssr.mjs"
     },
     "./node": {
-      "types": "./node/index.d.ts",
+      "types": "./types/node.d.ts",
       "default": "./fesm2022/node.mjs"
     }
   }

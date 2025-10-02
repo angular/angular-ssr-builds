@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "20.3.3+sha-4779fe3",
+  "version": "20.3.3+sha-92a6b2a",
   "description": "Angular server side rendering utilities",
   "type": "module",
   "license": "MIT",
@@ -29,12 +29,12 @@
   },
   "devDependencies": {
     "@angular-devkit/schematics": "workspace:*",
-    "@angular/common": "20.3.2",
-    "@angular/compiler": "20.3.2",
-    "@angular/core": "20.3.2",
-    "@angular/platform-browser": "20.3.2",
-    "@angular/platform-server": "20.3.2",
-    "@angular/router": "20.3.2",
+    "@angular/common": "20.3.3",
+    "@angular/compiler": "20.3.3",
+    "@angular/core": "20.3.3",
+    "@angular/platform-browser": "20.3.3",
+    "@angular/platform-server": "20.3.3",
+    "@angular/router": "20.3.3",
     "@schematics/angular": "workspace:*"
   },
   "sideEffects": false,

@@ -9,3 +9,4 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const schematics_1 = require("@angular-devkit/schematics");
 exports.default = (options) => (0, schematics_1.externalSchematic)('@schematics/angular', 'ssr', options);
+//# sourceMappingURL=index.js.map

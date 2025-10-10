@@ -1,7 +1,7 @@
 import { Type, EnvironmentProviders, Provider, ApplicationRef } from '@angular/core';
 import { DefaultExport } from '@angular/router';
 import { BootstrapContext } from '@angular/platform-browser';
-import Beasties from './third_party/beasties';
+import Beasties from '../third_party/beasties';
 
 /**
  * Identifies a particular kind of `ServerRenderingFeatureKind`.

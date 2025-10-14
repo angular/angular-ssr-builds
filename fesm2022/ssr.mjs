@@ -913,7 +913,11 @@ async function* handleRoute(options) {
             const routeInjector = route.providers
                 ? createEnvironmentInjector(route.providers, parentInjector.get(EnvironmentInjector), `Route: ${route.path}`)
                 : parentInjector;
-            const loadedChildRoutes = await _loadChildren(route, compiler, routeInjector).toPromise();
+            // TODO(alanagius): replace all the below when FW 21.0.0-next.7 is out.
+            const loadChildrenHelperResult = _loadChildren(route, compiler, routeInjector);
+            const loadedChildRoutes = await ('then' in loadChildrenHelperResult
+                ? loadChildrenHelperResult
+                : loadChildrenHelperResult.toPromise());
             if (loadedChildRoutes) {
                 const { routes: childRoutes, injector = routeInjector } = loadedChildRoutes;
                 yield* traverseRoutesConfig({

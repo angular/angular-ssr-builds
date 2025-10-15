@@ -287,7 +287,7 @@ function createRequestUrl(nodeRequest) {
             hostnameWithPort += `:${port}`;
         }
     }
-    return new URL(originalUrl ?? url, `${protocol}://${hostnameWithPort}`);
+    return new URL(`${protocol}://${hostnameWithPort}${originalUrl ?? url}`);
 }
 /**
  * Extracts the first value from a multi-value header string.

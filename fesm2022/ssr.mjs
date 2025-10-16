@@ -301,6 +301,28 @@ function buildPathWithParams(toPath, fromPath) {
     const resolvedParts = toPathParts.map((part, index) => toPathParts[index] === '*' ? fromPathParts[index] : part);
     return joinUrlParts(...resolvedParts);
 }
+const MATRIX_PARAMS_REGEX = /;[^/]+/g;
+/**
+ * Removes Angular matrix parameters from a given URL path.
+ *
+ * This function takes a URL path string and removes any matrix parameters.
+ * Matrix parameters are parts of a URL segment that start with a semicolon `;`.
+ *
+ * @param pathname - The URL path to remove matrix parameters from.
+ * @returns The URL path with matrix parameters removed.
+ *
+ * @example
+ * ```ts
+ * stripMatrixParams('/path;param=value'); // returns '/path'
+ * stripMatrixParams('/path;param=value/to;p=1/resource'); // returns '/path/to/resource'
+ * stripMatrixParams('/path/to/resource'); // returns '/path/to/resource'
+ * ```
+ */
+function stripMatrixParams(pathname) {
+    // Use a regular expression to remove matrix parameters.
+    // This regex finds all occurrences of a semicolon followed by any characters
+    return pathname.includes(';') ? pathname.replace(MATRIX_PARAMS_REGEX, '') : pathname;
+}
 
 /**
  * Renders an Angular application or module to an HTML string.
@@ -1550,8 +1572,10 @@ class ServerRouter {
     match(url) {
         // Strip 'index.html' from URL if present.
         // A request to `http://www.example.com/page/index.html` will render the Angular route corresponding to `http://www.example.com/page`.
-        const { pathname } = stripIndexHtmlFromURL(url);
-        return this.routeTree.match(decodeURIComponent(pathname));
+        let { pathname } = stripIndexHtmlFromURL(url);
+        pathname = stripMatrixParams(pathname);
+        pathname = decodeURIComponent(pathname);
+        return this.routeTree.match(pathname);
     }
 }
 

@@ -1,7 +1,7 @@
 import { ɵConsole as _Console, ApplicationRef, InjectionToken, provideEnvironmentInitializer, inject, makeEnvironmentProviders, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, Compiler, createEnvironmentInjector, EnvironmentInjector, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
 import { platformServer, INITIAL_CONFIG, ɵSERVER_CONTEXT as _SERVER_CONTEXT, ɵrenderInternal as _renderInternal, provideServerRendering as provideServerRendering$1 } from '@angular/platform-server';
-import { ActivatedRoute, Router, ROUTES, ɵloadChildren as _loadChildren } from '@angular/router';
-import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
+import { ActivatedRoute, Router, UrlSerializer, ROUTES, ɵloadChildren as _loadChildren } from '@angular/router';
+import { LocationStrategy, APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import Beasties from '../third_party/beasties/index.js';
 
 /**
@@ -342,12 +342,12 @@ function stripMatrixParams(pathname) {
  */
 async function renderAngular(html, bootstrap, url, platformProviders, serverContext) {
     // A request to `http://www.example.com/page/index.html` will render the Angular route corresponding to `http://www.example.com/page`.
-    const urlToRender = stripIndexHtmlFromURL(url).toString();
+    const urlToRender = stripIndexHtmlFromURL(url);
     const platformRef = platformServer([
         {
             provide: INITIAL_CONFIG,
             useValue: {
-                url: urlToRender,
+                url: urlToRender.href,
                 document: html,
             },
         },
@@ -388,12 +388,12 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
         }
         else if (lastSuccessfulNavigation?.finalUrl) {
             hasNavigationError = false;
-            const { finalUrl, initialUrl } = lastSuccessfulNavigation;
-            const finalUrlStringified = finalUrl.toString();
-            if (initialUrl.toString() !== finalUrlStringified) {
-                const baseHref = envInjector.get(APP_BASE_HREF, null, { optional: true }) ??
-                    envInjector.get(PlatformLocation).getBaseHrefFromDOM();
-                redirectTo = joinUrlParts(baseHref, finalUrlStringified);
+            const urlSerializer = envInjector.get(UrlSerializer);
+            const locationStrategy = envInjector.get(LocationStrategy);
+            const finalUrlSerialized = urlSerializer.serialize(lastSuccessfulNavigation.finalUrl);
+            const finalExternalUrl = joinUrlParts(locationStrategy.getBaseHref(), finalUrlSerialized);
+            if (urlToRender.href !== new URL(finalExternalUrl, urlToRender.origin).href) {
+                redirectTo = finalExternalUrl;
             }
         }
         return {

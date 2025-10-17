@@ -1,7 +1,7 @@
 import { ɵConsole as _Console, ApplicationRef, InjectionToken, provideEnvironmentInitializer, inject, makeEnvironmentProviders, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, Compiler, createEnvironmentInjector, EnvironmentInjector, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
 import { platformServer, INITIAL_CONFIG, ɵSERVER_CONTEXT as _SERVER_CONTEXT, ɵrenderInternal as _renderInternal, provideServerRendering as provideServerRendering$1 } from '@angular/platform-server';
-import { ActivatedRoute, Router, UrlSerializer, ROUTES, ɵloadChildren as _loadChildren } from '@angular/router';
-import { LocationStrategy, APP_BASE_HREF, PlatformLocation } from '@angular/common';
+import { ActivatedRoute, Router, ROUTES, ɵloadChildren as _loadChildren } from '@angular/router';
+import { PlatformLocation, APP_BASE_HREF } from '@angular/common';
 import Beasties from '../third_party/beasties/index.js';
 
 /**
@@ -145,6 +145,10 @@ function getAngularAppEngineManifest() {
  * stripTrailingSlash(''); // ''
  * ```
  */
+function stripTrailingSlash(url) {
+    // Check if the last character of the URL is a slash
+    return url.length > 1 && url[url.length - 1] === '/' ? url.slice(0, -1) : url;
+}
 /**
  * Removes the leading slash from a URL if it exists.
  *
@@ -386,14 +390,12 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
         if (!routerIsProvided) {
             hasNavigationError = false;
         }
-        else if (lastSuccessfulNavigation?.finalUrl) {
+        else if (lastSuccessfulNavigation) {
             hasNavigationError = false;
-            const urlSerializer = envInjector.get(UrlSerializer);
-            const locationStrategy = envInjector.get(LocationStrategy);
-            const finalUrlSerialized = urlSerializer.serialize(lastSuccessfulNavigation.finalUrl);
-            const finalExternalUrl = joinUrlParts(locationStrategy.getBaseHref(), finalUrlSerialized);
-            if (urlToRender.href !== new URL(finalExternalUrl, urlToRender.origin).href) {
-                redirectTo = finalExternalUrl;
+            const { pathname, search, hash } = envInjector.get(PlatformLocation);
+            const finalUrl = [stripTrailingSlash(pathname), search, hash].join('');
+            if (urlToRender.href !== new URL(finalUrl, urlToRender.origin).href) {
+                redirectTo = finalUrl;
             }
         }
         return {

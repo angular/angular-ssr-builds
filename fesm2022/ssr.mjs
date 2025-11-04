@@ -971,12 +971,19 @@ async function* traverseRoutesConfig(options) {
         const { matcher, path = matcher ? '**' : '' } = route;
         const currentRoutePath = joinUrlParts(parentRoute, path);
         if (matcher && serverConfigRouteTree) {
-            let foundMatch = false;
+            const matches = [];
             for (const matchedMetaData of serverConfigRouteTree.traverse()) {
-                if (!matchedMetaData.route.startsWith(currentRoutePath)) {
-                    continue;
+                if (matchedMetaData.route.startsWith(currentRoutePath)) {
+                    matches.push(matchedMetaData);
                 }
-                foundMatch = true;
+            }
+            if (!matches.length) {
+                const matchedMetaData = serverConfigRouteTree.match(currentRoutePath);
+                if (matchedMetaData) {
+                    matches.push(matchedMetaData);
+                }
+            }
+            for (const matchedMetaData of matches) {
                 matchedMetaData.presentInClientRouter = true;
                 if (matchedMetaData.renderMode === RenderMode.Prerender) {
                     yield {
@@ -997,7 +1004,7 @@ async function* traverseRoutesConfig(options) {
                     },
                 });
             }
-            if (!foundMatch) {
+            if (!matches.length) {
                 yield {
                     error: `The route '${stripLeadingSlash(currentRoutePath)}' has a defined matcher but does not ` +
                         'match any route in the server routing configuration. Please ensure this route is added to the server routing configuration.',
@@ -2600,9 +2607,9 @@ class AngularAppEngine {
      * @returns A promise that resolves to the entry point exports or `undefined` if not found.
      */
     getEntryPointExportsForUrl(url) {
-        const { basePath } = this.manifest;
+        const { basePath, supportedLocales } = this.manifest;
         if (this.supportedLocales.length === 1) {
-            return this.getEntryPointExports('');
+            return this.getEntryPointExports(supportedLocales[this.supportedLocales[0]]);
         }
         const potentialLocale = getPotentialLocaleIdFromUrl(url, basePath);
         return this.getEntryPointExports(potentialLocale) ?? this.getEntryPointExports('');

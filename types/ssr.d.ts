@@ -497,7 +497,7 @@ interface AngularAppEngineManifest {
      * - `key`: The locale identifier (e.g., 'en', 'fr').
      * - `value`: The url segment associated with that locale.
      */
-    readonly supportedLocales: Readonly<Record<string, string | undefined>>;
+    readonly supportedLocales: Readonly<Record<string, string>>;
 }
 /**
  * Manifest for a specific Angular server application, defining assets and bootstrap logic.

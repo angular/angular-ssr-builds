@@ -55,7 +55,7 @@ function getAngularAppEngineManifest() {
 }
 
 function stripTrailingSlash(url) {
-  return url.length > 1 && url[url.length - 1] === '/' ? url.slice(0, -1) : url;
+  return url.length > 1 && url.at(-1) === '/' ? url.slice(0, -1) : url;
 }
 function stripLeadingSlash(url) {
   return url.length > 1 && url[0] === '/' ? url.slice(1) : url;
@@ -64,7 +64,7 @@ function addLeadingSlash(url) {
   return url[0] === '/' ? url : `/${url}`;
 }
 function addTrailingSlash(url) {
-  return url[url.length - 1] === '/' ? url : `${url}/`;
+  return url.at(-1) === '/' ? url : `${url}/`;
 }
 function joinUrlParts(...parts) {
   const normalizeParts = [];
@@ -76,7 +76,7 @@ function joinUrlParts(...parts) {
     if (part[0] === '/') {
       normalizedPart = normalizedPart.slice(1);
     }
-    if (part[part.length - 1] === '/') {
+    if (part.at(-1) === '/') {
       normalizedPart = normalizedPart.slice(0, -1);
     }
     if (normalizedPart !== '') {

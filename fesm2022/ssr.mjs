@@ -147,16 +147,21 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
     const lastSuccessfulNavigation = router.lastSuccessfulNavigation();
     if (!routerIsProvided) {
       hasNavigationError = false;
-    } else if (lastSuccessfulNavigation) {
+    } else if (lastSuccessfulNavigation?.finalUrl) {
       hasNavigationError = false;
       const {
         pathname,
         search,
         hash
       } = envInjector.get(PlatformLocation);
-      const finalUrl = [stripTrailingSlash(pathname), search, hash].join('');
-      if (urlToRender.href !== new URL(finalUrl, urlToRender.origin).href) {
-        redirectTo = finalUrl;
+      const finalUrl = constructDecodedUrl({
+        pathname,
+        search,
+        hash
+      });
+      const urlToRenderString = constructDecodedUrl(urlToRender);
+      if (urlToRenderString !== finalUrl) {
+        redirectTo = [pathname, search, hash].join('');
       }
     }
     return {
@@ -189,6 +194,10 @@ function asyncDestroyPlatform(platformRef) {
       resolve();
     }, 0);
   });
+}
+function constructDecodedUrl(url) {
+  const joinedUrl = [stripTrailingSlash(url.pathname), url.search, url.hash].join('');
+  return decodeURIComponent(joinedUrl);
 }
 
 function promiseWithAbort(promise, signal, errorMessagePrefix) {

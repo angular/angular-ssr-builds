@@ -390,12 +390,13 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
         if (!routerIsProvided) {
             hasNavigationError = false;
         }
-        else if (lastSuccessfulNavigation) {
+        else if (lastSuccessfulNavigation?.finalUrl) {
             hasNavigationError = false;
             const { pathname, search, hash } = envInjector.get(PlatformLocation);
-            const finalUrl = [stripTrailingSlash(pathname), search, hash].join('');
-            if (urlToRender.href !== new URL(finalUrl, urlToRender.origin).href) {
-                redirectTo = finalUrl;
+            const finalUrl = constructDecodedUrl({ pathname, search, hash });
+            const urlToRenderString = constructDecodedUrl(urlToRender);
+            if (urlToRenderString !== finalUrl) {
+                redirectTo = [pathname, search, hash].join('');
             }
         }
         return {
@@ -448,6 +449,24 @@ function asyncDestroyPlatform(platformRef) {
             resolve();
         }, 0);
     });
+}
+/**
+ * Constructs a decoded URL string from its components, ensuring consistency for comparison.
+ *
+ * This function takes a URL-like object (containing `pathname`, `search`, and `hash`),
+ * strips the trailing slash from the pathname, joins the components, and then decodes
+ * the entire string. This normalization is crucial for accurately comparing URLs
+ * that might differ only in encoding or trailing slashes.
+ *
+ * @param url - An object containing the URL components:
+ *   - `pathname`: The path of the URL.
+ *   - `search`: The query string of the URL (including '?').
+ *   - `hash`: The hash fragment of the URL (including '#').
+ * @returns The constructed and decoded URL string.
+ */
+function constructDecodedUrl(url) {
+    const joinedUrl = [stripTrailingSlash(url.pathname), url.search, url.hash].join('');
+    return decodeURIComponent(joinedUrl);
 }
 
 /**

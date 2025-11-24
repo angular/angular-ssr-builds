@@ -1,7 +1,7 @@
-import { ɵConsole as _Console, ApplicationRef, InjectionToken, provideEnvironmentInitializer, inject, makeEnvironmentProviders, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, Compiler, createEnvironmentInjector, EnvironmentInjector, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
+import { ɵConsole as _Console, ApplicationRef, REQUEST, InjectionToken, provideEnvironmentInitializer, inject, makeEnvironmentProviders, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, Compiler, createEnvironmentInjector, EnvironmentInjector, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
 import { platformServer, INITIAL_CONFIG, ɵSERVER_CONTEXT as _SERVER_CONTEXT, ɵrenderInternal as _renderInternal, provideServerRendering as provideServerRendering$1 } from '@angular/platform-server';
 import { ActivatedRoute, Router, ROUTES, ɵloadChildren as _loadChildren } from '@angular/router';
-import { PlatformLocation, APP_BASE_HREF } from '@angular/common';
+import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import Beasties from '../third_party/beasties/index.js';
 
 class ServerAssets {
@@ -149,6 +149,11 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
       hasNavigationError = false;
     } else if (lastSuccessfulNavigation?.finalUrl) {
       hasNavigationError = false;
+      const requestPrefix = envInjector.get(APP_BASE_HREF, null, {
+        optional: true
+      }) ?? envInjector.get(REQUEST, null, {
+        optional: true
+      })?.headers.get('X-Forwarded-Prefix');
       const {
         pathname,
         search,
@@ -158,8 +163,8 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
         pathname,
         search,
         hash
-      });
-      const urlToRenderString = constructDecodedUrl(urlToRender);
+      }, requestPrefix);
+      const urlToRenderString = constructDecodedUrl(urlToRender, requestPrefix);
       if (urlToRenderString !== finalUrl) {
         redirectTo = [pathname, search, hash].join('');
       }
@@ -195,9 +200,20 @@ function asyncDestroyPlatform(platformRef) {
     }, 0);
   });
 }
-function constructDecodedUrl(url) {
-  const joinedUrl = [stripTrailingSlash(url.pathname), url.search, url.hash].join('');
-  return decodeURIComponent(joinedUrl);
+function constructDecodedUrl(url, prefix) {
+  const {
+    pathname,
+    hash,
+    search
+  } = url;
+  const urlParts = [];
+  if (prefix && !addTrailingSlash(pathname).startsWith(addTrailingSlash(prefix))) {
+    urlParts.push(joinUrlParts(prefix, pathname));
+  } else {
+    urlParts.push(stripTrailingSlash(pathname));
+  }
+  urlParts.push(search, hash);
+  return decodeURIComponent(urlParts.join(''));
 }
 
 function promiseWithAbort(promise, signal, errorMessagePrefix) {
@@ -1117,7 +1133,7 @@ class AngularServerApp {
       renderMode
     } = matchedRoute;
     if (redirectTo !== undefined) {
-      return createRedirectResponse(buildPathWithParams(redirectTo, url.pathname), status);
+      return createRedirectResponse(joinUrlParts(request.headers.get('X-Forwarded-Prefix') ?? '', buildPathWithParams(redirectTo, url.pathname)), status);
     }
     if (renderMode === RenderMode.Prerender) {
       const response = await this.handleServe(request, matchedRoute);

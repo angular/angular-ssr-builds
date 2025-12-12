@@ -1432,7 +1432,7 @@ function normalizeLocale(locale) {
 
 class AngularAppEngine {
   static ɵallowStaticRouteRender = false;
-  static ɵhooks = /* #__PURE__*/new Hooks();
+  static ɵhooks = new Hooks();
   manifest = getAngularAppEngineManifest();
   supportedLocales = Object.keys(this.manifest.supportedLocales);
   entryPointsCache = new Map();

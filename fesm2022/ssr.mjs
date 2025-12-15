@@ -1092,6 +1092,7 @@ class LRUCache {
   }
 }
 
+const WELL_KNOWN_NON_ANGULAR_URLS = new Set(['favicon.ico', '.well-known/appspecific/com.chrome.devtools.json']);
 const MAX_INLINE_CSS_CACHE_ENTRIES = 50;
 const SERVER_CONTEXT_VALUE = {
   [RenderMode.Prerender]: 'ssg',
@@ -1122,6 +1123,9 @@ class AngularServerApp {
   criticalCssLRUCache = new LRUCache(MAX_INLINE_CSS_CACHE_ENTRIES);
   async handle(request, requestContext) {
     const url = new URL(request.url);
+    if (WELL_KNOWN_NON_ANGULAR_URLS.has(url.pathname)) {
+      return null;
+    }
     this.router ??= await ServerRouter.from(this.manifest, url);
     const matchedRoute = this.router.match(url);
     if (!matchedRoute) {

@@ -234,6 +234,22 @@ function promiseWithAbort(promise, signal, errorMessagePrefix) {
   });
 }
 
+const VALID_REDIRECT_RESPONSE_CODES = new Set([301, 302, 303, 307, 308]);
+function isValidRedirectResponseCode(code) {
+  return VALID_REDIRECT_RESPONSE_CODES.has(code);
+}
+function createRedirectResponse(location, status = 302) {
+  if (ngDevMode && !isValidRedirectResponseCode(status)) {
+    throw new Error(`Invalid redirect status code: ${status}. ` + `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`);
+  }
+  return new Response(null, {
+    status,
+    headers: {
+      'Location': location
+    }
+  });
+}
+
 const APP_SHELL_ROUTE = 'ng-app-shell';
 var ServerRenderingFeatureKind;
 (function (ServerRenderingFeatureKind) {
@@ -387,7 +403,6 @@ class RouteTree {
 const MODULE_PRELOAD_MAX = 10;
 const CATCH_ALL_REGEXP = /\/(\*\*)$/;
 const URL_PARAMETER_REGEXP = /(?<!\\):([^/]+)/g;
-const VALID_REDIRECT_RESPONSE_CODES = new Set([301, 302, 303, 307, 308]);
 async function* handleRoute(options) {
   try {
     const {
@@ -414,7 +429,7 @@ async function* handleRoute(options) {
     if (metadata.renderMode === RenderMode.Prerender) {
       yield* handleSSGRoute(serverConfigRouteTree, typeof redirectTo === 'string' ? redirectTo : undefined, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
     } else if (redirectTo !== undefined) {
-      if (metadata.status && !VALID_REDIRECT_RESPONSE_CODES.has(metadata.status)) {
+      if (metadata.status && !isValidRedirectResponseCode(metadata.status)) {
         yield {
           error: `The '${metadata.status}' status code is not a valid redirect response code. ` + `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`
         };
@@ -1092,7 +1107,7 @@ class LRUCache {
   }
 }
 
-const WELL_KNOWN_NON_ANGULAR_URLS = new Set(['favicon.ico', '.well-known/appspecific/com.chrome.devtools.json']);
+const WELL_KNOWN_NON_ANGULAR_URLS = new Set(['/favicon.ico', '/.well-known/appspecific/com.chrome.devtools.json']);
 const MAX_INLINE_CSS_CACHE_ENTRIES = 50;
 const SERVER_CONTEXT_VALUE = {
   [RenderMode.Prerender]: 'ssg',
@@ -1251,7 +1266,7 @@ class AngularServerApp {
       return null;
     }
     if (result.redirectTo) {
-      return createRedirectResponse(result.redirectTo, status);
+      return createRedirectResponse(result.redirectTo, responseInit.status);
     }
     if (renderMode === RenderMode.Prerender) {
       const renderedHtml = await result.content();
@@ -1349,14 +1364,6 @@ function appendPreloadHintsToHtml(html, preload) {
     return html;
   }
   return [html.slice(0, bodyCloseIdx), ...preload.map(val => `<link rel="modulepreload" href="${val}">`), html.slice(bodyCloseIdx)].join('\n');
-}
-function createRedirectResponse(location, status = 302) {
-  return new Response(null, {
-    status,
-    headers: {
-      'Location': location
-    }
-  });
 }
 
 function getPotentialLocaleIdFromUrl(url, basePath) {

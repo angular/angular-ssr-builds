@@ -141,6 +141,11 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
       });
     }
     await applicationRef.whenStable();
+    if (applicationRef.destroyed) {
+      return {
+        hasNavigationError: true
+      };
+    }
     const envInjector = applicationRef.injector;
     const routerIsProvided = !!envInjector.get(ActivatedRoute, null);
     const router = envInjector.get(Router);

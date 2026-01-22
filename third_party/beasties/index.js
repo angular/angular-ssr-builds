@@ -5640,6 +5640,139 @@ function requireDist () {
 var distExports = requireDist();
 var mediaParser = /*@__PURE__*/getDefaultExportFromCjs(distExports);
 
+var safeParser$1;
+var hasRequiredSafeParser;
+
+function requireSafeParser () {
+	if (hasRequiredSafeParser) return safeParser$1;
+	hasRequiredSafeParser = 1;
+	let Comment = requireComment();
+	let Parser = requireParser();
+	let tokenizer = requireTokenize();
+
+	class SafeParser extends Parser {
+	  checkMissedSemicolon() {}
+
+	  comment(token) {
+	    let node = new Comment();
+	    this.init(node, token[2]);
+	    let pos =
+	      this.input.fromOffset(token[3]) ||
+	      this.input.fromOffset(this.input.css.length - 1);
+	    node.source.end = {
+	      column: pos.col,
+	      line: pos.line,
+	      offset: token[3] + 1
+	    };
+
+	    let text = token[1].slice(2);
+	    if (text.slice(-2) === '*/') text = text.slice(0, -2);
+
+	    if (/^\s*$/.test(text)) {
+	      node.text = '';
+	      node.raws.left = text;
+	      node.raws.right = '';
+	    } else {
+	      let match = text.match(/^(\s*)([^]*\S)(\s*)$/);
+	      node.text = match[2];
+	      node.raws.left = match[1];
+	      node.raws.right = match[3];
+	    }
+	  }
+
+	  createTokenizer() {
+	    this.tokenizer = tokenizer(this.input, { ignoreErrors: true });
+	  }
+
+	  decl(tokens) {
+	    if (tokens.length > 1 && tokens.some(i => i[0] === 'word')) {
+	      super.decl(tokens);
+	    }
+	  }
+
+	  doubleColon() {}
+
+	  endFile() {
+	    if (this.current.nodes && this.current.nodes.length) {
+	      this.current.raws.semicolon = this.semicolon;
+	    }
+	    this.current.raws.after = (this.current.raws.after || '') + this.spaces;
+
+	    while (this.current.parent) {
+	      this.current = this.current.parent;
+	      this.current.raws.after = '';
+	    }
+	    this.root.source.end = this.getPosition(this.tokenizer.position());
+	  }
+
+	  precheckMissedSemicolon(tokens) {
+	    let colon = this.colon(tokens);
+	    if (colon === false) return
+
+	    let nextStart, prevEnd;
+	    for (nextStart = colon - 1; nextStart >= 0; nextStart--) {
+	      if (tokens[nextStart][0] === 'word') break
+	    }
+	    if (nextStart === 0 || nextStart < 0) return
+
+	    for (prevEnd = nextStart - 1; prevEnd >= 0; prevEnd--) {
+	      if (tokens[prevEnd][0] !== 'space') {
+	        prevEnd += 1;
+	        break
+	      }
+	    }
+
+	    let other = tokens.slice(nextStart);
+	    let spaces = tokens.slice(prevEnd, nextStart);
+	    tokens.splice(prevEnd, tokens.length - prevEnd);
+	    this.spaces = spaces.map(i => i[1]).join('');
+
+	    this.decl(other);
+	  }
+
+	  unclosedBracket() {}
+
+	  unexpectedClose() {
+	    this.current.raws.after += '}';
+	  }
+
+	  unknownWord(tokens) {
+	    this.spaces += tokens.map(i => i[1]).join('');
+	  }
+
+	  unnamedAtrule(node) {
+	    node.name = '';
+	  }
+	}
+
+	safeParser$1 = SafeParser;
+	return safeParser$1;
+}
+
+var safeParse;
+var hasRequiredSafeParse;
+
+function requireSafeParse () {
+	if (hasRequiredSafeParse) return safeParse;
+	hasRequiredSafeParse = 1;
+	let { Input } = requirePostcss();
+
+	let SafeParser = requireSafeParser();
+
+	safeParse = function safeParse(css, opts) {
+	  let input = new Input(css, opts);
+
+	  let parser = new SafeParser(input);
+	  parser.parse();
+
+	  return parser.root
+	};
+	return safeParse;
+}
+
+var safeParseExports = requireSafeParse();
+var safeParser = /*@__PURE__*/getDefaultExportFromCjs(safeParseExports);
+
 var boolbase$1;
 var hasRequiredBoolbase;
 
@@ -7870,11 +8003,11 @@ function getAtomFeed(feedRoot) {
             if (href) {
                 entry.link = href;
             }
-            const description = fetch("summary", children) || fetch("content", children);
+            const description = fetch$1("summary", children) || fetch$1("content", children);
             if (description) {
                 entry.description = description;
             }
-            const pubDate = fetch("updated", children);
+            const pubDate = fetch$1("updated", children);
             if (pubDate) {
                 entry.pubDate = new Date(pubDate);
             }
@@ -7888,7 +8021,7 @@ function getAtomFeed(feedRoot) {
         feed.link = href;
     }
     addConditionally(feed, "description", "subtitle", childs);
-    const updated = fetch("updated", childs);
+    const updated = fetch$1("updated", childs);
     if (updated) {
         feed.updated = new Date(updated);
     }
@@ -7914,7 +8047,7 @@ function getRssFeed(feedRoot) {
             addConditionally(entry, "title", "title", children);
             addConditionally(entry, "link", "link", children);
             addConditionally(entry, "description", "description", children);
-            const pubDate = fetch("pubDate", children) || fetch("dc:date", children);
+            const pubDate = fetch$1("pubDate", children) || fetch$1("dc:date", children);
             if (pubDate)
                 entry.pubDate = new Date(pubDate);
             return entry;
@@ -7923,7 +8056,7 @@ function getRssFeed(feedRoot) {
     addConditionally(feed, "title", "title", childs);
     addConditionally(feed, "link", "link", childs);
     addConditionally(feed, "description", "description", childs);
-    const updated = fetch("lastBuildDate", childs);
+    const updated = fetch$1("lastBuildDate", childs);
     if (updated) {
         feed.updated = new Date(updated);
     }
@@ -7988,7 +8121,7 @@ function getOneElement(tagName, node) {
  * @param recurse Whether to recurse into child nodes.
  * @returns The text content of the element.
  */
-function fetch(tagName, where, recurse = false) {
+function fetch$1(tagName, where, recurse = false) {
     return textContent(getElementsByTagName(tagName, where, recurse, 1)).trim();
 }
 /**
@@ -8001,7 +8134,7 @@ function fetch(tagName, where, recurse = false) {
  * @param recurse Whether to recurse into child nodes.
  */
 function addConditionally(obj, prop, tagName, where, recurse = false) {
-    const val = fetch(tagName, where, recurse);
+    const val = fetch$1(tagName, where, recurse);
     if (val)
         obj[prop] = val;
 }
@@ -11219,7 +11352,10 @@ function parseDocument(data, options) {
 var picocolors_browserExports = /*@__PURE__*/ requirePicocolors_browser();
 var pc = /*@__PURE__*/getDefaultExportFromCjs(picocolors_browserExports);
 
-function parseStylesheet(stylesheet) {
+function parseStylesheet(stylesheet, options) {
+  if (options?.safeParser) {
+    return safeParser(stylesheet);
+  }
   return parse$2(stylesheet);
 }
 function serializeStylesheet(ast, options) {
@@ -11307,15 +11443,32 @@ function walkStyleRulesWithReverseMirror(node, node2, iterator) {
       const rule2 = rules2?.[index];
       if (hasNestedRules(rule)) {
         walkStyleRulesWithReverseMirror(rule, rule2, iterator);
+        if ("nodes" in rule && rule.nodes?.length === 0 && isRemovableIfEmpty(rule)) {
+          return false;
+        }
       }
       rule._other = rule2;
       rule.filterSelectors = filterSelectors;
       return iterator(rule) !== false;
     }
   );
+  if (node2.nodes) {
+    node2.nodes = node2.nodes.filter((rule) => {
+      if ("nodes" in rule && rule.nodes?.length === 0 && isRemovableIfEmpty(rule)) {
+        return false;
+      }
+      return true;
+    });
+  }
 }
 function hasNestedRules(rule) {
   return "nodes" in rule && !!rule.nodes?.length && (!("name" in rule) || rule.name !== "keyframes" && rule.name !== "-webkit-keyframes") && rule.nodes.some((n) => n.type === "rule" || n.type === "atrule");
+}
+function isRemovableIfEmpty(rule) {
+  if (!("name" in rule) || rule.type !== "atrule") {
+    return false;
+  }
+  return rule.name === "media" || rule.name === "supports";
 }
 function splitFilter(a, b, predicate) {
   const aOut = [];
@@ -11325,7 +11478,7 @@ function splitFilter(a, b, predicate) {
     if (predicate(item, index, a, b)) {
       aOut.push(item);
     } else {
-      bOut.push(item);
+      bOut.push(b?.[index] ?? item);
     }
   }
   return [aOut, bOut];
@@ -11740,9 +11893,21 @@ class Beasties {
     }
     if (this.options.external !== false) {
       const externalSheets = [...document.querySelectorAll('link[rel="stylesheet"]')];
-      await Promise.all(
-        externalSheets.map((link) => this.embedLinkedStylesheet(link, document))
-      );
+      const hasCustomEmbed = this.embedLinkedStylesheet !== Beasties.prototype.embedLinkedStylesheet;
+      if (hasCustomEmbed) {
+        for (const link of externalSheets) {
+          await this.embedLinkedStylesheet(link, document);
+        }
+      } else {
+        const sheets = await Promise.all(
+          externalSheets.map((link) => this.fetchStylesheet(link, document))
+        );
+        for (const sheet of sheets) {
+          if (sheet) {
+            this.embedFetchedStylesheet(sheet, document);
+          }
+        }
+      }
     }
     const styles = this.getAffectedStyleTags(document);
     for (const style of styles) {
@@ -11789,12 +11954,27 @@ class Beasties {
   async getCssAsset(href, _style) {
     const outputPath = this.options.path;
     const publicPath = this.options.publicPath;
-    let normalizedPath = href.replace(/^\//, "");
-    const pathPrefix = `${(publicPath || "").replace(/(^\/|\/$)/g, "")}/`;
-    if (normalizedPath.startsWith(pathPrefix)) {
+    let normalizedPath = href.replace(/^\/(?!\/)|[?#].*$/g, "");
+    const pathPrefix = `${(publicPath || "").replace(/(^\/(?!\/)|\/$)/g, "")}/`;
+    if (normalizedPath.startsWith(pathPrefix) && !(pathPrefix === "/" && normalizedPath.startsWith("//"))) {
       normalizedPath = normalizedPath.substring(pathPrefix.length).replace(/^\//, "");
     }
-    if (/^https?:\/\//.test(normalizedPath) || href.startsWith("//")) {
+    const isRemote = /^https?:\/\//.test(normalizedPath) || normalizedPath.startsWith("//");
+    if (isRemote) {
+      if (this.options.remote === true) {
+        try {
+          const absoluteUrl = href.startsWith("//") ? `https:${href}` : href;
+          const response = await fetch(absoluteUrl);
+          if (!response.ok) {
+            this.logger.warn?.(`Failed to fetch ${absoluteUrl} (${response.status})`);
+            return void 0;
+          }
+          return await response.text();
+        } catch (error) {
+          this.logger.warn?.(`Error fetching ${href}: ${error.message}`);
+          return void 0;
+        }
+      }
       return void 0;
     }
     const filename = _pathModule.resolve(outputPath, normalizedPath);
@@ -11834,6 +12014,7 @@ class Beasties {
         styleSheetsIncluded.push(cssFile);
         const style = document.createElement("style");
         style.$$external = true;
+        style.$$name = cssFile;
         return this.getCssAsset(cssFile, style).then((sheet) => [sheet, style]);
       })
     );
@@ -11845,19 +12026,27 @@ class Beasties {
     }
   }
   /**
-   * Inline the target stylesheet referred to by a <link rel="stylesheet"> (assuming it passes `options.filter`)
+   * Fetch CSS content for a linked stylesheet
    */
-  async embedLinkedStylesheet(link, document) {
+  async fetchStylesheet(link, document) {
     const href = link.getAttribute("href");
-    if (!href?.endsWith(".css")) {
+    const pathname = href?.split("?")[0]?.split("#")[0];
+    if (!pathname?.endsWith(".css")) {
       return void 0;
     }
     const style = document.createElement("style");
     style.$$external = true;
     const sheet = await this.getCssAsset(href, style);
     if (!sheet) {
-      return;
+      return void 0;
     }
+    return { link, href, sheet, style };
+  }
+  /**
+   * Embed a fetched stylesheet into the document
+   */
+  embedFetchedStylesheet(data, document) {
+    const { link, href, sheet, style } = data;
     style.textContent = sheet;
     style.$$name = href;
     style.$$links = [link];
@@ -11904,6 +12093,7 @@ class Beasties {
       } else if (preloadMode === "swap-high") {
         link.setAttribute("rel", "alternate stylesheet preload");
         link.setAttribute("title", "styles");
+        link.setAttribute("as", "style");
         link.setAttribute("onload", `this.title='';this.rel='stylesheet'`);
         noscriptFallback = true;
       } else if (preloadMode === "swap-low") {
@@ -11933,6 +12123,15 @@ class Beasties {
     if (updateLinkToPreload) {
       link.setAttribute("rel", "preload");
       link.setAttribute("as", "style");
+    }
+  }
+  /**
+   * Inline the target stylesheet referred to by a <link rel="stylesheet"> (assuming it passes `options.filter`)
+   */
+  async embedLinkedStylesheet(link, document) {
+    const sheet = await this.fetchStylesheet(link, document);
+    if (sheet) {
+      this.embedFetchedStylesheet(sheet, document);
     }
   }
   /**
@@ -11976,8 +12175,8 @@ class Beasties {
     const before = sheet;
     if (!sheet)
       return;
-    const ast = parseStylesheet(sheet);
-    const astInverse = options.pruneSource ? parseStylesheet(sheet) : null;
+    const ast = parseStylesheet(sheet, { safeParser: this.options.safeParser !== false });
+    const astInverse = options.pruneSource ? parseStylesheet(sheet, { safeParser: this.options.safeParser !== false }) : null;
     let criticalFonts = "";
     const failedSelectors = [];
     const criticalKeyframeNames = /* @__PURE__ */ new Set();

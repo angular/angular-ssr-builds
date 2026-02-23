@@ -1,3 +1,4 @@
+import { validateRequest, cloneRequestAndPatchHeaders } from './_validation-chunk.mjs';
 import { ɵConsole as _Console, ApplicationRef, REQUEST, InjectionToken, provideEnvironmentInitializer, inject, makeEnvironmentProviders, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, Compiler, createEnvironmentInjector, EnvironmentInjector, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
 import { platformServer, INITIAL_CONFIG, ɵSERVER_CONTEXT as _SERVER_CONTEXT, ɵrenderInternal as _renderInternal, provideServerRendering as provideServerRendering$1 } from '@angular/platform-server';
 import { ActivatedRoute, Router, ROUTES, ɵloadChildren as _loadChildren } from '@angular/router';
@@ -67,23 +68,24 @@ function addTrailingSlash(url) {
   return url.at(-1) === '/' ? url : `${url}/`;
 }
 function joinUrlParts(...parts) {
-  const normalizeParts = [];
+  const normalizedParts = [];
   for (const part of parts) {
     if (part === '') {
       continue;
     }
-    let normalizedPart = part;
-    if (part[0] === '/') {
-      normalizedPart = normalizedPart.slice(1);
+    let start = 0;
+    let end = part.length;
+    while (start < end && part[start] === '/') {
+      start++;
     }
-    if (part.at(-1) === '/') {
-      normalizedPart = normalizedPart.slice(0, -1);
+    while (end > start && part[end - 1] === '/') {
+      end--;
     }
-    if (normalizedPart !== '') {
-      normalizeParts.push(normalizedPart);
+    if (start < end) {
+      normalizedParts.push(part.slice(start, end));
     }
   }
-  return addLeadingSlash(normalizeParts.join('/'));
+  return addLeadingSlash(normalizedParts.join('/'));
 }
 function stripIndexHtmlFromURL(url) {
   if (url.pathname.endsWith('/index.html')) {
@@ -1352,6 +1354,23 @@ class AngularServerApp {
     }
     return html;
   }
+  async serveClientSidePage() {
+    const {
+      manifest: {
+        locale
+      },
+      assets
+    } = this;
+    const html = await assets.getServerAsset('index.csr.html').text();
+    return new Response(html, {
+      headers: new Headers({
+        'Content-Type': 'text/html;charset=UTF-8',
+        ...(locale !== undefined ? {
+          'Content-Language': locale
+        } : {})
+      })
+    });
+  }
 }
 let angularServerApp;
 function getOrCreateAngularServerApp(options) {
@@ -1450,12 +1469,26 @@ class AngularAppEngine {
   static ɵallowStaticRouteRender = false;
   static ɵhooks = new Hooks();
   manifest = getAngularAppEngineManifest();
+  allowedHosts;
   supportedLocales = Object.keys(this.manifest.supportedLocales);
   entryPointsCache = new Map();
+  constructor(options) {
+    this.allowedHosts = new Set([...(options?.allowedHosts ?? []), ...this.manifest.allowedHosts]);
+  }
   async handle(request, requestContext) {
-    const serverApp = await this.getAngularServerAppForRequest(request);
+    const allowedHost = this.allowedHosts;
+    try {
+      validateRequest(request, allowedHost);
+    } catch (error) {
+      return this.handleValidationError(error, request);
+    }
+    const {
+      request: securedRequest,
+      onError: onHeaderValidationError
+    } = cloneRequestAndPatchHeaders(request, allowedHost);
+    const serverApp = await this.getAngularServerAppForRequest(securedRequest);
     if (serverApp) {
-      return serverApp.handle(request, requestContext);
+      return Promise.race([onHeaderValidationError.then(error => this.handleValidationError(error, securedRequest)), serverApp.handle(securedRequest, requestContext)]);
     }
     if (this.supportedLocales.length > 1) {
       return this.redirectBasedOnAcceptLanguage(request);
@@ -1527,6 +1560,22 @@ class AngularAppEngine {
     }
     const potentialLocale = getPotentialLocaleIdFromUrl(url, basePath);
     return this.getEntryPointExports(potentialLocale) ?? this.getEntryPointExports('');
+  }
+  async handleValidationError(error, request) {
+    const isAllowedHostConfigured = this.allowedHosts.size > 0;
+    const errorMessage = error.message;
+    console.error(`ERROR: Bad Request ("${request.url}").\n` + errorMessage + (isAllowedHostConfigured ? '' : '\nFalling back to client side rendering. This will become a 400 Bad Request in a future major version.') + '\n\nFor more information, see https://angular.dev/best-practices/security#preventing-server-side-request-forgery-ssrf');
+    if (isAllowedHostConfigured) {
+      return new Response(errorMessage, {
+        status: 400,
+        statusText: 'Bad Request',
+        headers: {
+          'Content-Type': 'text/plain'
+        }
+      });
+    }
+    const serverApp = await this.getAngularServerAppForRequest(request);
+    return serverApp?.serveClientSidePage() ?? null;
   }
 }
 

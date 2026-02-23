@@ -68,23 +68,24 @@ function addTrailingSlash(url) {
   return url.at(-1) === '/' ? url : `${url}/`;
 }
 function joinUrlParts(...parts) {
-  const normalizeParts = [];
+  const normalizedParts = [];
   for (const part of parts) {
     if (part === '') {
       continue;
     }
-    let normalizedPart = part;
-    if (part[0] === '/') {
-      normalizedPart = normalizedPart.slice(1);
+    let start = 0;
+    let end = part.length;
+    while (start < end && part[start] === '/') {
+      start++;
     }
-    if (part.at(-1) === '/') {
-      normalizedPart = normalizedPart.slice(0, -1);
+    while (end > start && part[end - 1] === '/') {
+      end--;
     }
-    if (normalizedPart !== '') {
-      normalizeParts.push(normalizedPart);
+    if (start < end) {
+      normalizedParts.push(part.slice(start, end));
     }
   }
-  return addLeadingSlash(normalizeParts.join('/'));
+  return addLeadingSlash(normalizedParts.join('/'));
 }
 function stripIndexHtmlFromURL(url) {
   if (url.pathname.endsWith('/index.html')) {

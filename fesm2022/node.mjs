@@ -2,9 +2,30 @@ import { renderApplication, renderModule, ɵSERVER_CONTEXT as _SERVER_CONTEXT } 
 import * as fs from 'node:fs';
 import { dirname, join, normalize, resolve } from 'node:path';
 import { URL as URL$1, fileURLToPath } from 'node:url';
+import { a as validateUrl, g as getFirstHeaderValue } from './validation-DhKAntwS.mjs';
 import { ɵInlineCriticalCssProcessor as _InlineCriticalCssProcessor, AngularAppEngine } from '@angular/ssr';
 import { readFile } from 'node:fs/promises';
 import { argv } from 'node:process';
+
+/**
+ * Retrieves the list of allowed hosts from the environment variable `NG_ALLOWED_HOSTS`.
+ * @returns An array of allowed hosts.
+ */
+function getAllowedHostsFromEnv() {
+    const allowedHosts = [];
+    const envNgAllowedHosts = process.env['NG_ALLOWED_HOSTS'];
+    if (!envNgAllowedHosts) {
+        return allowedHosts;
+    }
+    const hosts = envNgAllowedHosts.split(',');
+    for (const host of hosts) {
+        const trimmed = host.trim();
+        if (trimmed.length > 0) {
+            allowedHosts.push(trimmed);
+        }
+    }
+    return allowedHosts;
+}
 
 class CommonEngineInlineCriticalCssProcessor {
     resourceCache = new Map();
@@ -74,14 +95,46 @@ class CommonEngine {
     templateCache = new Map();
     inlineCriticalCssProcessor = new CommonEngineInlineCriticalCssProcessor();
     pageIsSSG = new Map();
+    allowedHosts;
     constructor(options) {
         this.options = options;
+        this.allowedHosts = new Set([
+            ...getAllowedHostsFromEnv(),
+            ...(this.options?.allowedHosts ?? []),
+        ]);
     }
     /**
      * Render an HTML document for a specific URL with specified
      * render options
      */
     async render(opts) {
+        const { url } = opts;
+        if (url && URL$1.canParse(url)) {
+            const urlObj = new URL$1(url);
+            try {
+                validateUrl(urlObj, this.allowedHosts);
+            }
+            catch (error) {
+                const isAllowedHostConfigured = this.allowedHosts.size > 0;
+                // eslint-disable-next-line no-console
+                console.error(`ERROR: ${error.message}` +
+                    'Please provide a list of allowed hosts in the "allowedHosts" option in the "CommonEngine" constructor.', isAllowedHostConfigured
+                    ? ''
+                    : '\nFalling back to client side rendering. This will become a 400 Bad Request in a future major version.');
+                if (!isAllowedHostConfigured) {
+                    // Fallback to CSR to avoid a breaking change.
+                    // TODO(alanagius): Return a 400 and remove this fallback in the next major version (v22).
+                    let document = opts.document;
+                    if (!document && opts.documentFilePath) {
+                        document = opts.document ?? (await this.getDocument(opts.documentFilePath));
+                    }
+                    if (document) {
+                        return document;
+                    }
+                }
+                throw error;
+            }
+        }
         const enablePerformanceProfiler = this.options?.enablePerformanceProfiler;
         const runMethod = enablePerformanceProfiler
             ? runMethodAndMeasurePerf
@@ -257,23 +310,6 @@ function createRequestUrl(nodeRequest) {
     }
     return new URL(`${protocol}://${hostnameWithPort}${originalUrl ?? url}`);
 }
-/**
- * Extracts the first value from a multi-value header string.
- *
- * @param value - A string or an array of strings representing the header values.
- *                           If it's a string, values are expected to be comma-separated.
- * @returns The first trimmed value from the multi-value header, or `undefined` if the input is invalid or empty.
- *
- * @example
- * ```typescript
- * getFirstHeaderValue("value1, value2, value3"); // "value1"
- * getFirstHeaderValue(["value1", "value2"]); // "value1"
- * getFirstHeaderValue(undefined); // undefined
- * ```
- */
-function getFirstHeaderValue(value) {
-    return value?.toString().split(',', 1)[0]?.trim();
-}
 
 /**
  * Angular server application engine.
@@ -286,23 +322,47 @@ function getFirstHeaderValue(value) {
  * @developerPreview
  */
 class AngularNodeAppEngine {
-    angularAppEngine = new AngularAppEngine();
+    angularAppEngine;
+    /**
+     * Creates a new instance of the Angular Node.js server application engine.
+     * @param options Options for the Angular Node.js server application engine.
+     */
+    constructor(options) {
+        this.angularAppEngine = new AngularAppEngine({
+            ...options,
+            allowedHosts: [...getAllowedHostsFromEnv(), ...(options?.allowedHosts ?? [])],
+        });
+    }
     /**
      * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
      * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.
      *
-     * This method adapts Node.js's `IncomingMessage` or `Http2ServerRequest`
+     * This method adapts Node.js's `IncomingMessage`, `Http2ServerRequest` or `Request`
      * to a format compatible with the `AngularAppEngine` and delegates the handling logic to it.
      *
-     * @param request - The incoming HTTP request (`IncomingMessage` or `Http2ServerRequest`).
+     * @param request - The incoming HTTP request (`IncomingMessage`, `Http2ServerRequest` or `Request`).
      * @param requestContext - Optional context for rendering, such as metadata associated with the request.
      * @returns A promise that resolves to the resulting HTTP response object, or `null` if no matching Angular route is found.
      *
      * @remarks A request to `https://www.example.com/page/index.html` will serve or render the Angular route
      * corresponding to `https://www.example.com/page`.
+     *
+     * @remarks
+     * To prevent potential Server-Side Request Forgery (SSRF), this function verifies the hostname
+     * of the `request.url` against a list of authorized hosts.
+     * If the hostname is not recognized and `allowedHosts` is not empty, a Client-Side Rendered (CSR) version of the
+     * page is returned otherwise a 400 Bad Request is returned.
+     *
+     * Resolution:
+     * Authorize your hostname by configuring `allowedHosts` in `angular.json` in:
+     * `projects.[project-name].architect.build.options.security.allowedHosts`.
+     * Alternatively, you can define the allowed hostname via the environment variable `process.env['NG_ALLOWED_HOSTS']`
+     * or pass it directly through the configuration options of `AngularNodeAppEngine`.
+     *
+     * For more information see: https://angular.dev/best-practices/security#preventing-server-side-request-forgery-ssrf
      */
     async handle(request, requestContext) {
-        const webRequest = createWebRequestFromNodeRequest(request);
+        const webRequest = request instanceof Request ? request : createWebRequestFromNodeRequest(request);
         return this.angularAppEngine.handle(webRequest, requestContext);
     }
 }

@@ -2,9 +2,26 @@ import { renderApplication, renderModule, ɵSERVER_CONTEXT as _SERVER_CONTEXT } 
 import * as fs from 'node:fs';
 import { dirname, join, normalize, resolve } from 'node:path';
 import { URL as URL$1, fileURLToPath } from 'node:url';
+import { validateUrl, getFirstHeaderValue } from './_validation-chunk.mjs';
 import { ɵInlineCriticalCssProcessor as _InlineCriticalCssProcessor, AngularAppEngine } from '@angular/ssr';
 import { readFile } from 'node:fs/promises';
 import { argv } from 'node:process';
+
+function getAllowedHostsFromEnv() {
+  const allowedHosts = [];
+  const envNgAllowedHosts = process.env['NG_ALLOWED_HOSTS'];
+  if (!envNgAllowedHosts) {
+    return allowedHosts;
+  }
+  const hosts = envNgAllowedHosts.split(',');
+  for (const host of hosts) {
+    const trimmed = host.trim();
+    if (trimmed.length > 0) {
+      allowedHosts.push(trimmed);
+    }
+  }
+  return allowedHosts;
+}
 
 function attachNodeGlobalErrorHandlers() {
   if (typeof Zone !== 'undefined') {
@@ -82,11 +99,35 @@ class CommonEngine {
   templateCache = new Map();
   inlineCriticalCssProcessor = new CommonEngineInlineCriticalCssProcessor();
   pageIsSSG = new Map();
+  allowedHosts;
   constructor(options) {
     this.options = options;
+    this.allowedHosts = new Set([...getAllowedHostsFromEnv(), ...(this.options?.allowedHosts ?? [])]);
     attachNodeGlobalErrorHandlers();
   }
   async render(opts) {
+    const {
+      url
+    } = opts;
+    if (url && URL$1.canParse(url)) {
+      const urlObj = new URL$1(url);
+      try {
+        validateUrl(urlObj, this.allowedHosts);
+      } catch (error) {
+        const isAllowedHostConfigured = this.allowedHosts.size > 0;
+        console.error(`ERROR: ${error.message}` + 'Please provide a list of allowed hosts in the "allowedHosts" option in the "CommonEngine" constructor.', isAllowedHostConfigured ? '' : '\nFalling back to client side rendering. This will become a 400 Bad Request in a future major version.');
+        if (!isAllowedHostConfigured) {
+          let document = opts.document;
+          if (!document && opts.documentFilePath) {
+            document = opts.document ?? (await this.getDocument(opts.documentFilePath));
+          }
+          if (document) {
+            return document;
+          }
+        }
+        throw error;
+      }
+    }
     const enablePerformanceProfiler = this.options?.enablePerformanceProfiler;
     const runMethod = enablePerformanceProfiler ? runMethodAndMeasurePerf : noopRunMethodAndMeasurePerf;
     let html = await runMethod('Retrieve SSG Page', () => this.retrieveSSGPage(opts));
@@ -233,17 +274,18 @@ function createRequestUrl(nodeRequest) {
   }
   return new URL(`${protocol}://${hostnameWithPort}${originalUrl ?? url}`);
 }
-function getFirstHeaderValue(value) {
-  return value?.toString().split(',', 1)[0]?.trim();
-}
 
 class AngularNodeAppEngine {
-  angularAppEngine = new AngularAppEngine();
-  constructor() {
+  angularAppEngine;
+  constructor(options) {
+    this.angularAppEngine = new AngularAppEngine({
+      ...options,
+      allowedHosts: [...getAllowedHostsFromEnv(), ...(options?.allowedHosts ?? [])]
+    });
     attachNodeGlobalErrorHandlers();
   }
   async handle(request, requestContext) {
-    const webRequest = createWebRequestFromNodeRequest(request);
+    const webRequest = request instanceof Request ? request : createWebRequestFromNodeRequest(request);
     return this.angularAppEngine.handle(webRequest, requestContext);
   }
 }

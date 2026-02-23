@@ -2,6 +2,7 @@ import { Type, ApplicationRef, StaticProvider } from '@angular/core';
 import { BootstrapContext } from '@angular/platform-browser';
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Http2ServerRequest, Http2ServerResponse } from 'node:http2';
+import { AngularAppEngineOptions } from './_app-engine-chunk.js';
 
 interface CommonEngineOptions {
     /** A method that when invoked returns a promise that returns an `ApplicationRef` instance once resolved or an NgModule. */
@@ -10,6 +11,8 @@ interface CommonEngineOptions {
     providers?: StaticProvider[];
     /** Enable request performance profiling data collection and printing the results in the server console. */
     enablePerformanceProfiler?: boolean;
+    /** A set of hostnames that are allowed to access the server. */
+    allowedHosts?: readonly string[];
 }
 interface CommonEngineRenderOptions {
     /** A method that when invoked returns a promise that returns an `ApplicationRef` instance once resolved or an NgModule. */
@@ -38,6 +41,7 @@ declare class CommonEngine {
     private readonly templateCache;
     private readonly inlineCriticalCssProcessor;
     private readonly pageIsSSG;
+    private readonly allowedHosts;
     constructor(options?: CommonEngineOptions | undefined);
     /**
      * Render an HTML document for a specific URL with specified
@@ -52,6 +56,11 @@ declare class CommonEngine {
 }
 
 /**
+ * Options for the Angular Node.js server application engine.
+ */
+interface AngularNodeAppEngineOptions extends AngularAppEngineOptions {
+}
+/**
  * Angular server application engine.
  * Manages Angular server applications (including localized ones), handles rendering requests,
  * and optionally transforms index HTML before rendering.
@@ -61,22 +70,40 @@ declare class CommonEngine {
  */
 declare class AngularNodeAppEngine {
     private readonly angularAppEngine;
-    constructor();
+    /**
+     * Creates a new instance of the Angular Node.js server application engine.
+     * @param options Options for the Angular Node.js server application engine.
+     */
+    constructor(options?: AngularNodeAppEngineOptions);
     /**
      * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
      * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.
      *
-     * This method adapts Node.js's `IncomingMessage` or `Http2ServerRequest`
+     * This method adapts Node.js's `IncomingMessage`, `Http2ServerRequest` or `Request`
      * to a format compatible with the `AngularAppEngine` and delegates the handling logic to it.
      *
-     * @param request - The incoming HTTP request (`IncomingMessage` or `Http2ServerRequest`).
+     * @param request - The incoming HTTP request (`IncomingMessage`, `Http2ServerRequest` or `Request`).
      * @param requestContext - Optional context for rendering, such as metadata associated with the request.
      * @returns A promise that resolves to the resulting HTTP response object, or `null` if no matching Angular route is found.
      *
      * @remarks A request to `https://www.example.com/page/index.html` will serve or render the Angular route
      * corresponding to `https://www.example.com/page`.
+     *
+     * @remarks
+     * To prevent potential Server-Side Request Forgery (SSRF), this function verifies the hostname
+     * of the `request.url` against a list of authorized hosts.
+     * If the hostname is not recognized and `allowedHosts` is not empty, a Client-Side Rendered (CSR) version of the
+     * page is returned otherwise a 400 Bad Request is returned.
+     *
+     * Resolution:
+     * Authorize your hostname by configuring `allowedHosts` in `angular.json` in:
+     * `projects.[project-name].architect.build.options.security.allowedHosts`.
+     * Alternatively, you can define the allowed hostname via the environment variable `process.env['NG_ALLOWED_HOSTS']`
+     * or pass it directly through the configuration options of `AngularNodeAppEngine`.
+     *
+     * For more information see: https://angular.dev/best-practices/security#preventing-server-side-request-forgery-ssrf
      */
-    handle(request: IncomingMessage | Http2ServerRequest, requestContext?: unknown): Promise<Response | null>;
+    handle(request: IncomingMessage | Http2ServerRequest | Request, requestContext?: unknown): Promise<Response | null>;
 }
 
 /**
@@ -176,4 +203,4 @@ declare function createWebRequestFromNodeRequest(nodeRequest: IncomingMessage | 
 declare function isMainModule(url: string): boolean;
 
 export { AngularNodeAppEngine, CommonEngine, createNodeRequestHandler, createWebRequestFromNodeRequest, isMainModule, writeResponseToNodeResponse };
-export type { CommonEngineOptions, CommonEngineRenderOptions, NodeRequestHandlerFunction };
+export type { AngularNodeAppEngineOptions, CommonEngineOptions, CommonEngineRenderOptions, NodeRequestHandlerFunction };

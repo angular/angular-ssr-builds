@@ -114,17 +114,7 @@ class CommonEngine {
       try {
         validateUrl(urlObj, this.allowedHosts);
       } catch (error) {
-        const isAllowedHostConfigured = this.allowedHosts.size > 0;
-        console.error(`ERROR: ${error.message}` + 'Please provide a list of allowed hosts in the "allowedHosts" option in the "CommonEngine" constructor.', isAllowedHostConfigured ? '' : '\nFalling back to client side rendering. This will become a 400 Bad Request in a future major version.');
-        if (!isAllowedHostConfigured) {
-          let document = opts.document;
-          if (!document && opts.documentFilePath) {
-            document = opts.document ?? (await this.getDocument(opts.documentFilePath));
-          }
-          if (document) {
-            return document;
-          }
-        }
+        console.error(`ERROR: ${error.message}` + 'Please provide a list of allowed hosts in the "allowedHosts" option in the "CommonEngine" constructor.');
         throw error;
       }
     }

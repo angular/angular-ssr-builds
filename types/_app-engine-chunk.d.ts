@@ -129,8 +129,8 @@ declare class AngularAppEngine {
      * @remarks
      * To prevent potential Server-Side Request Forgery (SSRF), this function verifies the hostname
      * of the `request.url` against a list of authorized hosts.
-     * If the hostname is not recognized and `allowedHosts` is not empty, a Client-Side Rendered (CSR) version of the
-     * page is returned otherwise a 400 Bad Request is returned.
+     * If the hostname is not recognized a 400 Bad Request is returned.
+     *
      * Resolution:
      * Authorize your hostname by configuring `allowedHosts` in `angular.json` in:
      * `projects.[project-name].architect.build.options.security.allowedHosts`.
@@ -182,10 +182,9 @@ declare class AngularAppEngine {
     /**
      * Handles validation errors by logging the error and returning an appropriate response.
      *
+     * @param url - The URL of the request.
      * @param error - The validation error to handle.
-     * @param request - The HTTP request that caused the validation error.
-     * @returns A promise that resolves to a `Response` object with a 400 status code if allowed hosts are configured,
-     * or `null` if allowed hosts are not configured (in which case the request is served client-side).
+     * @returns A `Response` object with a 400 status code.
      */
     private handleValidationError;
 }

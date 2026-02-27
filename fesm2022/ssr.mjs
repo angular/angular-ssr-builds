@@ -1354,23 +1354,6 @@ class AngularServerApp {
     }
     return html;
   }
-  async serveClientSidePage() {
-    const {
-      manifest: {
-        locale
-      },
-      assets
-    } = this;
-    const html = await assets.getServerAsset('index.csr.html').text();
-    return new Response(html, {
-      headers: new Headers({
-        'Content-Type': 'text/html;charset=UTF-8',
-        ...(locale !== undefined ? {
-          'Content-Language': locale
-        } : {})
-      })
-    });
-  }
 }
 let angularServerApp;
 function getOrCreateAngularServerApp(options) {
@@ -1480,7 +1463,7 @@ class AngularAppEngine {
     try {
       validateRequest(request, allowedHost);
     } catch (error) {
-      return this.handleValidationError(error, request);
+      return this.handleValidationError(request.url, error);
     }
     const {
       request: securedRequest,
@@ -1488,7 +1471,7 @@ class AngularAppEngine {
     } = cloneRequestAndPatchHeaders(request, allowedHost);
     const serverApp = await this.getAngularServerAppForRequest(securedRequest);
     if (serverApp) {
-      return Promise.race([onHeaderValidationError.then(error => this.handleValidationError(error, securedRequest)), serverApp.handle(securedRequest, requestContext)]);
+      return Promise.race([onHeaderValidationError.then(error => this.handleValidationError(securedRequest.url, error)), serverApp.handle(securedRequest, requestContext)]);
     }
     if (this.supportedLocales.length > 1) {
       return this.redirectBasedOnAcceptLanguage(request);
@@ -1561,21 +1544,16 @@ class AngularAppEngine {
     const potentialLocale = getPotentialLocaleIdFromUrl(url, basePath);
     return this.getEntryPointExports(potentialLocale) ?? this.getEntryPointExports('');
   }
-  async handleValidationError(error, request) {
-    const isAllowedHostConfigured = this.allowedHosts.size > 0;
+  handleValidationError(url, error) {
     const errorMessage = error.message;
-    console.error(`ERROR: Bad Request ("${request.url}").\n` + errorMessage + (isAllowedHostConfigured ? '' : '\nFalling back to client side rendering. This will become a 400 Bad Request in a future major version.') + '\n\nFor more information, see https://angular.dev/best-practices/security#preventing-server-side-request-forgery-ssrf');
-    if (isAllowedHostConfigured) {
-      return new Response(errorMessage, {
-        status: 400,
-        statusText: 'Bad Request',
-        headers: {
-          'Content-Type': 'text/plain'
-        }
-      });
-    }
-    const serverApp = await this.getAngularServerAppForRequest(request);
-    return serverApp?.serveClientSidePage() ?? null;
+    console.error(`ERROR: Bad Request ("${url}").\n` + errorMessage + '\n\nFor more information, see https://angular.dev/best-practices/security#preventing-server-side-request-forgery-ssrf');
+    return new Response(errorMessage, {
+      status: 400,
+      statusText: 'Bad Request',
+      headers: {
+        'Content-Type': 'text/plain'
+      }
+    });
   }
 }
 

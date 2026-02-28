@@ -1450,6 +1450,7 @@ function normalizeLocale(locale) {
 
 class AngularAppEngine {
   static ɵallowStaticRouteRender = false;
+  static ɵdisableAllowedHostsCheck = false;
   static ɵhooks = new Hooks();
   manifest = getAngularAppEngineManifest();
   allowedHosts;
@@ -1460,18 +1461,27 @@ class AngularAppEngine {
   }
   async handle(request, requestContext) {
     const allowedHost = this.allowedHosts;
+    const disableAllowedHostsCheck = AngularAppEngine.ɵdisableAllowedHostsCheck;
     try {
-      validateRequest(request, allowedHost);
+      validateRequest(request, allowedHost, disableAllowedHostsCheck);
     } catch (error) {
       return this.handleValidationError(request.url, error);
     }
     const {
       request: securedRequest,
       onError: onHeaderValidationError
-    } = cloneRequestAndPatchHeaders(request, allowedHost);
+    } = disableAllowedHostsCheck ? {
+      request,
+      onError: null
+    } : cloneRequestAndPatchHeaders(request, allowedHost);
     const serverApp = await this.getAngularServerAppForRequest(securedRequest);
     if (serverApp) {
-      return Promise.race([onHeaderValidationError.then(error => this.handleValidationError(securedRequest.url, error)), serverApp.handle(securedRequest, requestContext)]);
+      const promises = [];
+      if (onHeaderValidationError) {
+        promises.push(onHeaderValidationError.then(error => this.handleValidationError(securedRequest.url, error)));
+      }
+      promises.push(serverApp.handle(securedRequest, requestContext));
+      return Promise.race(promises);
     }
     if (this.supportedLocales.length > 1) {
       return this.redirectBasedOnAcceptLanguage(request);

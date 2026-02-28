@@ -6,9 +6,11 @@ const INVALID_PREFIX_REGEX = /^[/\\]{2}|(?:^|[/\\])\.\.?(?:[/\\]|$)/;
 function getFirstHeaderValue(value) {
   return value?.toString().split(',', 1)[0]?.trim();
 }
-function validateRequest(request, allowedHosts) {
+function validateRequest(request, allowedHosts, disableHostCheck) {
   validateHeaders(request);
-  validateUrl(new URL(request.url), allowedHosts);
+  if (!disableHostCheck) {
+    validateUrl(new URL(request.url), allowedHosts);
+  }
 }
 function validateUrl(url, allowedHosts) {
   const {

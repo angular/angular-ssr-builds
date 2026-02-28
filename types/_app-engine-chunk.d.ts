@@ -87,6 +87,14 @@ declare class AngularAppEngine {
      */
     static ɵallowStaticRouteRender: boolean;
     /**
+     * A flag to enable or disable the allowed hosts check.
+     *
+     * Typically used during development to avoid the allowed hosts check.
+     *
+     * @private
+     */
+    static ɵdisableAllowedHostsCheck: boolean;
+    /**
      * Hooks for extending or modifying the behavior of the server application.
      * These hooks are used by the Angular CLI when running the development server and
      * provide extensibility points for the application lifecycle.

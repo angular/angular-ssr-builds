@@ -407,6 +407,10 @@ class RouteTree {
   }
 }
 
+const IS_DISCOVERING_ROUTES = new InjectionToken(typeof ngDevMode === 'undefined' || ngDevMode ? 'IS_DISCOVERING_ROUTES' : '', {
+  providedIn: 'platform',
+  factory: () => false
+});
 const MODULE_PRELOAD_MAX = 10;
 const CATCH_ALL_REGEXP = /\/(\*\*)$/;
 const URL_PARAMETER_REGEXP = /(?<!\\):([^/]+)/g;
@@ -716,6 +720,9 @@ async function getRoutesFromAngularRouterConfig(bootstrap, document, url, invoke
   }, {
     provide: _ENABLE_ROOT_COMPONENT_BOOTSTRAP,
     useValue: false
+  }, {
+    provide: IS_DISCOVERING_ROUTES,
+    useValue: true
   }]);
   try {
     let applicationRef;
@@ -1594,5 +1601,5 @@ function createRequestHandler(handler) {
   return handler;
 }
 
-export { AngularAppEngine, PrerenderFallback, RenderMode, createRequestHandler, provideServerRendering, withAppShell, withRoutes, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
+export { AngularAppEngine, IS_DISCOVERING_ROUTES, PrerenderFallback, RenderMode, createRequestHandler, provideServerRendering, withAppShell, withRoutes, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
 //# sourceMappingURL=ssr.mjs.map

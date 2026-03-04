@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "22.0.0-next.0+sha-108fe07",
+  "version": "22.0.0-next.0+sha-1d7fceb",
   "description": "Angular server side rendering utilities",
   "type": "module",
   "license": "MIT",

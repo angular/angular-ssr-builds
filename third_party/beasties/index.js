@@ -2807,7 +2807,15 @@ function requireMapGenerator () {
 	        }
 	      }
 	    } else if (this.css) {
-	      this.css = this.css.replace(/\n*\/\*#[\S\s]*?\*\/$/gm, '');
+	      let startIndex;
+	      while ((startIndex = this.css.lastIndexOf('/*#')) !== -1) {
+	        let endIndex = this.css.indexOf('*/', startIndex + 3);
+	        if (endIndex === -1) break
+	        while (startIndex > 0 && this.css[startIndex - 1] === '\n') {
+	          startIndex--;
+	        }
+	        this.css = this.css.slice(0, startIndex) + this.css.slice(endIndex + 2);
+	      }
 	    }
 	  }
 
@@ -3558,7 +3566,7 @@ function requireParser () {
 	    node.source.end.offset++;
 
 	    let text = token[1].slice(2, -2);
-	    if (/^\s*$/.test(text)) {
+	    if (!text.trim()) {
 	      node.text = '';
 	      node.raws.left = text;
 	      node.raws.right = '';
@@ -4791,10 +4799,9 @@ function requireNoWorkResult () {
 	    this._css = css;
 	    this._opts = opts;
 	    this._map = undefined;
-	    let root;
 
 	    let str = stringify;
-	    this.result = new Result(this._processor, root, this._opts);
+	    this.result = new Result(this._processor, undefined, this._opts);
 	    this.result.css = css;
 
 	    let self = this;
@@ -4804,7 +4811,7 @@ function requireNoWorkResult () {
 	      }
 	    });
 
-	    let map = new MapGenerator(str, root, this._opts, css);
+	    let map = new MapGenerator(str, undefined, this._opts, css);
 	    if (map.isMap()) {
 	      let [generatedCSS, generatedMap] = map.generate();
 	      if (generatedCSS) {
@@ -4879,7 +4886,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.6';
+	    this.version = '8.5.8';
 	    this.plugins = this.normalize(plugins);
 	  }
 

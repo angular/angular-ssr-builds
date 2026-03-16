@@ -1,4 +1,4 @@
-import { Type, EnvironmentProviders, Provider, ApplicationRef, InjectionToken } from '@angular/core';
+import { Provider, EnvironmentProviders, Type, ApplicationRef, InjectionToken } from '@angular/core';
 import { DefaultExport } from '@angular/router';
 import { BootstrapContext } from '@angular/platform-browser';
 import { Hooks } from './_app-engine-chunk.js';

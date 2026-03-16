@@ -1,8 +1,8 @@
 import { validateRequest, cloneRequestAndPatchHeaders } from './_validation-chunk.mjs';
-import { ɵConsole as _Console, ApplicationRef, REQUEST, InjectionToken, provideEnvironmentInitializer, inject, makeEnvironmentProviders, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, Compiler, createEnvironmentInjector, EnvironmentInjector, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
+import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
+import { ɵConsole as _Console, ApplicationRef, REQUEST, makeEnvironmentProviders, provideEnvironmentInitializer, inject, InjectionToken, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, Compiler, createEnvironmentInjector, EnvironmentInjector, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
 import { platformServer, INITIAL_CONFIG, ɵSERVER_CONTEXT as _SERVER_CONTEXT, ɵrenderInternal as _renderInternal, provideServerRendering as provideServerRendering$1 } from '@angular/platform-server';
 import { ActivatedRoute, Router, ROUTES, ɵloadChildren as _loadChildren } from '@angular/router';
-import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import Beasties from '../third_party/beasties/index.js';
 
 class ServerAssets {

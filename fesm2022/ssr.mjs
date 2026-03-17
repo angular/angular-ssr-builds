@@ -917,7 +917,7 @@ const URL_PARAMETER_REGEXP = /(?<!\\):([^/]+)/g;
 /**
  * An set of HTTP status codes that are considered valid for redirect responses.
  */
-const VALID_REDIRECT_RESPONSE_CODES = new Set([301, 302, 303, 307, 308]);
+const VALID_REDIRECT_RESPONSE_CODES$1 = new Set([301, 302, 303, 307, 308]);
 /**
  * Handles a single route within the route tree and yields metadata or errors.
  *
@@ -935,10 +935,10 @@ async function* handleRoute(options) {
             yield* handleSSGRoute(serverConfigRouteTree, typeof redirectTo === 'string' ? redirectTo : undefined, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
         }
         else if (redirectTo !== undefined) {
-            if (metadata.status && !VALID_REDIRECT_RESPONSE_CODES.has(metadata.status)) {
+            if (metadata.status && !VALID_REDIRECT_RESPONSE_CODES$1.has(metadata.status)) {
                 yield {
                     error: `The '${metadata.status}' status code is not a valid redirect response code. ` +
-                        `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`,
+                        `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES$1.values()].join(', ')}.`,
                 };
             }
             else if (typeof redirectTo === 'string') {
@@ -1924,6 +1924,55 @@ class LRUCache {
 }
 
 /**
+ * An set of HTTP status codes that are considered valid for redirect responses.
+ */
+const VALID_REDIRECT_RESPONSE_CODES = new Set([301, 302, 303, 307, 308]);
+/**
+ * Checks if the given HTTP status code is a valid redirect response code.
+ *
+ * @param code The HTTP status code to check.
+ * @returns `true` if the code is a valid redirect response code, `false` otherwise.
+ */
+function isValidRedirectResponseCode(code) {
+    return VALID_REDIRECT_RESPONSE_CODES.has(code);
+}
+/**
+ * Creates an HTTP redirect response with a specified location and status code.
+ *
+ * @param location - The URL to which the response should redirect.
+ * @param status - The HTTP status code for the redirection. Defaults to 302 (Found).
+ *                 See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
+ * @param headers - Additional headers to include in the response.
+ * @returns A `Response` object representing the HTTP redirect.
+ */
+function createRedirectResponse(location, status = 302, headers) {
+    if (ngDevMode && !isValidRedirectResponseCode(status)) {
+        throw new Error(`Invalid redirect status code: ${status}. ` +
+            `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`);
+    }
+    const resHeaders = new Headers(headers);
+    if (ngDevMode && resHeaders.has('location')) {
+        // eslint-disable-next-line no-console
+        console.warn(`Location header "${resHeaders.get('location')}" will ignored and set to "${location}".`);
+    }
+    // Ensure unique values for Vary header
+    const varyArray = resHeaders.get('Vary')?.split(',') ?? [];
+    const varySet = new Set(['X-Forwarded-Prefix']);
+    for (const vary of varyArray) {
+        const value = vary.trim();
+        if (value) {
+            varySet.add(value);
+        }
+    }
+    resHeaders.set('Vary', [...varySet].join(', '));
+    resHeaders.set('Location', location);
+    return new Response(null, {
+        status,
+        headers: resHeaders,
+    });
+}
+
+/**
  * Maximum number of critical CSS entries the cache can store.
  * This value determines the capacity of the LRU (Least Recently Used) cache, which stores critical CSS for pages.
  */
@@ -2029,9 +2078,9 @@ class AngularServerApp {
             // Not a known Angular route.
             return null;
         }
-        const { redirectTo, status, renderMode } = matchedRoute;
+        const { redirectTo, status, renderMode, headers } = matchedRoute;
         if (redirectTo !== undefined) {
-            return createRedirectResponse(joinUrlParts(request.headers.get('X-Forwarded-Prefix') ?? '', buildPathWithParams(redirectTo, url.pathname)), status);
+            return createRedirectResponse(joinUrlParts(request.headers.get('X-Forwarded-Prefix') ?? '', buildPathWithParams(redirectTo, url.pathname)), status, headers);
         }
         if (renderMode === RenderMode.Prerender) {
             const response = await this.handleServe(request, matchedRoute);
@@ -2138,7 +2187,7 @@ class AngularServerApp {
             return null;
         }
         if (result.redirectTo) {
-            return createRedirectResponse(result.redirectTo, status);
+            return createRedirectResponse(result.redirectTo, responseInit.status, headers);
         }
         if (renderMode === RenderMode.Prerender) {
             const renderedHtml = await result.content();
@@ -2314,22 +2363,6 @@ function appendPreloadHintsToHtml(html, preload) {
         ...preload.map((val) => `<link rel="modulepreload" href="${val}">`),
         html.slice(bodyCloseIdx),
     ].join('\n');
-}
-/**
- * Creates an HTTP redirect response with a specified location and status code.
- *
- * @param location - The URL to which the response should redirect.
- * @param status - The HTTP status code for the redirection. Defaults to 302 (Found).
- *                 See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
- * @returns A `Response` object representing the HTTP redirect.
- */
-function createRedirectResponse(location, status = 302) {
-    return new Response(null, {
-        status,
-        headers: {
-            'Location': location,
-        },
-    });
 }
 
 /**

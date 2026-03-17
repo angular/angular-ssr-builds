@@ -253,12 +253,15 @@ function createRedirectResponse(location, status = 302, headers) {
   if (ngDevMode && resHeaders.has('location')) {
     console.warn(`Location header "${resHeaders.get('location')}" will ignored and set to "${location}".`);
   }
-  let vary = resHeaders.get('Vary') ?? '';
-  if (vary) {
-    vary += ', ';
+  const varyArray = resHeaders.get('Vary')?.split(',') ?? [];
+  const varySet = new Set(['X-Forwarded-Prefix']);
+  for (const vary of varyArray) {
+    const value = vary.trim();
+    if (value) {
+      varySet.add(value);
+    }
   }
-  vary += 'X-Forwarded-Prefix';
-  resHeaders.set('Vary', vary);
+  resHeaders.set('Vary', [...varySet].join(', '));
   resHeaders.set('Location', location);
   return new Response(null, {
     status,

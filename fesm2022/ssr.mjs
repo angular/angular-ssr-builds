@@ -245,15 +245,24 @@ const VALID_REDIRECT_RESPONSE_CODES = new Set([301, 302, 303, 307, 308]);
 function isValidRedirectResponseCode(code) {
   return VALID_REDIRECT_RESPONSE_CODES.has(code);
 }
-function createRedirectResponse(location, status = 302) {
+function createRedirectResponse(location, status = 302, headers) {
   if (ngDevMode && !isValidRedirectResponseCode(status)) {
     throw new Error(`Invalid redirect status code: ${status}. ` + `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`);
   }
+  const resHeaders = new Headers(headers);
+  if (ngDevMode && resHeaders.has('location')) {
+    console.warn(`Location header "${resHeaders.get('location')}" will ignored and set to "${location}".`);
+  }
+  let vary = resHeaders.get('Vary') ?? '';
+  if (vary) {
+    vary += ', ';
+  }
+  vary += 'X-Forwarded-Prefix';
+  resHeaders.set('Vary', vary);
+  resHeaders.set('Location', location);
   return new Response(null, {
     status,
-    headers: {
-      'Location': location
-    }
+    headers: resHeaders
   });
 }
 
@@ -1163,10 +1172,11 @@ class AngularServerApp {
     const {
       redirectTo,
       status,
-      renderMode
+      renderMode,
+      headers
     } = matchedRoute;
     if (redirectTo !== undefined) {
-      return createRedirectResponse(joinUrlParts(request.headers.get('X-Forwarded-Prefix') ?? '', buildPathWithParams(redirectTo, url.pathname)), status);
+      return createRedirectResponse(joinUrlParts(request.headers.get('X-Forwarded-Prefix') ?? '', buildPathWithParams(redirectTo, url.pathname)), status, headers);
     }
     if (renderMode === RenderMode.Prerender) {
       const response = await this.handleServe(request, matchedRoute);
@@ -1280,7 +1290,7 @@ class AngularServerApp {
       return null;
     }
     if (result.redirectTo) {
-      return createRedirectResponse(result.redirectTo, responseInit.status);
+      return createRedirectResponse(result.redirectTo, responseInit.status, headers);
     }
     if (renderMode === RenderMode.Prerender) {
       const renderedHtml = await result.content();

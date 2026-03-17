@@ -2,7 +2,7 @@ const HOST_HEADERS_TO_VALIDATE = new Set(['host', 'x-forwarded-host']);
 const VALID_PORT_REGEX = /^\d+$/;
 const VALID_PROTO_REGEX = /^https?$/i;
 const VALID_HOST_REGEX = /^[a-z0-9.:-]+$/i;
-const INVALID_PREFIX_REGEX = /^[/\\]{2}|(?:^|[/\\])\.\.?(?:[/\\]|$)/;
+const INVALID_PREFIX_REGEX = /^(?:\\|\/[/\\])|(?:^|[/\\])\.\.?(?:[/\\]|$)/;
 function getFirstHeaderValue(value) {
   return value?.toString().split(',', 1)[0]?.trim();
 }
@@ -131,7 +131,7 @@ function validateHeaders(request) {
   }
   const xForwardedPrefix = getFirstHeaderValue(headers.get('x-forwarded-prefix'));
   if (xForwardedPrefix && INVALID_PREFIX_REGEX.test(xForwardedPrefix)) {
-    throw new Error('Header "x-forwarded-prefix" must not start with multiple "/" or "\\" or contain ".", ".." path segments.');
+    throw new Error('Header "x-forwarded-prefix" must not start with "\\" or multiple "/" or contain ".", ".." path segments.');
   }
 }
 

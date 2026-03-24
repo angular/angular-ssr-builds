@@ -1521,7 +1521,7 @@ class AngularAppEngine {
       return Promise.race(promises);
     }
     if (this.supportedLocales.length > 1) {
-      return this.redirectBasedOnAcceptLanguage(request);
+      return this.redirectBasedOnAcceptLanguage(securedRequest);
     }
     return null;
   }
@@ -1540,12 +1540,9 @@ class AngularAppEngine {
     if (preferredLocale) {
       const subPath = supportedLocales[preferredLocale];
       if (subPath !== undefined) {
-        return new Response(null, {
-          status: 302,
-          headers: {
-            'Location': joinUrlParts(pathname, subPath),
-            'Vary': 'Accept-Language'
-          }
+        const prefix = request.headers.get('X-Forwarded-Prefix') ?? '';
+        return createRedirectResponse(joinUrlParts(prefix, pathname, subPath), 302, {
+          'Vary': 'Accept-Language'
         });
       }
     }

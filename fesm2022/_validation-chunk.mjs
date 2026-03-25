@@ -99,7 +99,7 @@ function verifyHostAllowed(headerName, headerValue, allowedHosts) {
   }
 }
 function isHostAllowed(hostname, allowedHosts) {
-  if (allowedHosts.has(hostname)) {
+  if (allowedHosts.has('*') || allowedHosts.has(hostname)) {
     return true;
   }
   for (const allowedHost of allowedHosts) {

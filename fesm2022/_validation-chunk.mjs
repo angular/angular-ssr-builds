@@ -62,6 +62,13 @@ function cloneRequestAndPatchHeaders(request, allowedHosts) {
       }
     };
   };
+  const originalForEach = headers.forEach;
+  headers.forEach = function (callback, thisArg) {
+    originalForEach.call(headers, (value, key, parent) => {
+      validateHeader(key, value, allowedHosts, onError);
+      callback.call(thisArg, value, key, parent);
+    }, thisArg);
+  };
   headers[Symbol.iterator] = headers.entries;
   return {
     request: clonedReq,

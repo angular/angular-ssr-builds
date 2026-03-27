@@ -1,7 +1,7 @@
 const HOST_HEADERS_TO_VALIDATE = new Set(['host', 'x-forwarded-host']);
 const VALID_PORT_REGEX = /^\d+$/;
 const VALID_PROTO_REGEX = /^https?$/i;
-const VALID_HOST_REGEX = /^[a-z0-9.:-]+$/i;
+const VALID_HOST_REGEX = /^[a-z0-9_.-]+(:[0-9]+)?$/i;
 const INVALID_PREFIX_REGEX = /^(?:\\|\/[/\\])|(?:^|[/\\])\.\.?(?:[/\\]|$)/;
 function getFirstHeaderValue(value) {
   return value?.toString().split(',', 1)[0]?.trim();

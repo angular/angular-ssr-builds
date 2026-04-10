@@ -2126,7 +2126,8 @@ function requirePreviousMap () {
 	      return fromBase64(text.substr(baseUriMatch[0].length))
 	    }
 
-	    let encoding = text.match(/data:application\/json;([^,]+),/)[1];
+	    let encoding = text.slice('data:application/json;'.length);
+	    encoding = encoding.slice(0, encoding.indexOf(','));
 	    throw new Error('Unsupported source map encoding ' + encoding)
 	  }
 
@@ -2369,7 +2370,15 @@ function requireInput () {
 	      );
 	    }
 
-	    result.input = { column, endColumn, endLine, endOffset, line, offset, source: this.css };
+	    result.input = {
+	      column,
+	      endColumn,
+	      endLine,
+	      endOffset,
+	      line,
+	      offset,
+	      source: this.css
+	    };
 	    if (this.file) {
 	      if (pathToFileURL) {
 	        result.input.url = pathToFileURL(this.file).toString();
@@ -4736,7 +4745,7 @@ function requireNoWorkResult () {
 
 	let MapGenerator = requireMapGenerator();
 	let parse = requireParse();
-	const Result = requireResult();
+	let Result = requireResult();
 	let stringify = requireStringify();
 	let warnOnce = requireWarnOnce();
 
@@ -4886,7 +4895,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.8';
+	    this.version = '8.5.9';
 	    this.plugins = this.normalize(plugins);
 	  }
 
@@ -11647,23 +11656,21 @@ function validateMediaQuery(query) {
   return true;
 }
 
-let classCache = null;
-let idCache = null;
 function buildCache(container) {
-  classCache = /* @__PURE__ */ new Set();
-  idCache = /* @__PURE__ */ new Set();
+  container._classCache = /* @__PURE__ */ new Set();
+  container._idCache = /* @__PURE__ */ new Set();
   const queue = [container];
   while (queue.length) {
     const node = queue.shift();
     if (node.hasAttribute?.("class")) {
       const classList = node.getAttribute("class").trim().split(" ");
       classList.forEach((cls) => {
-        classCache.add(cls);
+        container._classCache.add(cls);
       });
     }
     if (node.hasAttribute?.("id")) {
       const id = node.getAttribute("id").trim();
-      idCache.add(id);
+      container._idCache.add(id);
     }
     if ("children" in node) {
       queue.push(...node.children.filter((child) => child.type === "tag"));
@@ -11749,10 +11756,8 @@ function extendElement(element) {
     },
     setAttribute: {
       value(name, value) {
-        if (this.attribs == null)
-          this.attribs = {};
-        if (value == null)
-          value = "";
+        this.attribs ??= {};
+        value ??= "";
         this.attribs[name] = value;
       }
     },
@@ -11870,15 +11875,16 @@ function cachedQuerySelector(sel, node) {
     selectorTokens = parseRelevantSelectors(sel);
     selectorTokensCache.set(sel, selectorTokens);
   }
-  if (selectorTokens) {
+  if (selectorTokens && node._classCache && node._idCache) {
     for (const token of selectorTokens) {
-      if (token.name === "class") {
-        return classCache.has(token.value);
+      if (token.name === "class" && !node._classCache.has(token.value)) {
+        return false;
       }
-      if (token.name === "id") {
-        return idCache.has(token.value);
+      if (token.name === "id" && !node._idCache.has(token.value)) {
+        return false;
       }
     }
+    return true;
   }
   return !!selectOne(sel, node);
 }
@@ -11888,7 +11894,7 @@ function parseRelevantSelectors(sel) {
   for (let i = 0; i < tokens.length; i++) {
     const tokenGroup = tokens[i];
     if (tokenGroup?.length !== 1) {
-      continue;
+      return null;
     }
     const token = tokenGroup[0];
     if (token?.type === "attribute" && (token.name === "class" || token.name === "id")) {
@@ -11937,6 +11943,15 @@ const removePseudoClassesAndElementsPattern = /(?<!\\)::?[a-z-]+(?:\(.+\))?/gi;
 const implicitUniversalPattern = /([>+~])\s*(?!\1)([>+~])/g;
 const emptyCombinatorPattern = /([>+~])\s*(?=\1|$)/g;
 const removeTrailingCommasPattern = /\(\s*,|,\s*\)/g;
+const LEADING_SLASH_OR_QUERY_RE = /^\/(?!\/)|[?#].*$/g;
+const PUBLIC_PATH_RE = /(^\/(?!\/)|\/$)/g;
+const REMOTE_URL_RE = /^https?:\/\//;
+const BEFORE_AFTER_PSEUDO_RE = /^::?(?:before|after)$/;
+const FONT_FAMILY_RE = /\bfont(?:-family)?\b/i;
+const BEASTIES_COMMENT_RE = /^(?<!! )beasties:(.*)/;
+const LEADING_SLASH_RE = /^\//;
+const WHITESPACE_RE = /\s+/;
+const URL_RE = /url\s*\(\s*(['"]?)(.+?)\1\s*\)/;
 class Beasties {
   #selectorCache = /* @__PURE__ */ new Map();
   options;
@@ -12062,12 +12077,12 @@ class Beasties {
   async getCssAsset(href, _style) {
     const outputPath = this.options.path;
     const publicPath = this.options.publicPath;
-    let normalizedPath = href.replace(/^\/(?!\/)|[?#].*$/g, "");
-    const pathPrefix = `${(publicPath || "").replace(/(^\/(?!\/)|\/$)/g, "")}/`;
+    let normalizedPath = href.replace(LEADING_SLASH_OR_QUERY_RE, "");
+    const pathPrefix = `${(publicPath || "").replace(PUBLIC_PATH_RE, "")}/`;
     if (normalizedPath.startsWith(pathPrefix) && !(pathPrefix === "/" && normalizedPath.startsWith("//"))) {
-      normalizedPath = normalizedPath.substring(pathPrefix.length).replace(/^\//, "");
+      normalizedPath = normalizedPath.substring(pathPrefix.length).replace(LEADING_SLASH_RE, "");
     }
-    const isRemote = /^https?:\/\//.test(normalizedPath) || normalizedPath.startsWith("//");
+    const isRemote = REMOTE_URL_RE.test(normalizedPath) || normalizedPath.startsWith("//");
     if (isRemote) {
       if (this.options.remote === true) {
         try {
@@ -12271,7 +12286,7 @@ class Beasties {
   processStyle(style, document) {
     if (style.$$reduce === false)
       return;
-    const name = style.$$name ? style.$$name.replace(/^\//, "") : "inline CSS";
+    const name = style.$$name ? style.$$name.replace(LEADING_SLASH_RE, "") : "inline CSS";
     const options = this.options;
     const beastiesContainer = document.beastiesContainer;
     let keyframesMode = options.keyframes ?? "critical";
@@ -12298,7 +12313,7 @@ class Beasties {
       ast,
       markOnly((rule) => {
         if (rule.type === "comment") {
-          const beastiesComment = rule.text.match(/^(?<!! )beasties:(.*)/);
+          const beastiesComment = rule.text.match(BEASTIES_COMMENT_RE);
           const command = beastiesComment && beastiesComment[1];
           if (command) {
             switch (command) {
@@ -12347,7 +12362,7 @@ class Beasties {
             });
             if (isAllowedRule)
               return true;
-            if (sel === ":root" || sel === "html" || sel === "body" || sel[0] === ":" && /^::?(?:before|after)$/.test(sel)) {
+            if (sel === ":root" || sel === "html" || sel === "body" || sel[0] === ":" && BEFORE_AFTER_PSEUDO_RE.test(sel)) {
               return true;
             }
             sel = this.normalizeCssSelector(sel);
@@ -12368,11 +12383,11 @@ class Beasties {
               if (!("prop" in decl)) {
                 continue;
               }
-              if (shouldInlineFonts && /\bfont(?:-family)?\b/i.test(decl.prop)) {
+              if (shouldInlineFonts && FONT_FAMILY_RE.test(decl.prop)) {
                 criticalFonts += ` ${decl.value}`;
               }
               if (decl.prop === "animation" || decl.prop === "animation-name") {
-                for (const name2 of decl.value.split(/\s+/)) {
+                for (const name2 of decl.value.split(WHITESPACE_RE)) {
                   const nameTrimmed = name2.trim();
                   if (nameTrimmed)
                     criticalKeyframeNames.add(nameTrimmed);
@@ -12415,7 +12430,7 @@ class Beasties {
               continue;
             }
             if (decl.prop === "src") {
-              src = (decl.value.match(/url\s*\(\s*(['"]?)(.+?)\1\s*\)/) || [])[2];
+              src = (decl.value.match(URL_RE) || [])[2];
             } else if (decl.prop === "font-family") {
               family = decl.value;
             }

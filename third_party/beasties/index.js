@@ -599,6 +599,18 @@ function requireStringifier () {
 	if (hasRequiredStringifier) return stringifier;
 	hasRequiredStringifier = 1;
 
+	// Escapes sequences that could break out of an HTML <style> context.
+	// Uses CSS unicode escaping (\3c = '<') which is valid CSS and parsed
+	// correctly by all compliant CSS consumers.
+	const STYLE_TAG = /(<)(\/?style\b)/gi;
+	const COMMENT_OPEN = /(<)(!--)/g;
+
+	function escapeHTMLInCSS(str) {
+	  if (typeof str !== 'string') return str
+	  if (!str.includes('<')) return str
+	  return str.replace(STYLE_TAG, '\\3c $2').replace(COMMENT_OPEN, '\\3c $2')
+	}
+
 	const DEFAULT_RAW = {
 	  after: '\n',
 	  beforeClose: '\n',
@@ -637,7 +649,7 @@ function requireStringifier () {
 	      this.block(node, name + params);
 	    } else {
 	      let end = (node.raws.between || '') + (semicolon ? ';' : '');
-	      this.builder(name + params + end, node);
+	      this.builder(escapeHTMLInCSS(name + params + end), node);
 	    }
 	  }
 
@@ -672,7 +684,7 @@ function requireStringifier () {
 
 	  block(node, start) {
 	    let between = this.raw(node, 'between', 'beforeOpen');
-	    this.builder(start + between + '{', node, 'start');
+	    this.builder(escapeHTMLInCSS(start + between) + '{', node, 'start');
 
 	    let after;
 	    if (node.nodes && node.nodes.length) {
@@ -682,7 +694,7 @@ function requireStringifier () {
 	      after = this.raw(node, 'after', 'emptyBody');
 	    }
 
-	    if (after) this.builder(after);
+	    if (after) this.builder(escapeHTMLInCSS(after));
 	    this.builder('}', node, 'end');
 	  }
 
@@ -694,10 +706,11 @@ function requireStringifier () {
 	    }
 
 	    let semicolon = this.raw(node, 'semicolon');
+	    let isDocument = node.type === 'document';
 	    for (let i = 0; i < node.nodes.length; i++) {
 	      let child = node.nodes[i];
 	      let before = this.raw(child, 'before');
-	      if (before) this.builder(before);
+	      if (before) this.builder(isDocument ? before : escapeHTMLInCSS(before));
 	      this.stringify(child, last !== i || semicolon);
 	    }
 	  }
@@ -705,7 +718,7 @@ function requireStringifier () {
 	  comment(node) {
 	    let left = this.raw(node, 'left', 'commentLeft');
 	    let right = this.raw(node, 'right', 'commentRight');
-	    this.builder('/*' + left + node.text + right + '*/', node);
+	    this.builder(escapeHTMLInCSS('/*' + left + node.text + right + '*/'), node);
 	  }
 
 	  decl(node, semicolon) {
@@ -717,7 +730,7 @@ function requireStringifier () {
 	    }
 
 	    if (semicolon) string += ';';
-	    this.builder(string, node);
+	    this.builder(escapeHTMLInCSS(string), node);
 	  }
 
 	  document(node) {
@@ -923,13 +936,17 @@ function requireStringifier () {
 
 	  root(node) {
 	    this.body(node);
-	    if (node.raws.after) this.builder(node.raws.after);
+	    if (node.raws.after) {
+	      let after = node.raws.after;
+	      let isDocument = node.parent && node.parent.type === 'document';
+	      this.builder(isDocument ? after : escapeHTMLInCSS(after));
+	    }
 	  }
 
 	  rule(node) {
 	    this.block(node, this.rawValue(node, 'selector'));
 	    if (node.raws.ownSemicolon) {
-	      this.builder(node.raws.ownSemicolon, node, 'end');
+	      this.builder(escapeHTMLInCSS(node.raws.ownSemicolon), node, 'end');
 	    }
 	  }
 
@@ -4895,7 +4912,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.9';
+	    this.version = '8.5.10';
 	    this.plugins = this.normalize(plugins);
 	  }
 

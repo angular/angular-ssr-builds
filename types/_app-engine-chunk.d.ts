@@ -67,6 +67,21 @@ interface AngularAppEngineOptions {
      * A set of allowed hostnames for the server application.
      */
     allowedHosts?: readonly string[];
+    /**
+     * Extends the scope of trusted proxy headers (`X-Forwarded-*`).
+     *
+     * @remarks
+     * When `trustProxyHeaders` is enabled, headers such as `X-Forwarded-Host` and
+     * `X-Forwarded-Prefix` should ideally be strictly validated at a higher infrastructure
+     * level (e.g., at the reverse proxy or API gateway) before reaching the application.
+     *
+     * If a `string[]` is provided, only those proxy headers are allowed.
+     * If `true`, all proxy headers are allowed.
+     * If `false`, proxy headers are ignored.
+     *
+     * @default undefined
+     */
+    trustProxyHeaders?: boolean | readonly string[];
 }
 /**
  * Angular server application engine.
@@ -114,6 +129,10 @@ declare class AngularAppEngine {
      * A map of supported locales from the server application's manifest.
      */
     private readonly supportedLocales;
+    /**
+     * The normalized allowed proxy headers.
+     */
+    private readonly trustProxyHeaders;
     /**
      * A cache that holds entry points, keyed by their potential locale string.
      */

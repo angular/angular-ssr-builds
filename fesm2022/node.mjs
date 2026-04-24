@@ -1,5 +1,5 @@
 import { ɵInlineCriticalCssProcessor as _InlineCriticalCssProcessor, AngularAppEngine } from '@angular/ssr';
-import { validateUrl, getFirstHeaderValue } from './_validation-chunk.mjs';
+import { validateUrl, normalizeTrustProxyHeaders, isProxyHeaderAllowed, getFirstHeaderValue } from './_validation-chunk.mjs';
 import { renderApplication, ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule } from '@angular/platform-server';
 import * as fs from 'node:fs';
 import { dirname, join, normalize, resolve } from 'node:path';
@@ -222,14 +222,15 @@ function isBootstrapFn(value) {
 }
 
 const HTTP2_PSEUDO_HEADERS = new Set([':method', ':scheme', ':authority', ':path', ':status']);
-function createWebRequestFromNodeRequest(nodeRequest) {
+function createWebRequestFromNodeRequest(nodeRequest, trustProxyHeaders) {
+  const trustProxyHeadersNormalized = normalizeTrustProxyHeaders(trustProxyHeaders);
   const {
     headers,
     method = 'GET'
   } = nodeRequest;
   const withBody = method !== 'GET' && method !== 'HEAD';
   const referrer = headers.referer && URL.canParse(headers.referer) ? headers.referer : undefined;
-  return new Request(createRequestUrl(nodeRequest), {
+  return new Request(createRequestUrl(nodeRequest, trustProxyHeadersNormalized), {
     method,
     headers: createRequestHeaders(headers),
     body: withBody ? nodeRequest : undefined,
@@ -253,39 +254,44 @@ function createRequestHeaders(nodeHeaders) {
   }
   return headers;
 }
-function createRequestUrl(nodeRequest) {
+function createRequestUrl(nodeRequest, trustProxyHeaders) {
   const {
     headers,
     socket,
     url = '',
     originalUrl
   } = nodeRequest;
-  const protocol = getFirstHeaderValue(headers['x-forwarded-proto']) ?? ('encrypted' in socket && socket.encrypted ? 'https' : 'http');
-  const hostname = getFirstHeaderValue(headers['x-forwarded-host']) ?? headers.host ?? headers[':authority'];
+  const protocol = getAllowedProxyHeaderValue(headers, 'x-forwarded-proto', trustProxyHeaders) ?? ('encrypted' in socket && socket.encrypted ? 'https' : 'http');
+  const hostname = getAllowedProxyHeaderValue(headers, 'x-forwarded-host', trustProxyHeaders) ?? headers.host ?? headers[':authority'];
   if (Array.isArray(hostname)) {
     throw new Error('host value cannot be an array.');
   }
   let hostnameWithPort = hostname;
   if (!hostname?.includes(':')) {
-    const port = getFirstHeaderValue(headers['x-forwarded-port']);
+    const port = getAllowedProxyHeaderValue(headers, 'x-forwarded-port', trustProxyHeaders);
     if (port) {
       hostnameWithPort += `:${port}`;
     }
   }
   return new URL(`${protocol}://${hostnameWithPort}${originalUrl ?? url}`);
 }
+function getAllowedProxyHeaderValue(headers, headerName, trustProxyHeaders) {
+  return isProxyHeaderAllowed(headerName, trustProxyHeaders) ? getFirstHeaderValue(headers[headerName]) : undefined;
+}
 
 class AngularNodeAppEngine {
   angularAppEngine;
+  trustProxyHeaders;
   constructor(options) {
     this.angularAppEngine = new AngularAppEngine({
       ...options,
       allowedHosts: [...getAllowedHostsFromEnv(), ...(options?.allowedHosts ?? [])]
     });
+    this.trustProxyHeaders = options?.trustProxyHeaders;
     attachNodeGlobalErrorHandlers();
   }
   async handle(request, requestContext) {
-    const webRequest = request instanceof Request ? request : createWebRequestFromNodeRequest(request);
+    const webRequest = request instanceof Request ? request : createWebRequestFromNodeRequest(request, this.trustProxyHeaders);
     return this.angularAppEngine.handle(webRequest, requestContext);
   }
 }

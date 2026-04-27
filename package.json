@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "20.3.24+sha-5411257",
+  "version": "20.3.24+sha-24e2502",
   "description": "Angular server side rendering utilities",
   "type": "module",
   "license": "MIT",

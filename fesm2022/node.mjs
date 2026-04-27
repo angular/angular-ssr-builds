@@ -2,7 +2,7 @@ import { renderApplication, renderModule, ɵSERVER_CONTEXT as _SERVER_CONTEXT } 
 import * as fs from 'node:fs';
 import { dirname, join, normalize, resolve } from 'node:path';
 import { URL as URL$1, fileURLToPath } from 'node:url';
-import { validateUrl, getFirstHeaderValue } from './validation.mjs';
+import { validateUrl, normalizeTrustProxyHeaders, isProxyHeaderAllowed, getFirstHeaderValue } from './validation.mjs';
 import { ɵInlineCriticalCssProcessor as _InlineCriticalCssProcessor, AngularAppEngine } from '@angular/ssr';
 import { readFile } from 'node:fs/promises';
 import { argv } from 'node:process';
@@ -273,7 +273,13 @@ function isBootstrapFn(value) {
  * as they are not allowed to be set directly using the `Node.js` Undici API or
  * the web `Headers` API.
  */
-const HTTP2_PSEUDO_HEADERS = new Set([':method', ':scheme', ':authority', ':path', ':status']);
+const HTTP2_PSEUDO_HEADERS = new Set([
+    ':method',
+    ':scheme',
+    ':authority',
+    ':path',
+    ':status',
+]);
 /**
  * Converts a Node.js `IncomingMessage` or `Http2ServerRequest` into a
  * Web Standard `Request` object.
@@ -282,13 +288,21 @@ const HTTP2_PSEUDO_HEADERS = new Set([':method', ':scheme', ':authority', ':path
  * be used by web platform APIs.
  *
  * @param nodeRequest - The Node.js request object (`IncomingMessage` or `Http2ServerRequest`) to convert.
+ * @param trustProxyHeaders - A boolean or an array of proxy headers to trust when constructing the request URL.
+ *
+ * @remarks
+ * When `trustProxyHeaders` is enabled, headers such as `X-Forwarded-Host` and
+ * `X-Forwarded-Prefix` should ideally be strictly validated at a higher infrastructure
+ * level (e.g., at the reverse proxy or API gateway) before reaching the application.
+ *
  * @returns A Web Standard `Request` object.
  */
-function createWebRequestFromNodeRequest(nodeRequest) {
+function createWebRequestFromNodeRequest(nodeRequest, trustProxyHeaders) {
+    const trustProxyHeadersNormalized = normalizeTrustProxyHeaders(trustProxyHeaders);
     const { headers, method = 'GET' } = nodeRequest;
     const withBody = method !== 'GET' && method !== 'HEAD';
     const referrer = headers.referer && URL.canParse(headers.referer) ? headers.referer : undefined;
-    return new Request(createRequestUrl(nodeRequest), {
+    return new Request(createRequestUrl(nodeRequest, trustProxyHeadersNormalized), {
         method,
         headers: createRequestHeaders(headers),
         body: withBody ? nodeRequest : undefined,
@@ -323,24 +337,46 @@ function createRequestHeaders(nodeHeaders) {
  * Creates a `URL` object from a Node.js `IncomingMessage`, taking into account the protocol, host, and port.
  *
  * @param nodeRequest - The Node.js `IncomingMessage` or `Http2ServerRequest` object to extract URL information from.
+ * @param trustProxyHeaders - A set of allowed proxy headers.
+ *
+ * @remarks
+ * When `trustProxyHeaders` is enabled, headers such as `X-Forwarded-Host` and
+ * `X-Forwarded-Prefix` should ideally be strictly validated at a higher infrastructure
+ * level (e.g., at the reverse proxy or API gateway) before reaching the application.
+ *
  * @returns A `URL` object representing the request URL.
  */
-function createRequestUrl(nodeRequest) {
+function createRequestUrl(nodeRequest, trustProxyHeaders) {
     const { headers, socket, url = '', originalUrl, } = nodeRequest;
-    const protocol = getFirstHeaderValue(headers['x-forwarded-proto']) ??
+    const protocol = getAllowedProxyHeaderValue(headers, 'x-forwarded-proto', trustProxyHeaders) ??
         ('encrypted' in socket && socket.encrypted ? 'https' : 'http');
-    const hostname = getFirstHeaderValue(headers['x-forwarded-host']) ?? headers.host ?? headers[':authority'];
+    const hostname = getAllowedProxyHeaderValue(headers, 'x-forwarded-host', trustProxyHeaders) ??
+        headers.host ??
+        headers[':authority'];
     if (Array.isArray(hostname)) {
         throw new Error('host value cannot be an array.');
     }
     let hostnameWithPort = hostname;
     if (!hostname?.includes(':')) {
-        const port = getFirstHeaderValue(headers['x-forwarded-port']);
+        const port = getAllowedProxyHeaderValue(headers, 'x-forwarded-port', trustProxyHeaders);
         if (port) {
             hostnameWithPort += `:${port}`;
         }
     }
     return new URL(`${protocol}://${hostnameWithPort}${originalUrl ?? url}`);
+}
+/**
+ * Gets the first value of an allowed proxy header.
+ *
+ * @param headers - The Node.js incoming HTTP headers.
+ * @param headerName - The name of the proxy header to retrieve.
+ * @param trustProxyHeaders - A set of allowed proxy headers.
+ * @returns The value of the allowed proxy header, or `undefined` if not allowed or not present.
+ */
+function getAllowedProxyHeaderValue(headers, headerName, trustProxyHeaders) {
+    return isProxyHeaderAllowed(headerName, trustProxyHeaders)
+        ? getFirstHeaderValue(headers[headerName])
+        : undefined;
 }
 
 /**
@@ -353,6 +389,7 @@ function createRequestUrl(nodeRequest) {
  */
 class AngularNodeAppEngine {
     angularAppEngine;
+    trustProxyHeaders;
     /**
      * Creates a new instance of the Angular Node.js server application engine.
      * @param options Options for the Angular Node.js server application engine.
@@ -362,6 +399,7 @@ class AngularNodeAppEngine {
             ...options,
             allowedHosts: [...getAllowedHostsFromEnv(), ...(options?.allowedHosts ?? [])],
         });
+        this.trustProxyHeaders = options?.trustProxyHeaders;
         attachNodeGlobalErrorHandlers();
     }
     /**
@@ -393,7 +431,9 @@ class AngularNodeAppEngine {
      * For more information see: https://angular.dev/best-practices/security#preventing-server-side-request-forgery-ssrf
      */
     async handle(request, requestContext) {
-        const webRequest = request instanceof Request ? request : createWebRequestFromNodeRequest(request);
+        const webRequest = request instanceof Request
+            ? request
+            : createWebRequestFromNodeRequest(request, this.trustProxyHeaders);
         return this.angularAppEngine.handle(webRequest, requestContext);
     }
 }

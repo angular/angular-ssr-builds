@@ -67,6 +67,21 @@ interface AngularAppEngineOptions {
      * A set of allowed hostnames for the server application.
      */
     allowedHosts?: readonly string[];
+    /**
+     * Extends the scope of trusted proxy headers (`X-Forwarded-*`).
+     *
+     * @remarks
+     * When `trustProxyHeaders` is enabled, headers such as `X-Forwarded-Host` and
+     * `X-Forwarded-Prefix` should ideally be strictly validated at a higher infrastructure
+     * level (e.g., at the reverse proxy or API gateway) before reaching the application.
+     *
+     * If a `string[]` is provided, only those proxy headers are allowed.
+     * If `true`, all proxy headers are allowed.
+     * If `false`, proxy headers are ignored.
+     *
+     * @default undefined
+     */
+    trustProxyHeaders?: boolean | readonly string[];
 }
 /**
  * Angular server application engine.
@@ -95,6 +110,12 @@ declare class AngularAppEngine {
      */
     static ɵhooks: Hooks;
     /**
+     * A flag to disable the allowed hosts check.
+     *
+     * @private
+     */
+    static ɵdisableAllowedHostsCheck: boolean;
+    /**
      * The manifest for the server application.
      */
     private readonly manifest;
@@ -107,6 +128,10 @@ declare class AngularAppEngine {
      */
     private readonly supportedLocales;
     /**
+     * The normalized allowed proxy headers.
+     */
+    private readonly trustProxyHeaders;
+    /**
      * A cache that holds entry points, keyed by their potential locale string.
      */
     private readonly entryPointsCache;
@@ -115,6 +140,7 @@ declare class AngularAppEngine {
      * @param options Options for the Angular server application engine.
      */
     constructor(options?: AngularAppEngineOptions);
+    private getAllowedHosts;
     /**
      * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
      * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.

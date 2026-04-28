@@ -8,19 +8,24 @@ import { readFile } from 'node:fs/promises';
 import { argv } from 'node:process';
 
 function getAllowedHostsFromEnv() {
-  const allowedHosts = [];
-  const envNgAllowedHosts = process.env['NG_ALLOWED_HOSTS'];
-  if (!envNgAllowedHosts) {
-    return allowedHosts;
+  return getArrayFromEnv('NG_ALLOWED_HOSTS');
+}
+function getTrustProxyHeadersFromEnv() {
+  return getArrayFromEnv('NG_TRUST_PROXY_HEADERS');
+}
+function getArrayFromEnv(envName) {
+  const envValue = process.env[envName];
+  if (!envValue) {
+    return undefined;
   }
-  const hosts = envNgAllowedHosts.split(',');
-  for (const host of hosts) {
-    const trimmed = host.trim();
+  const values = [];
+  for (const value of envValue.split(',')) {
+    const trimmed = value.trim();
     if (trimmed.length > 0) {
-      allowedHosts.push(trimmed);
+      values.push(trimmed);
     }
   }
-  return allowedHosts;
+  return values;
 }
 
 function attachNodeGlobalErrorHandlers() {
@@ -102,7 +107,7 @@ class CommonEngine {
   allowedHosts;
   constructor(options) {
     this.options = options;
-    this.allowedHosts = new Set([...getAllowedHostsFromEnv(), ...(this.options?.allowedHosts ?? [])]);
+    this.allowedHosts = new Set(getAllowedHostsFromEnv() ?? this.options?.allowedHosts ?? []);
     attachNodeGlobalErrorHandlers();
   }
   async render(opts) {
@@ -273,11 +278,13 @@ class AngularNodeAppEngine {
   angularAppEngine;
   trustProxyHeaders;
   constructor(options) {
-    this.angularAppEngine = new AngularAppEngine({
+    const appEngineOptions = {
       ...options,
-      allowedHosts: [...getAllowedHostsFromEnv(), ...(options?.allowedHosts ?? [])]
-    });
-    this.trustProxyHeaders = options?.trustProxyHeaders;
+      allowedHosts: getAllowedHostsFromEnv() ?? options?.allowedHosts,
+      trustProxyHeaders: getTrustProxyHeadersFromEnv() ?? options?.trustProxyHeaders
+    };
+    this.angularAppEngine = new AngularAppEngine(appEngineOptions);
+    this.trustProxyHeaders = appEngineOptions.trustProxyHeaders;
     attachNodeGlobalErrorHandlers();
   }
   async handle(request, requestContext) {

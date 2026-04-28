@@ -166,12 +166,12 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
         search,
         hash
       } = envInjector.get(PlatformLocation);
-      const finalUrl = constructDecodedUrl({
+      const finalUrl = constructSerializedUrl(router, {
         pathname,
         search,
         hash
       }, requestPrefix);
-      const urlToRenderString = constructDecodedUrl(urlToRender, requestPrefix);
+      const urlToRenderString = constructSerializedUrl(router, urlToRender, requestPrefix);
       if (urlToRenderString !== finalUrl) {
         redirectTo = [pathname, search, hash].join('');
       }
@@ -207,7 +207,7 @@ function asyncDestroyPlatform(platformRef) {
     }, 0);
   });
 }
-function constructDecodedUrl(url, prefix) {
+function constructSerializedUrl(router, url, prefix) {
   const {
     pathname,
     hash,
@@ -220,7 +220,8 @@ function constructDecodedUrl(url, prefix) {
     urlParts.push(stripTrailingSlash(pathname));
   }
   urlParts.push(search, hash);
-  return decodeURIComponent(urlParts.join(''));
+  const urlTree = router.parseUrl(urlParts.join(''));
+  return router.serializeUrl(urlTree);
 }
 
 function promiseWithAbort(promise, signal, errorMessagePrefix) {
@@ -386,7 +387,7 @@ class RouteTree {
     }
   }
   getPathSegments(route) {
-    return route.split('/').filter(Boolean);
+    return route.split('/').filter(Boolean).map(decodeURIComponent);
   }
   traverseBySegments(segments, node = this.root, currentIndex = 0) {
     if (currentIndex >= segments.length) {
@@ -939,7 +940,6 @@ class ServerRouter {
       pathname
     } = stripIndexHtmlFromURL(url);
     pathname = stripMatrixParams(pathname);
-    pathname = decodeURIComponent(pathname);
     return this.routeTree.match(pathname);
   }
 }

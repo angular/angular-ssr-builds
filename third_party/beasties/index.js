@@ -599,6 +599,18 @@ function requireStringifier () {
 	if (hasRequiredStringifier) return stringifier;
 	hasRequiredStringifier = 1;
 
+	// Escapes sequences that could break out of an HTML <style> context.
+	// Uses CSS unicode escaping (\3c = '<') which is valid CSS and parsed
+	// correctly by all compliant CSS consumers.
+	const STYLE_TAG = /(<)(\/?style\b)/gi;
+	const COMMENT_OPEN = /(<)(!--)/g;
+
+	function escapeHTMLInCSS(str) {
+	  if (typeof str !== 'string') return str
+	  if (!str.includes('<')) return str
+	  return str.replace(STYLE_TAG, '\\3c $2').replace(COMMENT_OPEN, '\\3c $2')
+	}
+
 	const DEFAULT_RAW = {
 	  after: '\n',
 	  beforeClose: '\n',
@@ -624,11 +636,12 @@ function requireStringifier () {
 	  }
 
 	  atrule(node, semicolon) {
+	    let raws = node.raws;
 	    let name = '@' + node.name;
 	    let params = node.params ? this.rawValue(node, 'params') : '';
 
-	    if (typeof node.raws.afterName !== 'undefined') {
-	      name += node.raws.afterName;
+	    if (typeof raws.afterName !== 'undefined') {
+	      name += raws.afterName;
 	    } else if (params) {
 	      name += ' ';
 	    }
@@ -636,8 +649,8 @@ function requireStringifier () {
 	    if (node.nodes) {
 	      this.block(node, name + params);
 	    } else {
-	      let end = (node.raws.between || '') + (semicolon ? ';' : '');
-	      this.builder(name + params + end, node);
+	      let end = (raws.between || '') + (semicolon ? ';' : '');
+	      this.builder(escapeHTMLInCSS(name + params + end), node);
 	    }
 	  }
 
@@ -671,53 +684,77 @@ function requireStringifier () {
 	  }
 
 	  block(node, start) {
-	    let between = this.raw(node, 'between', 'beforeOpen');
-	    this.builder(start + between + '{', node, 'start');
+	    let raws = node.raws;
+	    let between = typeof raws.between !== 'undefined'
+	      ? raws.between
+	      : this.raw(node, 'between', 'beforeOpen');
+	    this.builder(escapeHTMLInCSS(start + between) + '{', node, 'start');
 
 	    let after;
 	    if (node.nodes && node.nodes.length) {
 	      this.body(node);
-	      after = this.raw(node, 'after');
+	      after = typeof raws.after !== 'undefined'
+	        ? raws.after
+	        : this.raw(node, 'after');
 	    } else {
-	      after = this.raw(node, 'after', 'emptyBody');
+	      after = typeof raws.after !== 'undefined'
+	        ? raws.after
+	        : this.raw(node, 'after', 'emptyBody');
 	    }
 
-	    if (after) this.builder(after);
+	    if (after) this.builder(escapeHTMLInCSS(after));
 	    this.builder('}', node, 'end');
 	  }
 
 	  body(node) {
-	    let last = node.nodes.length - 1;
+	    let nodes = node.nodes;
+	    let last = nodes.length - 1;
 	    while (last > 0) {
-	      if (node.nodes[last].type !== 'comment') break
+	      if (nodes[last].type !== 'comment') break
 	      last -= 1;
 	    }
 
 	    let semicolon = this.raw(node, 'semicolon');
-	    for (let i = 0; i < node.nodes.length; i++) {
-	      let child = node.nodes[i];
-	      let before = this.raw(child, 'before');
-	      if (before) this.builder(before);
+	    let isDocument = node.type === 'document';
+	    for (let i = 0; i < nodes.length; i++) {
+	      let child = nodes[i];
+	      let before = child.raws.before;
+	      if (typeof before === 'undefined') {
+	        before = this.raw(child, 'before');
+	      }
+	      if (before) this.builder(isDocument ? before : escapeHTMLInCSS(before));
 	      this.stringify(child, last !== i || semicolon);
 	    }
 	  }
 
 	  comment(node) {
-	    let left = this.raw(node, 'left', 'commentLeft');
-	    let right = this.raw(node, 'right', 'commentRight');
-	    this.builder('/*' + left + node.text + right + '*/', node);
+	    let raws = node.raws;
+	    let left = typeof raws.left !== 'undefined'
+	      ? raws.left
+	      : this.raw(node, 'left', 'commentLeft');
+	    let right = typeof raws.right !== 'undefined'
+	      ? raws.right
+	      : this.raw(node, 'right', 'commentRight');
+	    this.builder(escapeHTMLInCSS('/*' + left + node.text + right + '*/'), node);
 	  }
 
 	  decl(node, semicolon) {
-	    let between = this.raw(node, 'between', 'colon');
-	    let string = node.prop + between + this.rawValue(node, 'value');
+	    let raws = node.raws;
+	    let between = typeof raws.between !== 'undefined'
+	      ? raws.between
+	      : this.raw(node, 'between', 'colon');
+
+	    let rawVal = raws.value;
+	    let value = rawVal && rawVal.value === node.value ? rawVal.raw : node.value;
+
+	    let string = node.prop + between + value;
 
 	    if (node.important) {
-	      string += node.raws.important || ' !important';
+	      string += raws.important || ' !important';
 	    }
 
 	    if (semicolon) string += ';';
-	    this.builder(string, node);
+	    this.builder(escapeHTMLInCSS(string), node);
 	  }
 
 	  document(node) {
@@ -753,9 +790,9 @@ function requireStringifier () {
 
 	    // Detect style by other nodes
 	    let root = node.root();
-	    if (!root.rawCache) root.rawCache = {};
-	    if (typeof root.rawCache[detect] !== 'undefined') {
-	      return root.rawCache[detect]
+	    let cache = root.rawCache || (root.rawCache = {});
+	    if (typeof cache[detect] !== 'undefined') {
+	      return cache[detect]
 	    }
 
 	    if (detect === 'before' || detect === 'after') {
@@ -774,7 +811,7 @@ function requireStringifier () {
 
 	    if (typeof value === 'undefined') value = DEFAULT_RAW[detect];
 
-	    root.rawCache[detect] = value;
+	    cache[detect] = value;
 	    return value
 	  }
 
@@ -923,13 +960,17 @@ function requireStringifier () {
 
 	  root(node) {
 	    this.body(node);
-	    if (node.raws.after) this.builder(node.raws.after);
+	    if (node.raws.after) {
+	      let after = node.raws.after;
+	      let isDocument = node.parent && node.parent.type === 'document';
+	      this.builder(isDocument ? after : escapeHTMLInCSS(after));
+	    }
 	  }
 
 	  rule(node) {
 	    this.block(node, this.rawValue(node, 'selector'));
 	    if (node.raws.ownSemicolon) {
-	      this.builder(node.raws.ownSemicolon, node, 'end');
+	      this.builder(escapeHTMLInCSS(node.raws.ownSemicolon), node, 'end');
 	    }
 	  }
 
@@ -2091,6 +2132,7 @@ function requirePreviousMap () {
 	class PreviousMap {
 	  constructor(css, opts) {
 	    if (opts.map === false) return
+	    if (opts.unsafeMap) this.unsafeMap = true;
 	    this.loadAnnotation(css);
 	    this.inline = this.startWith(this.annotation, 'data:');
 
@@ -2105,7 +2147,7 @@ function requirePreviousMap () {
 
 	  consumer() {
 	    if (!this.consumerCache) {
-	      this.consumerCache = new SourceMapConsumer(this.text);
+	      this.consumerCache = new SourceMapConsumer(this.json || this.text);
 	    }
 	    return this.consumerCache
 	  }
@@ -2126,7 +2168,8 @@ function requirePreviousMap () {
 	      return fromBase64(text.substr(baseUriMatch[0].length))
 	    }
 
-	    let encoding = text.match(/data:application\/json;([^,]+),/)[1];
+	    let encoding = text.slice('data:application/json;'.length);
+	    encoding = encoding.slice(0, encoding.indexOf(','));
 	    throw new Error('Unsupported source map encoding ' + encoding)
 	  }
 
@@ -2157,7 +2200,13 @@ function requirePreviousMap () {
 	    }
 	  }
 
-	  loadFile(path) {
+	  loadFile(path, cssFile, trusted) {
+	    /* c8 ignore next 5 */
+	    if (!trusted && !this.unsafeMap) {
+	      if (!/\.map$/i.test(path)) {
+	        return undefined
+	      }
+	    }
 	    this.root = dirname(path);
 	    if (existsSync(path)) {
 	      this.mapFile = path;
@@ -2174,7 +2223,7 @@ function requirePreviousMap () {
 	      } else if (typeof prev === 'function') {
 	        let prevPath = prev(file);
 	        if (prevPath) {
-	          let map = this.loadFile(prevPath);
+	          let map = this.loadFile(prevPath, file, true);
 	          if (!map) {
 	            throw new Error(
 	              'Unable to load previous source map: ' + prevPath.toString()
@@ -2198,7 +2247,16 @@ function requirePreviousMap () {
 	    } else if (this.annotation) {
 	      let map = this.annotation;
 	      if (file) map = join(dirname(file), map);
-	      return this.loadFile(map)
+	      let unknown = this.loadFile(map, file, false);
+	      if (unknown) {
+	        try {
+	          /* c8 ignore next 4 */
+	          this.json = JSON.parse(unknown.replace(/^\)]}'[^\n]*\n/, ''));
+	        } catch {
+	          return undefined
+	        }
+	      }
+	      return unknown
 	    }
 	  }
 
@@ -2369,7 +2427,15 @@ function requireInput () {
 	      );
 	    }
 
-	    result.input = { column, endColumn, endLine, endOffset, line, offset, source: this.css };
+	    result.input = {
+	      column,
+	      endColumn,
+	      endLine,
+	      endOffset,
+	      line,
+	      offset,
+	      source: this.css
+	    };
 	    if (this.file) {
 	      if (pathToFileURL) {
 	        result.input.url = pathToFileURL(this.file).toString();
@@ -2807,7 +2873,15 @@ function requireMapGenerator () {
 	        }
 	      }
 	    } else if (this.css) {
-	      this.css = this.css.replace(/\n*\/\*#[\S\s]*?\*\/$/gm, '');
+	      let startIndex;
+	      while ((startIndex = this.css.lastIndexOf('/*#')) !== -1) {
+	        let endIndex = this.css.indexOf('*/', startIndex + 3);
+	        if (endIndex === -1) break
+	        while (startIndex > 0 && this.css[startIndex - 1] === '\n') {
+	          startIndex--;
+	        }
+	        this.css = this.css.slice(0, startIndex) + this.css.slice(endIndex + 2);
+	      }
 	    }
 	  }
 
@@ -3144,6 +3218,7 @@ function requireTokenize () {
 	  let pos = 0;
 	  let buffer = [];
 	  let returned = [];
+	  let lastBadParen = -1;
 
 	  function position() {
 	    return pos
@@ -3235,11 +3310,14 @@ function requireTokenize () {
 	          currentToken = ['brackets', css.slice(pos, next + 1), pos, next];
 
 	          pos = next;
+	        } else if (pos <= lastBadParen) {
+	          currentToken = ['(', '(', pos];
 	        } else {
 	          next = css.indexOf(')', pos + 1);
 	          content = css.slice(pos, next + 1);
 
 	          if (next === -1 || RE_BAD_BRACKET.test(content)) {
+	            lastBadParen = next === -1 ? length : next;
 	            currentToken = ['(', '(', pos];
 	          } else {
 	            currentToken = ['brackets', content, pos, next];
@@ -3558,7 +3636,7 @@ function requireParser () {
 	    node.source.end.offset++;
 
 	    let text = token[1].slice(2, -2);
-	    if (/^\s*$/.test(text)) {
+	    if (!text.trim()) {
 	      node.text = '';
 	      node.raws.left = text;
 	      node.raws.right = '';
@@ -4546,6 +4624,16 @@ function requireLazyResult () {
 	    if (opts.stringifier) str = opts.stringifier;
 	    if (str.stringify) str = str.stringify;
 
+	    let rootSource = this.result.root.source;
+	    if (opts.map === undefined && !(rootSource && rootSource.input && rootSource.input.map)) {
+	      let result = '';
+	      str(this.result.root, i => {
+	        result += i;
+	      });
+	      this.result.css = result;
+	      return this.result
+	    }
+
 	    let map = new MapGenerator(str, this.result.root, this.result.opts);
 	    let data = map.generate();
 	    this.result.css = data[0];
@@ -4728,7 +4816,7 @@ function requireNoWorkResult () {
 
 	let MapGenerator = requireMapGenerator();
 	let parse = requireParse();
-	const Result = requireResult();
+	let Result = requireResult();
 	let stringify = requireStringify();
 	let warnOnce = requireWarnOnce();
 
@@ -4791,10 +4879,9 @@ function requireNoWorkResult () {
 	    this._css = css;
 	    this._opts = opts;
 	    this._map = undefined;
-	    let root;
 
 	    let str = stringify;
-	    this.result = new Result(this._processor, root, this._opts);
+	    this.result = new Result(this._processor, undefined, this._opts);
 	    this.result.css = css;
 
 	    let self = this;
@@ -4804,7 +4891,7 @@ function requireNoWorkResult () {
 	      }
 	    });
 
-	    let map = new MapGenerator(str, root, this._opts, css);
+	    let map = new MapGenerator(str, undefined, this._opts, css);
 	    if (map.isMap()) {
 	      let [generatedCSS, generatedMap] = map.generate();
 	      if (generatedCSS) {
@@ -4879,7 +4966,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.6';
+	    this.version = '8.5.12';
 	    this.plugins = this.normalize(plugins);
 	  }
 

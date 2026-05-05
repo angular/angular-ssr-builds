@@ -636,11 +636,12 @@ function requireStringifier () {
 	  }
 
 	  atrule(node, semicolon) {
+	    let raws = node.raws;
 	    let name = '@' + node.name;
 	    let params = node.params ? this.rawValue(node, 'params') : '';
 
-	    if (typeof node.raws.afterName !== 'undefined') {
-	      name += node.raws.afterName;
+	    if (typeof raws.afterName !== 'undefined') {
+	      name += raws.afterName;
 	    } else if (params) {
 	      name += ' ';
 	    }
@@ -648,7 +649,7 @@ function requireStringifier () {
 	    if (node.nodes) {
 	      this.block(node, name + params);
 	    } else {
-	      let end = (node.raws.between || '') + (semicolon ? ';' : '');
+	      let end = (raws.between || '') + (semicolon ? ';' : '');
 	      this.builder(escapeHTMLInCSS(name + params + end), node);
 	    }
 	  }
@@ -683,15 +684,23 @@ function requireStringifier () {
 	  }
 
 	  block(node, start) {
-	    let between = this.raw(node, 'between', 'beforeOpen');
+	    let raws = node.raws;
+	    let between =
+	      typeof raws.between !== 'undefined'
+	        ? raws.between
+	        : this.raw(node, 'between', 'beforeOpen');
 	    this.builder(escapeHTMLInCSS(start + between) + '{', node, 'start');
 
 	    let after;
 	    if (node.nodes && node.nodes.length) {
 	      this.body(node);
-	      after = this.raw(node, 'after');
+	      after =
+	        typeof raws.after !== 'undefined' ? raws.after : this.raw(node, 'after');
 	    } else {
-	      after = this.raw(node, 'after', 'emptyBody');
+	      after =
+	        typeof raws.after !== 'undefined'
+	          ? raws.after
+	          : this.raw(node, 'after', 'emptyBody');
 	    }
 
 	    if (after) this.builder(escapeHTMLInCSS(after));
@@ -699,34 +708,50 @@ function requireStringifier () {
 	  }
 
 	  body(node) {
-	    let last = node.nodes.length - 1;
+	    let nodes = node.nodes;
+	    let last = nodes.length - 1;
 	    while (last > 0) {
-	      if (node.nodes[last].type !== 'comment') break
+	      if (nodes[last].type !== 'comment') break
 	      last -= 1;
 	    }
 
 	    let semicolon = this.raw(node, 'semicolon');
 	    let isDocument = node.type === 'document';
-	    for (let i = 0; i < node.nodes.length; i++) {
-	      let child = node.nodes[i];
-	      let before = this.raw(child, 'before');
+	    for (let i = 0; i < nodes.length; i++) {
+	      let child = nodes[i];
+	      let before = child.raws.before;
+	      if (typeof before === 'undefined') {
+	        before = this.raw(child, 'before');
+	      }
 	      if (before) this.builder(isDocument ? before : escapeHTMLInCSS(before));
 	      this.stringify(child, last !== i || semicolon);
 	    }
 	  }
 
 	  comment(node) {
-	    let left = this.raw(node, 'left', 'commentLeft');
-	    let right = this.raw(node, 'right', 'commentRight');
+	    let raws = node.raws;
+	    let left =
+	      typeof raws.left !== 'undefined'
+	        ? raws.left
+	        : this.raw(node, 'left', 'commentLeft');
+	    let right =
+	      typeof raws.right !== 'undefined'
+	        ? raws.right
+	        : this.raw(node, 'right', 'commentRight');
 	    this.builder(escapeHTMLInCSS('/*' + left + node.text + right + '*/'), node);
 	  }
 
 	  decl(node, semicolon) {
-	    let between = this.raw(node, 'between', 'colon');
+	    let raws = node.raws;
+	    let between =
+	      typeof raws.between !== 'undefined'
+	        ? raws.between
+	        : this.raw(node, 'between', 'colon');
+
 	    let string = node.prop + between + this.rawValue(node, 'value');
 
 	    if (node.important) {
-	      string += node.raws.important || ' !important';
+	      string += raws.important || ' !important';
 	    }
 
 	    if (semicolon) string += ';';
@@ -766,9 +791,9 @@ function requireStringifier () {
 
 	    // Detect style by other nodes
 	    let root = node.root();
-	    if (!root.rawCache) root.rawCache = {};
-	    if (typeof root.rawCache[detect] !== 'undefined') {
-	      return root.rawCache[detect]
+	    let cache = root.rawCache || (root.rawCache = {});
+	    if (typeof cache[detect] !== 'undefined') {
+	      return cache[detect]
 	    }
 
 	    if (detect === 'before' || detect === 'after') {
@@ -787,7 +812,7 @@ function requireStringifier () {
 
 	    if (typeof value === 'undefined') value = DEFAULT_RAW[detect];
 
-	    root.rawCache[detect] = value;
+	    cache[detect] = value;
 	    return value
 	  }
 
@@ -2108,6 +2133,7 @@ function requirePreviousMap () {
 	class PreviousMap {
 	  constructor(css, opts) {
 	    if (opts.map === false) return
+	    if (opts.unsafeMap) this.unsafeMap = true;
 	    this.loadAnnotation(css);
 	    this.inline = this.startWith(this.annotation, 'data:');
 
@@ -2122,7 +2148,7 @@ function requirePreviousMap () {
 
 	  consumer() {
 	    if (!this.consumerCache) {
-	      this.consumerCache = new SourceMapConsumer(this.text);
+	      this.consumerCache = new SourceMapConsumer(this.json || this.text);
 	    }
 	    return this.consumerCache
 	  }
@@ -2175,7 +2201,13 @@ function requirePreviousMap () {
 	    }
 	  }
 
-	  loadFile(path) {
+	  loadFile(path, cssFile, trusted) {
+	    /* c8 ignore next 5 */
+	    if (!trusted && !this.unsafeMap) {
+	      if (!/\.map$/i.test(path)) {
+	        return undefined
+	      }
+	    }
 	    this.root = dirname(path);
 	    if (existsSync(path)) {
 	      this.mapFile = path;
@@ -2192,7 +2224,7 @@ function requirePreviousMap () {
 	      } else if (typeof prev === 'function') {
 	        let prevPath = prev(file);
 	        if (prevPath) {
-	          let map = this.loadFile(prevPath);
+	          let map = this.loadFile(prevPath, file, true);
 	          if (!map) {
 	            throw new Error(
 	              'Unable to load previous source map: ' + prevPath.toString()
@@ -2216,7 +2248,16 @@ function requirePreviousMap () {
 	    } else if (this.annotation) {
 	      let map = this.annotation;
 	      if (file) map = join(dirname(file), map);
-	      return this.loadFile(map)
+	      let unknown = this.loadFile(map, file, false);
+	      if (unknown) {
+	        try {
+	          /* c8 ignore next 4 */
+	          this.json = JSON.parse(unknown.replace(/^\)]}'[^\n]*\n/, ''));
+	        } catch {
+	          return undefined
+	        }
+	      }
+	      return unknown
 	    }
 	  }
 
@@ -3178,6 +3219,7 @@ function requireTokenize () {
 	  let pos = 0;
 	  let buffer = [];
 	  let returned = [];
+	  let lastBadParen = -1;
 
 	  function position() {
 	    return pos
@@ -3269,11 +3311,14 @@ function requireTokenize () {
 	          currentToken = ['brackets', css.slice(pos, next + 1), pos, next];
 
 	          pos = next;
+	        } else if (pos <= lastBadParen) {
+	          currentToken = ['(', '(', pos];
 	        } else {
 	          next = css.indexOf(')', pos + 1);
 	          content = css.slice(pos, next + 1);
 
 	          if (next === -1 || RE_BAD_BRACKET.test(content)) {
+	            lastBadParen = next === -1 ? length : next;
 	            currentToken = ['(', '(', pos];
 	          } else {
 	            currentToken = ['brackets', content, pos, next];
@@ -4580,6 +4625,19 @@ function requireLazyResult () {
 	    if (opts.stringifier) str = opts.stringifier;
 	    if (str.stringify) str = str.stringify;
 
+	    let rootSource = this.result.root.source;
+	    if (
+	      opts.map === undefined &&
+	      !(rootSource && rootSource.input && rootSource.input.map)
+	    ) {
+	      let result = '';
+	      str(this.result.root, i => {
+	        result += i;
+	      });
+	      this.result.css = result;
+	      return this.result
+	    }
+
 	    let map = new MapGenerator(str, this.result.root, this.result.opts);
 	    let data = map.generate();
 	    this.result.css = data[0];
@@ -4912,7 +4970,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.10';
+	    this.version = '8.5.13';
 	    this.plugins = this.normalize(plugins);
 	  }
 

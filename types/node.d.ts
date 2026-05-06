@@ -4,6 +4,10 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 import { Http2ServerRequest, Http2ServerResponse } from 'node:http2';
 import { AngularAppEngineOptions } from './_app-engine-chunk.js';
 
+/**
+ * @deprecated Use `AngularNodeAppEngine` or `AngularAppEngine` instead.
+ * Deprecated since v22.
+ */
 interface CommonEngineOptions {
     /** A method that when invoked returns a promise that returns an `ApplicationRef` instance once resolved or an NgModule. */
     bootstrap?: Type<{}> | ((context: BootstrapContext) => Promise<ApplicationRef>);
@@ -14,6 +18,10 @@ interface CommonEngineOptions {
     /** A set of hostnames that are allowed to access the server. */
     allowedHosts?: readonly string[];
 }
+/**
+ * @deprecated Use `AngularNodeAppEngine` or `AngularAppEngine` instead.
+ * Deprecated since v22.
+ */
 interface CommonEngineRenderOptions {
     /** A method that when invoked returns a promise that returns an `ApplicationRef` instance once resolved or an NgModule. */
     bootstrap?: Type<{}> | ((context: BootstrapContext) => Promise<ApplicationRef>);
@@ -35,6 +43,9 @@ interface CommonEngineRenderOptions {
 }
 /**
  * A common engine to use to server render an application.
+ *
+ * @deprecated Use `AngularNodeAppEngine` or `AngularAppEngine` instead.
+ * Deprecated since v22.
  */
 declare class CommonEngine {
     private options?;

@@ -185,8 +185,7 @@ class CommonEngine {
     }
     const commonRenderingOptions = {
       url: opts.url,
-      document,
-      allowedHosts: ['*']
+      document
     };
     return isBootstrapFn(moduleOrFactory) ? renderApplication(moduleOrFactory, {
       platformProviders: extraProviders,

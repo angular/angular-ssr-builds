@@ -1,10 +1,8 @@
 {
   "name": "@angular/ssr",
-  "version": "22.0.0-next.8+sha-653e4e9",
+  "version": "22.0.0-next.7+sha-ea95e1a",
   "description": "Angular server side rendering utilities",
   "type": "module",
-  "license": "MIT",
-  "homepage": "https://github.com/angular/angular-cli",
   "keywords": [
     "angular",
     "ssr",
@@ -29,21 +27,17 @@
   },
   "devDependencies": {
     "@angular-devkit/schematics": "workspace:*",
-    "@angular/common": "22.0.0-next.12",
-    "@angular/compiler": "22.0.0-next.12",
-    "@angular/core": "22.0.0-next.12",
-    "@angular/platform-browser": "22.0.0-next.12",
-    "@angular/platform-server": "22.0.0-next.12",
-    "@angular/router": "22.0.0-next.12",
+    "@angular/common": "22.0.0-next.10",
+    "@angular/compiler": "22.0.0-next.10",
+    "@angular/core": "22.0.0-next.10",
+    "@angular/platform-browser": "22.0.0-next.10",
+    "@angular/platform-server": "22.0.0-next.10",
+    "@angular/router": "22.0.0-next.10",
     "@schematics/angular": "workspace:*",
     "beasties": "0.4.2"
   },
   "sideEffects": false,
   "schematics": "./schematics/collection.json",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/angular/angular-cli.git"
-  },
   "module": "./fesm2022/ssr.mjs",
   "typings": "./types/ssr.d.ts",
   "exports": {

@@ -426,7 +426,8 @@ const IS_DISCOVERING_ROUTES = new InjectionToken(typeof ngDevMode === 'undefined
 });
 const MODULE_PRELOAD_MAX = 10;
 const CATCH_ALL_REGEXP = /\/(\*\*)$/;
-const URL_PARAMETER_REGEXP = /(?<!\\):([^/]+)/g;
+const URL_PARAMETER_REGEXP = /(?<!\\):([^/]+)/;
+const URL_PARAMETER_GLOBAL_REGEXP = new RegExp(URL_PARAMETER_REGEXP, 'g');
 async function* handleRoute(options) {
   try {
     const {
@@ -644,7 +645,7 @@ async function* handleSSGRoute(serverConfigRouteTree, redirectTo, metadata, pare
     try {
       for (const params of parameters) {
         const replacer = handlePrerenderParamsReplacement(params, currentRoutePath);
-        const routeWithResolvedParams = currentRoutePath.replace(URL_PARAMETER_REGEXP, replacer).replace(CATCH_ALL_REGEXP, replacer);
+        const routeWithResolvedParams = currentRoutePath.replace(URL_PARAMETER_GLOBAL_REGEXP, replacer).replace(CATCH_ALL_REGEXP, replacer);
         yield {
           ...meta,
           route: routeWithResolvedParams,

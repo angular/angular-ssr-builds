@@ -234,6 +234,8 @@ class CommonEngine {
         const commonRenderingOptions = {
             url: opts.url,
             document,
+            // Validation is already happened in the render method.
+            allowedHosts: ['*'],
         };
         return isBootstrapFn(moduleOrFactory)
             ? renderApplication(moduleOrFactory, {

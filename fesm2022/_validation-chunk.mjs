@@ -1,4 +1,4 @@
-const X_FORWARDED_HEADERS = new Set(['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-port', 'x-forwarded-proto', 'x-forwarded-prefix']);
+const TRUST_ALL_PROXY_HEADERS = '*';
 const HOST_HEADERS_TO_VALIDATE = ['host', 'x-forwarded-host'];
 const VALID_PORT_REGEX = /^\d+$/;
 const VALID_PROTO_REGEX = /^https?$/i;
@@ -94,16 +94,20 @@ function validateHeaders(request, allowedHosts, disableHostCheck) {
   }
 }
 function isProxyHeaderAllowed(headerName, trustProxyHeaders) {
-  return trustProxyHeaders.has(headerName.toLowerCase());
+  return trustProxyHeaders.has(TRUST_ALL_PROXY_HEADERS) || trustProxyHeaders.has(headerName.toLowerCase());
 }
 function normalizeTrustProxyHeaders(trustProxyHeaders) {
   if (!trustProxyHeaders) {
     return new Set();
   }
   if (trustProxyHeaders === true) {
-    return X_FORWARDED_HEADERS;
+    return new Set([TRUST_ALL_PROXY_HEADERS]);
   }
-  return new Set(trustProxyHeaders.map(h => h.toLowerCase()));
+  const normalizedTrustedProxyHeaders = new Set(trustProxyHeaders.map(h => h.toLowerCase()));
+  if (normalizedTrustedProxyHeaders.has(TRUST_ALL_PROXY_HEADERS)) {
+    throw new Error(`"${TRUST_ALL_PROXY_HEADERS}" is not allowed as a value for the "trustProxyHeaders" option.`);
+  }
+  return normalizedTrustedProxyHeaders;
 }
 
 export { getFirstHeaderValue, isProxyHeaderAllowed, normalizeTrustProxyHeaders, sanitizeRequestHeaders, validateRequest, validateUrl };

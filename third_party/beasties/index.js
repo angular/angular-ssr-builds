@@ -684,23 +684,15 @@ function requireStringifier () {
 	  }
 
 	  block(node, start) {
-	    let raws = node.raws;
-	    let between =
-	      typeof raws.between !== 'undefined'
-	        ? raws.between
-	        : this.raw(node, 'between', 'beforeOpen');
+	    let between = this.raw(node, 'between', 'beforeOpen');
 	    this.builder(escapeHTMLInCSS(start + between) + '{', node, 'start');
 
 	    let after;
 	    if (node.nodes && node.nodes.length) {
 	      this.body(node);
-	      after =
-	        typeof raws.after !== 'undefined' ? raws.after : this.raw(node, 'after');
+	      after = this.raw(node, 'after');
 	    } else {
-	      after =
-	        typeof raws.after !== 'undefined'
-	          ? raws.after
-	          : this.raw(node, 'after', 'emptyBody');
+	      after = this.raw(node, 'after', 'emptyBody');
 	    }
 
 	    if (after) this.builder(escapeHTMLInCSS(after));
@@ -719,34 +711,21 @@ function requireStringifier () {
 	    let isDocument = node.type === 'document';
 	    for (let i = 0; i < nodes.length; i++) {
 	      let child = nodes[i];
-	      let before = child.raws.before;
-	      if (typeof before === 'undefined') {
-	        before = this.raw(child, 'before');
-	      }
+	      let before = this.raw(child, 'before');
 	      if (before) this.builder(isDocument ? before : escapeHTMLInCSS(before));
 	      this.stringify(child, last !== i || semicolon);
 	    }
 	  }
 
 	  comment(node) {
-	    let raws = node.raws;
-	    let left =
-	      typeof raws.left !== 'undefined'
-	        ? raws.left
-	        : this.raw(node, 'left', 'commentLeft');
-	    let right =
-	      typeof raws.right !== 'undefined'
-	        ? raws.right
-	        : this.raw(node, 'right', 'commentRight');
+	    let left = this.raw(node, 'left', 'commentLeft');
+	    let right = this.raw(node, 'right', 'commentRight');
 	    this.builder(escapeHTMLInCSS('/*' + left + node.text + right + '*/'), node);
 	  }
 
 	  decl(node, semicolon) {
 	    let raws = node.raws;
-	    let between =
-	      typeof raws.between !== 'undefined'
-	        ? raws.between
-	        : this.raw(node, 'between', 'colon');
+	    let between = this.raw(node, 'between', 'colon');
 
 	    let string = node.prop + between + this.rawValue(node, 'value');
 
@@ -4970,7 +4949,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.13';
+	    this.version = '8.5.14';
 	    this.plugins = this.normalize(plugins);
 	  }
 

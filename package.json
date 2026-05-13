@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "22.0.0-next.7+sha-0a622bb",
+  "version": "22.0.0-next.7+sha-daca934",
   "description": "Angular server side rendering utilities",
   "type": "module",
   "keywords": [
@@ -27,12 +27,12 @@
   },
   "devDependencies": {
     "@angular-devkit/schematics": "workspace:*",
-    "@angular/common": "22.0.0-next.10",
-    "@angular/compiler": "22.0.0-next.10",
-    "@angular/core": "22.0.0-next.10",
-    "@angular/platform-browser": "22.0.0-next.10",
-    "@angular/platform-server": "22.0.0-next.10",
-    "@angular/router": "22.0.0-next.10",
+    "@angular/common": "22.0.0-next.12",
+    "@angular/compiler": "22.0.0-next.12",
+    "@angular/core": "22.0.0-next.12",
+    "@angular/platform-browser": "22.0.0-next.12",
+    "@angular/platform-server": "22.0.0-next.12",
+    "@angular/router": "22.0.0-next.12",
     "@schematics/angular": "workspace:*",
     "beasties": "0.4.2"
   },

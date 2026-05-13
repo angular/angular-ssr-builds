@@ -346,11 +346,13 @@ function renderAngular(html, bootstrap, url, platformProviders, serverContext) {
             url: urlToRender,
             document: html,
             extraProviders: providers,
+            allowedHosts: ['*'],
         })
         : renderApplication(bootstrap, {
             url: urlToRender,
             document: html,
             platformProviders: providers,
+            allowedHosts: ['*'],
         });
 }
 /**

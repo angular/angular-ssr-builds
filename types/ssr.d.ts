@@ -238,6 +238,16 @@ declare function withRoutes(routes: ServerRoute[]): ServerRenderingFeature<Serve
  */
 declare function withAppShell(component: Type<unknown> | (() => Promise<Type<unknown> | DefaultExport<Type<unknown>>>)): ServerRenderingFeature<ServerRenderingFeatureKind.AppShell>;
 /**
+ * Options for configuring server-side rendering.
+ */
+interface ServerRenderingOptions {
+    /**
+     * The maximum allowed response body size when using the Fetch API.
+     * @default 1MB
+     */
+    maxResponseBodySize: number;
+}
+/**
  * Configures server-side rendering for an Angular application.
  *
  * This function sets up the necessary providers for server-side rendering, including
@@ -274,6 +284,45 @@ declare function withAppShell(component: Type<unknown> | (() => Promise<Type<unk
  * @see {@link withAppShell} configures the application shell
  */
 declare function provideServerRendering(...features: ServerRenderingFeature<ServerRenderingFeatureKind>[]): EnvironmentProviders;
+/**
+ * Configures server-side rendering for an Angular application with additional options.
+ *
+ * This function sets up the necessary providers for server-side rendering, including
+ * support for server routes and app shell. It combines features configured using
+ * `withRoutes` and `withAppShell` to provide a comprehensive server-side rendering setup.
+ *
+ * @param options - Configuration options for server-side rendering.
+ * @param features - Optional features to configure additional server rendering behaviors.
+ * @returns An `EnvironmentProviders` instance with the server-side rendering configuration.
+ *
+ * @example
+ * Basic example of how you can enable server-side rendering with options in your application
+ * when using the `bootstrapApplication` function:
+ *
+ * ```ts
+ * import { bootstrapApplication, BootstrapContext } from '@angular/platform-browser';
+ * import { provideServerRendering, withRoutes, withAppShell } from '@angular/ssr';
+ * import { AppComponent } from './app/app.component';
+ * import { SERVER_ROUTES } from './app/app.server.routes';
+ * import { AppShellComponent } from './app/app-shell.component';
+ *
+ * const bootstrap = (context: BootstrapContext) =>
+ *     bootstrapApplication(AppComponent, {
+ *       providers: [
+ *         provideServerRendering(
+ *           { maxResponseBodySize: 1024 * 1024 }, // 1MB limit
+ *           withRoutes(SERVER_ROUTES),
+ *           withAppShell(AppShellComponent),
+ *         ),
+ *       ],
+ *     }, context);
+ *
+ * export default bootstrap;
+ * ```
+ * @see {@link withRoutes} configures server-side routing
+ * @see {@link withAppShell} configures the application shell
+ */
+declare function provideServerRendering(options: ServerRenderingOptions, ...features: ServerRenderingFeature<ServerRenderingFeatureKind>[]): EnvironmentProviders;
 
 /**
  * Represents the serialized format of a route tree as an array of node metadata objects.
@@ -918,4 +967,4 @@ type RequestHandlerFunction = (request: Request) => Promise<Response | null> | n
 declare function createRequestHandler(handler: RequestHandlerFunction): RequestHandlerFunction;
 
 export { IS_DISCOVERING_ROUTES, PrerenderFallback, RenderMode, createRequestHandler, provideServerRendering, withAppShell, withRoutes, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
-export type { RequestHandlerFunction, ServerRoute, ServerRouteClient, ServerRouteCommon, ServerRoutePrerender, ServerRoutePrerenderWithParams, ServerRouteServer };
+export type { RequestHandlerFunction, ServerRenderingOptions, ServerRoute, ServerRouteClient, ServerRouteCommon, ServerRoutePrerender, ServerRoutePrerenderWithParams, ServerRouteServer };

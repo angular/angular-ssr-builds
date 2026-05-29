@@ -322,10 +322,19 @@ function withAppShell(component) {
     })]
   };
 }
-function provideServerRendering(...features) {
+function provideServerRendering(...args) {
+  let options;
+  let features;
+  if (hasOptions(args)) {
+    const [first, ...rest] = args;
+    options = first;
+    features = rest;
+  } else {
+    features = args;
+  }
+  const providers = [provideServerRendering$1(options)];
   let hasAppShell = false;
   let hasServerRoutes = false;
-  const providers = [provideServerRendering$1()];
   for (const {
     ɵkind,
     ɵproviders
@@ -338,6 +347,10 @@ function provideServerRendering(...features) {
     throw new Error(`Configuration error: found 'withAppShell()' without 'withRoutes()' in the same call to 'provideServerRendering()'.` + `The 'withAppShell()' function requires 'withRoutes()' to be used.`);
   }
   return makeEnvironmentProviders(providers);
+}
+function hasOptions(args) {
+  const value = args[0];
+  return !!value && typeof value === 'object' && !('ɵkind' in value);
 }
 
 class RouteTree {

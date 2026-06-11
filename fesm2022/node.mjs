@@ -405,8 +405,8 @@ class AngularNodeAppEngine {
     constructor(options) {
         const appEngineOptions = {
             ...options,
-            allowedHosts: getAllowedHostsFromEnv() ?? options?.allowedHosts,
-            trustProxyHeaders: getTrustProxyHeadersFromEnv() ?? options?.trustProxyHeaders,
+            allowedHosts: options?.allowedHosts ?? getAllowedHostsFromEnv(),
+            trustProxyHeaders: options?.trustProxyHeaders ?? getTrustProxyHeadersFromEnv(),
         };
         this.angularAppEngine = new AngularAppEngine(appEngineOptions);
         this.trustProxyHeaders = appEngineOptions.trustProxyHeaders;

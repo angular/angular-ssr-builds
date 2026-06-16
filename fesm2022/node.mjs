@@ -162,13 +162,15 @@ class CommonEngine {
       return undefined;
     }
     if (pagePath === resolve(documentFilePath) || !(await exists(pagePath))) {
-      this.pageIsSSG.set(pagePath, false);
       return undefined;
     }
     const content = await fs.promises.readFile(pagePath, 'utf-8');
     const isSSG = SSG_MARKER_REGEXP.test(content);
-    this.pageIsSSG.set(pagePath, isSSG);
-    return isSSG ? content : undefined;
+    if (isSSG) {
+      this.pageIsSSG.set(pagePath, true);
+      return content;
+    }
+    return undefined;
   }
   async renderApplication(opts) {
     const moduleOrFactory = this.options?.bootstrap ?? opts.bootstrap;

@@ -25,7 +25,8 @@ function sanitizeRequestHeaders(request, trustProxyHeaders) {
   const headers = new Headers();
   for (const [key, value] of request.headers) {
     const lowerKey = key.toLowerCase();
-    if (lowerKey.startsWith('x-forwarded-') && !isProxyHeaderAllowed(lowerKey, trustProxyHeaders)) {
+    const isProxyHeader = lowerKey === 'forwarded' || lowerKey.startsWith('x-forwarded-');
+    if (isProxyHeader && !isProxyHeaderAllowed(lowerKey, trustProxyHeaders)) {
       console.warn(`Received "${key}" header but "trustProxyHeaders" was not set up to allow it.\n` + `For more information, see https://angular.dev/best-practices/security#configuring-trusted-proxy-headers`);
       headersDeleted = true;
     } else {
@@ -80,6 +81,16 @@ function validateHeaders(request, allowedHosts, disableHostCheck) {
       verifyHostAllowed(headerName, headerValue, allowedHosts);
     }
   }
+  const forwarded = headers.get('forwarded');
+  if (forwarded) {
+    const forwardedParams = parseForwardedHeader(forwarded);
+    if (forwardedParams.host && !disableHostCheck) {
+      verifyHostAllowed('Forwarded "host"', forwardedParams.host, allowedHosts);
+    }
+    if (forwardedParams.proto && !VALID_PROTO_REGEX.test(forwardedParams.proto)) {
+      throw new Error('Header "forwarded" proto parameter must be either "http" or "https".');
+    }
+  }
   const xForwardedPort = getFirstHeaderValue(headers.get('x-forwarded-port'));
   if (xForwardedPort && !VALID_PORT_REGEX.test(xForwardedPort)) {
     throw new Error('Header "x-forwarded-port" must be a numeric value.');
@@ -103,12 +114,120 @@ function normalizeTrustProxyHeaders(trustProxyHeaders) {
   if (trustProxyHeaders === true) {
     return new Set([TRUST_ALL_PROXY_HEADERS]);
   }
-  const normalizedTrustedProxyHeaders = new Set(trustProxyHeaders.map(h => h.toLowerCase()));
-  if (normalizedTrustedProxyHeaders.has(TRUST_ALL_PROXY_HEADERS)) {
-    throw new Error(`"${TRUST_ALL_PROXY_HEADERS}" is not allowed as a value for the "trustProxyHeaders" option.`);
+  const normalizedTrustedProxyHeaders = new Set();
+  for (const header of trustProxyHeaders) {
+    const lowerHeader = header.toLowerCase();
+    if (lowerHeader === TRUST_ALL_PROXY_HEADERS) {
+      throw new Error(`"${TRUST_ALL_PROXY_HEADERS}" is not allowed as a value for the "trustProxyHeaders" option.`);
+    }
+    const isValid = lowerHeader === 'forwarded' || lowerHeader.startsWith('x-forwarded-');
+    if (!isValid) {
+      throw new Error(`"${header}" is not a valid proxy header. Trusted proxy headers must be "forwarded" or start with "x-forwarded-".`);
+    }
+    normalizedTrustedProxyHeaders.add(lowerHeader);
   }
   return normalizedTrustedProxyHeaders;
 }
+function parseForwardedHeader(headerValue) {
+  if (!headerValue) {
+    return {};
+  }
+  const params = {};
+  let inQuotes = false;
+  let escaped = false;
+  let currentKey = '';
+  let currentValue = '';
+  let isParsingValue = false;
+  let isKeyEnded = false;
+  let isParsingValueEnded = false;
+  for (const char of headerValue) {
+    if (escaped) {
+      escaped = false;
+      if (isParsingValue) {
+        currentValue += char;
+      } else {
+        currentKey += char;
+      }
+      continue;
+    }
+    if (char === '\\') {
+      if (inQuotes) {
+        escaped = true;
+      } else if (isParsingValue) {
+        currentValue += char;
+      } else {
+        currentKey += char;
+      }
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (inQuotes) {
+      if (isParsingValue) {
+        currentValue += char;
+      } else {
+        currentKey += char;
+      }
+      continue;
+    }
+    if (char === ',') {
+      addParam(currentKey, currentValue, isParsingValue, params);
+      break;
+    }
+    if (char === ';') {
+      addParam(currentKey, currentValue, isParsingValue, params);
+      currentKey = '';
+      currentValue = '';
+      isParsingValue = false;
+      isKeyEnded = false;
+      isParsingValueEnded = false;
+      continue;
+    }
+    if (char === '=') {
+      if (!isParsingValue) {
+        isParsingValue = true;
+      } else {
+        currentValue += char;
+      }
+      continue;
+    }
+    if (char === ' ' || char === '\t') {
+      if (isParsingValue) {
+        if (currentValue.length > 0) {
+          isParsingValueEnded = true;
+        }
+      } else if (currentKey.length > 0) {
+        isKeyEnded = true;
+      }
+      continue;
+    }
+    if (isParsingValue) {
+      if (!isParsingValueEnded) {
+        currentValue += char;
+      }
+    } else if (isKeyEnded) {
+      currentKey = char;
+      isKeyEnded = false;
+    } else {
+      currentKey += char;
+    }
+  }
+  if (currentKey || currentValue || isParsingValue) {
+    addParam(currentKey, currentValue, isParsingValue, params);
+  }
+  return params;
+}
+function addParam(key, value, hasValue, params) {
+  if (!hasValue) {
+    return;
+  }
+  const trimmedKey = key.trim().toLowerCase();
+  if (trimmedKey) {
+    params[trimmedKey] = value;
+  }
+}
 
-export { getFirstHeaderValue, isProxyHeaderAllowed, normalizeTrustProxyHeaders, sanitizeRequestHeaders, validateRequest, validateUrl };
+export { getFirstHeaderValue, isProxyHeaderAllowed, normalizeTrustProxyHeaders, parseForwardedHeader, sanitizeRequestHeaders, validateRequest, validateUrl };
 //# sourceMappingURL=_validation-chunk.mjs.map

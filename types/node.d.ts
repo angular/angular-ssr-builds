@@ -195,7 +195,7 @@ declare function writeResponseToNodeResponse(source: Response, destination: Serv
  * @param trustProxyHeaders - A boolean or an array of proxy headers to trust when constructing the request URL.
  *
  * @remarks
- * When `trustProxyHeaders` is enabled, headers such as `X-Forwarded-Host` and
+ * When `trustProxyHeaders` is enabled, headers such as `Forwarded`, `X-Forwarded-Host`, and
  * `X-Forwarded-Prefix` should ideally be strictly validated at a higher infrastructure
  * level (e.g., at the reverse proxy or API gateway) before reaching the application.
  *

@@ -1,5 +1,5 @@
 import { ɵInlineCriticalCssProcessor as _InlineCriticalCssProcessor, AngularAppEngine } from '@angular/ssr';
-import { validateUrl, normalizeTrustProxyHeaders, isProxyHeaderAllowed, getFirstHeaderValue } from './_validation-chunk.mjs';
+import { validateUrl, normalizeTrustProxyHeaders, parseForwardedHeader, isProxyHeaderAllowed, getFirstHeaderValue } from './_validation-chunk.mjs';
 import { renderApplication, ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule } from '@angular/platform-server';
 import * as fs from 'node:fs';
 import { dirname, join, normalize, resolve } from 'node:path';
@@ -259,8 +259,10 @@ function createRequestUrl(nodeRequest, trustProxyHeaders) {
     url = '',
     originalUrl
   } = nodeRequest;
-  const protocol = getAllowedProxyHeaderValue(headers, 'x-forwarded-proto', trustProxyHeaders) ?? ('encrypted' in socket && socket.encrypted ? 'https' : 'http');
-  const hostname = getAllowedProxyHeaderValue(headers, 'x-forwarded-host', trustProxyHeaders) ?? headers.host ?? headers[':authority'];
+  const forwardedHeaderValue = getAllowedProxyHeaderValue(headers, 'forwarded', trustProxyHeaders);
+  const forwardedParams = parseForwardedHeader(forwardedHeaderValue);
+  const protocol = forwardedParams.proto ?? getAllowedProxyHeaderValue(headers, 'x-forwarded-proto', trustProxyHeaders) ?? ('encrypted' in socket && socket.encrypted ? 'https' : 'http');
+  const hostname = forwardedParams.host ?? getAllowedProxyHeaderValue(headers, 'x-forwarded-host', trustProxyHeaders) ?? headers.host ?? headers[':authority'];
   if (Array.isArray(hostname)) {
     throw new Error('host value cannot be an array.');
   }

@@ -250,7 +250,7 @@ function createRedirectResponse(location, status = 302, headers) {
   if (ngDevMode && !isValidRedirectResponseCode(status)) {
     throw new Error(`Invalid redirect status code: ${status}. ` + `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`);
   }
-  const resHeaders = new Headers(headers);
+  const resHeaders = headers instanceof Headers ? headers : new Headers(headers);
   if (ngDevMode && resHeaders.has('location')) {
     console.warn(`Location header "${resHeaders.get('location')}" will be ignored and set to "${location}".`);
   }
@@ -1307,7 +1307,7 @@ class AngularServerApp {
       return null;
     }
     if (result.redirectTo) {
-      return createRedirectResponse(result.redirectTo, responseInit.status, headers);
+      return createRedirectResponse(result.redirectTo, responseInit.status, responseInit.headers);
     }
     if (renderMode === RenderMode.Prerender) {
       const renderedHtml = await result.content();

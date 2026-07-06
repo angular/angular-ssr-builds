@@ -694,7 +694,7 @@ function resolveRedirectTo(routePath, redirectTo) {
   if (redirectTo[0] === '/') {
     return redirectTo;
   }
-  const segments = routePath.replace(URL_PARAMETER_REGEXP, '*').split('/');
+  const segments = routePath.replace(URL_PARAMETER_GLOBAL_REGEXP, '*').split('/');
   segments.pop();
   return joinUrlParts(...segments, redirectTo);
 }

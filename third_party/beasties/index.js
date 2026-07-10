@@ -1087,7 +1087,10 @@ function requireNode$1 () {
 	      if (name === 'nodes') {
 	        this.nodes = [];
 	        for (let node of defaults[name]) {
-	          if (typeof node.clone === 'function') {
+	          // Clone only nodes that already belong to another tree, so passing a
+	          // freshly created (parent-less) node adopts that instance instead of
+	          // a copy and keeps the caller's reference usable. See #1987.
+	          if (typeof node.clone === 'function' && node.parent) {
 	            this.append(node.clone());
 	          } else {
 	            this.append(node);
@@ -1220,14 +1223,18 @@ function requireNode$1 () {
 	  }
 
 	  positionBy(opts = {}) {
-	    let pos = this.source.start;
+	    let inputString =
+	      'document' in this.source.input
+	        ? this.source.input.document
+	        : this.source.input.css;
+	    let pos = {
+	      column: this.source.start.column,
+	      line: this.source.start.line,
+	      offset: sourceOffset(inputString, this.source.start)
+	    };
 	    if (opts.index) {
 	      pos = this.positionInside(opts.index);
 	    } else if (opts.word) {
-	      let inputString =
-	        'document' in this.source.input
-	          ? this.source.input.document
-	          : this.source.input.css;
 	      let stringRepresentation = inputString.slice(
 	        sourceOffset(inputString, this.source.start),
 	        sourceOffset(inputString, this.source.end)
@@ -1312,7 +1319,7 @@ function requireNode$1 () {
 	          line: opts.start.line,
 	          offset: sourceOffset(inputString, opts.start)
 	        };
-	      } else if (opts.index) {
+	      } else if (typeof opts.index === 'number') {
 	        start = this.positionInside(opts.index);
 	      }
 
@@ -1324,7 +1331,7 @@ function requireNode$1 () {
 	        };
 	      } else if (typeof opts.endIndex === 'number') {
 	        end = this.positionInside(opts.endIndex);
-	      } else if (opts.index) {
+	      } else if (typeof opts.index === 'number') {
 	        end = this.positionInside(opts.index + 1);
 	      }
 	    }
@@ -2461,12 +2468,15 @@ function requireInput () {
 	    if (!this.map) return false
 	    let consumer = this.map.consumer();
 
-	    let from = consumer.originalPositionFor({ column, line });
+	    let from = consumer.originalPositionFor({ column: column - 1, line });
 	    if (!from.source) return false
 
 	    let to;
 	    if (typeof endLine === 'number') {
-	      to = consumer.originalPositionFor({ column: endColumn, line: endLine });
+	      to = consumer.originalPositionFor({
+	        column: endColumn - 1,
+	        line: endLine
+	      });
 	    }
 
 	    let fromUrl;
@@ -2481,8 +2491,8 @@ function requireInput () {
 	    }
 
 	    let result = {
-	      column: from.column,
-	      endColumn: to && to.column,
+	      column: from.column + 1,
+	      endColumn: to && to.column + 1,
 	      endLine: to && to.line,
 	      line: from.line,
 	      url: fromUrl.toString()
@@ -2731,8 +2741,13 @@ function requireFromJSON () {
 	      inputs.push(inputHydrated);
 	    }
 	  }
+	  // Rehydrate children separately and attach them after construction.
+	  // Passing them through the container constructor would re-run insertion
+	  // spacing normalization and overwrite each child's own `raws.before`.
+	  let nodes;
 	  if (defaults.nodes) {
-	    defaults.nodes = json.nodes.map(n => fromJSON(n, inputs));
+	    nodes = json.nodes.map(n => fromJSON(n, inputs));
+	    delete defaults.nodes;
 	  }
 	  if (defaults.source) {
 	    let { inputId, ...source } = defaults.source;
@@ -2741,19 +2756,28 @@ function requireFromJSON () {
 	      defaults.source.input = inputs[inputId];
 	    }
 	  }
+
+	  let node;
 	  if (defaults.type === 'root') {
-	    return new Root(defaults)
+	    node = new Root(defaults);
 	  } else if (defaults.type === 'decl') {
-	    return new Declaration(defaults)
+	    node = new Declaration(defaults);
 	  } else if (defaults.type === 'rule') {
-	    return new Rule(defaults)
+	    node = new Rule(defaults);
 	  } else if (defaults.type === 'comment') {
-	    return new Comment(defaults)
+	    node = new Comment(defaults);
 	  } else if (defaults.type === 'atrule') {
-	    return new AtRule(defaults)
+	    node = new AtRule(defaults);
 	  } else {
 	    throw new Error('Unknown node type: ' + json.type)
 	  }
+
+	  if (nodes) {
+	    node.nodes = nodes;
+	    for (let child of nodes) child.parent = node;
+	  }
+
+	  return node
 	}
 
 	fromJSON_1 = fromJSON;
@@ -4946,7 +4970,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.15';
+	    this.version = '8.5.16';
 	    this.plugins = this.normalize(plugins);
 	  }
 

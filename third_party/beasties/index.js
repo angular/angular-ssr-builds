@@ -11579,9 +11579,10 @@ function serializeStylesheet(ast, options) {
       }
       return;
     }
-    if (type === "end" && result === "}" && node?.raws?.semicolon) {
+    if (type === "end" && result === "}" && node?.raws?.semicolon && (node.type === "rule" || node.type === "atrule")) {
+      const lastChild = node.nodes?.[node.nodes.length - 1];
       const lastItemIdx = cssParts.length - 2;
-      if (lastItemIdx >= 0 && cssParts[lastItemIdx]) {
+      if (lastChild?.type === "decl" && lastItemIdx >= 0 && cssParts[lastItemIdx]) {
         cssParts[lastItemIdx] = cssParts[lastItemIdx].slice(0, -1);
       }
     }
@@ -11756,13 +11757,15 @@ function createDocument(html) {
   const document = parseDocument(html, { decodeEntities: false });
   extendDocument(document);
   extendElement(Element.prototype);
-  let beastiesContainer = document.querySelector("[data-beasties-container]");
-  if (!beastiesContainer) {
+  let beastiesContainers = document.querySelectorAll("[data-beasties-container]");
+  if (!beastiesContainers.length) {
     document.documentElement?.setAttribute("data-beasties-container", "");
-    beastiesContainer = document.documentElement || document;
+    beastiesContainers = [document.documentElement || document];
   }
-  document.beastiesContainer = beastiesContainer;
-  buildCache(beastiesContainer);
+  document.beastiesContainers = beastiesContainers;
+  for (const container of beastiesContainers) {
+    buildCache(container);
+  }
   return document;
 }
 function serializeDocument(document) {
@@ -11939,6 +11942,11 @@ function extendDocument(document) {
           return this;
         }
         return selectAll(sel, this);
+      }
+    },
+    beastiesContainer: {
+      get() {
+        return this.beastiesContainers?.[0];
       }
     }
   });
@@ -12227,6 +12235,9 @@ class Beasties {
    * Fetch CSS content for a linked stylesheet
    */
   async fetchStylesheet(link, document) {
+    if (link.hasAttribute("data-beasties-skip")) {
+      return void 0;
+    }
     const href = link.getAttribute("href");
     const pathname = href?.split("?")[0]?.split("#")[0];
     if (!pathname?.endsWith(".css")) {
@@ -12363,7 +12374,7 @@ class Beasties {
       return;
     const name = style.$$name ? style.$$name.replace(LEADING_SLASH_RE, "") : "inline CSS";
     const options = this.options;
-    const beastiesContainer = document.beastiesContainer;
+    const beastiesContainers = document.beastiesContainers;
     let keyframesMode = options.keyframes ?? "critical";
     if (keyframesMode === true)
       keyframesMode = "all";
@@ -12444,7 +12455,7 @@ class Beasties {
             if (!sel)
               return false;
             try {
-              return beastiesContainer.exists(sel);
+              return beastiesContainers.some((container) => container.exists(sel));
             } catch (e) {
               failedSelectors.push(`${sel} -> ${e.message || e.toString()}`);
               return false;

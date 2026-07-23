@@ -630,27 +630,74 @@ function requireStringifier () {
 	  return str[0].toUpperCase() + str.slice(1)
 	}
 
+	function atruleStart(str, node) {
+	  let name = '@' + node.name;
+	  let params = node.params ? str.rawValue(node, 'params') : '';
+
+	  if (typeof node.raws.afterName !== 'undefined') {
+	    name += node.raws.afterName;
+	  } else if (params) {
+	    name += ' ';
+	  }
+
+	  return name + params
+	}
+
+	function pushBody(str, stack, node) {
+	  let nodes = node.nodes;
+	  let last = nodes.length - 1;
+	  while (last > 0) {
+	    if (nodes[last].type !== 'comment') break
+	    last -= 1;
+	  }
+
+	  let semicolon = str.raw(node, 'semicolon');
+	  let isDocument = node.type === 'document';
+	  for (let i = nodes.length - 1; i >= 0; i--) {
+	    stack.push({
+	      document: isDocument,
+	      node: nodes[i],
+	      semicolon: last !== i || semicolon
+	    });
+	  }
+	}
+
+	function pushBlock(str, stack, node, start) {
+	  let between = str.raw(node, 'between', 'beforeOpen');
+	  str.builder(escapeHTMLInCSS(start + between) + '{', node, 'start');
+
+	  let hasNodes = node.nodes && node.nodes.length;
+	  let close = () => {
+	    let after = hasNodes
+	      ? str.raw(node, 'after')
+	      : str.raw(node, 'after', 'emptyBody');
+	    if (after) str.builder(escapeHTMLInCSS(after));
+	    str.builder('}', node, 'end');
+	    if (node.type === 'rule' && node.raws.ownSemicolon) {
+	      str.builder(escapeHTMLInCSS(node.raws.ownSemicolon), node, 'end');
+	    }
+	  };
+
+	  if (hasNodes) {
+	    stack.push(close);
+	    pushBody(str, stack, node);
+	  } else {
+	    close();
+	  }
+	}
+
 	class Stringifier {
 	  constructor(builder) {
 	    this.builder = builder;
 	  }
 
 	  atrule(node, semicolon) {
-	    let raws = node.raws;
-	    let name = '@' + node.name;
-	    let params = node.params ? this.rawValue(node, 'params') : '';
-
-	    if (typeof raws.afterName !== 'undefined') {
-	      name += raws.afterName;
-	    } else if (params) {
-	      name += ' ';
-	    }
-
+	    let start = atruleStart(this, node);
 	    if (node.nodes) {
-	      this.block(node, name + params);
+	      this.block(node, start);
 	    } else {
-	      let end = (raws.between || '') + (semicolon ? ';' : '');
-	      this.builder(escapeHTMLInCSS(name + params + end), node);
+	      let end = (node.raws.between || '') + (semicolon ? ';' : '');
+	      this.builder(escapeHTMLInCSS(start + end), node);
 	    }
 	  }
 
@@ -700,20 +747,38 @@ function requireStringifier () {
 	  }
 
 	  body(node) {
-	    let nodes = node.nodes;
-	    let last = nodes.length - 1;
-	    while (last > 0) {
-	      if (nodes[last].type !== 'comment') break
-	      last -= 1;
-	    }
+	    // Rules and at-rules are expanded into an explicit stack instead of
+	    // recursive `stringify()` calls to survive deeply nested trees.
+	    // If a subclass changes the traversal methods, its children go
+	    // through `stringify()` to keep the override in charge.
+	    let proto = Stringifier.prototype;
+	    let expandable = ['atrule', 'block', 'body', 'rule', 'stringify'].every(
+	      method => this[method] === proto[method]
+	    );
 
-	    let semicolon = this.raw(node, 'semicolon');
-	    let isDocument = node.type === 'document';
-	    for (let i = 0; i < nodes.length; i++) {
-	      let child = nodes[i];
+	    let stack = [];
+	    pushBody(this, stack, node);
+
+	    while (stack.length > 0) {
+	      let entry = stack.pop();
+	      if (typeof entry === 'function') {
+	        entry();
+	        continue
+	      }
+
+	      let child = entry.node;
 	      let before = this.raw(child, 'before');
-	      if (before) this.builder(isDocument ? before : escapeHTMLInCSS(before));
-	      this.stringify(child, last !== i || semicolon);
+	      if (before) {
+	        this.builder(entry.document ? before : escapeHTMLInCSS(before));
+	      }
+
+	      if (expandable && child.type === 'rule') {
+	        pushBlock(this, stack, child, this.rawValue(child, 'selector'));
+	      } else if (expandable && child.type === 'atrule' && child.nodes) {
+	        pushBlock(this, stack, child, atruleStart(this, child));
+	      } else {
+	        this.stringify(child, entry.semicolon);
+	      }
 	    }
 	  }
 
@@ -1021,25 +1086,41 @@ function requireNode$1 () {
 
 	function cloneNode(obj, parent) {
 	  let cloned = new obj.constructor();
+	  // An explicit stack instead of recursive calls to survive deeply
+	  // nested trees. Each entry is [source, its clone, clone's parent].
+	  let stack = [[obj, cloned, parent]];
 
-	  for (let i in obj) {
-	    if (!Object.prototype.hasOwnProperty.call(obj, i)) {
-	      /* c8 ignore next 2 */
-	      continue
-	    }
-	    if (i === 'proxyCache') continue
-	    let value = obj[i];
-	    let type = typeof value;
+	  while (stack.length > 0) {
+	    let [source, target, targetParent] = stack.pop();
+	    for (let i in source) {
+	      if (!Object.prototype.hasOwnProperty.call(source, i)) {
+	        /* c8 ignore next 2 */
+	        continue
+	      }
+	      if (i === 'proxyCache') continue
+	      let value = source[i];
+	      let type = typeof value;
 
-	    if (i === 'parent' && type === 'object') {
-	      if (parent) cloned[i] = parent;
-	    } else if (i === 'source') {
-	      cloned[i] = value;
-	    } else if (Array.isArray(value)) {
-	      cloned[i] = value.map(j => cloneNode(j, cloned));
-	    } else {
-	      if (type === 'object' && value !== null) value = cloneNode(value);
-	      cloned[i] = value;
+	      if (i === 'parent' && type === 'object') {
+	        if (targetParent) target[i] = targetParent;
+	      } else if (i === 'source') {
+	        target[i] = value;
+	      } else if (Array.isArray(value)) {
+	        let children = [];
+	        target[i] = children;
+	        for (let j of value) {
+	          let childClone = new j.constructor();
+	          children.push(childClone);
+	          stack.push([j, childClone, target]);
+	        }
+	      } else {
+	        if (type === 'object' && value !== null) {
+	          let valueClone = new value.constructor();
+	          stack.push([value, valueClone, undefined]);
+	          value = valueClone;
+	        }
+	        target[i] = value;
+	      }
 	    }
 	  }
 
@@ -1083,7 +1164,8 @@ function requireNode$1 () {
 	    this[isClean] = false;
 	    this[my] = true;
 
-	    for (let name in defaults) {
+	    for (let name of Object.keys(defaults)) {
+	      if (name === '__proto__') continue
 	      if (name === 'nodes') {
 	        this.nodes = [];
 	        for (let node of defaults[name]) {
@@ -1395,47 +1477,68 @@ function requireNode$1 () {
 	  }
 
 	  toJSON(_, inputs) {
-	    let fixed = {};
 	    let emitInputs = inputs == null;
 	    inputs = inputs || new Map();
-	    let inputsNextIndex = 0;
 
-	    for (let name in this) {
-	      if (!Object.prototype.hasOwnProperty.call(this, name)) {
-	        /* c8 ignore next 2 */
-	        continue
-	      }
-	      if (name === 'parent' || name === 'proxyCache') continue
-	      let value = this[name];
+	    // A worklist instead of recursive `toJSON()` calls to survive deeply
+	    // nested trees. Each entry converts one node and writes the result
+	    // into the already converted parent by [holder, key].
+	    let holderOfRoot = [];
+	    let queue = [[this, holderOfRoot, 0]];
 
-	      if (Array.isArray(value)) {
-	        fixed[name] = value.map(i => {
-	          if (typeof i === 'object' && i.toJSON) {
-	            return i.toJSON(null, inputs)
-	          } else {
-	            return i
-	          }
-	        });
-	      } else if (typeof value === 'object' && value.toJSON) {
-	        fixed[name] = value.toJSON(null, inputs);
-	      } else if (name === 'source') {
-	        if (value == null) continue
-	        let inputId = inputs.get(value.input);
-	        if (inputId == null) {
-	          inputId = inputsNextIndex;
-	          inputs.set(value.input, inputsNextIndex);
-	          inputsNextIndex++;
+	    for (let step = 0; step < queue.length; step++) {
+	      let [node, holder, key] = queue[step];
+	      let fixed = {};
+	      holder[key] = fixed;
+
+	      for (let name in node) {
+	        if (!Object.prototype.hasOwnProperty.call(node, name)) {
+	          /* c8 ignore next 2 */
+	          continue
 	        }
-	        fixed[name] = {
-	          end: value.end,
-	          inputId,
-	          start: value.start
-	        };
-	      } else {
-	        fixed[name] = value;
+	        if (name === 'parent' || name === 'proxyCache') continue
+	        let value = node[name];
+
+	        if (Array.isArray(value)) {
+	          let fixedArray = [];
+	          fixed[name] = fixedArray;
+	          for (let i = 0; i < value.length; i++) {
+	            let item = value[i];
+	            if (typeof item === 'object' && item.toJSON) {
+	              if (item.toJSON === Node.prototype.toJSON) {
+	                queue.push([item, fixedArray, i]);
+	              } else {
+	                fixedArray[i] = item.toJSON(null, inputs);
+	              }
+	            } else {
+	              fixedArray[i] = item;
+	            }
+	          }
+	        } else if (typeof value === 'object' && value.toJSON) {
+	          if (value.toJSON === Node.prototype.toJSON) {
+	            queue.push([value, fixed, name]);
+	          } else {
+	            fixed[name] = value.toJSON(null, inputs);
+	          }
+	        } else if (name === 'source') {
+	          if (value == null) continue
+	          let inputId = inputs.get(value.input);
+	          if (inputId == null) {
+	            inputId = inputs.size;
+	            inputs.set(value.input, inputId);
+	          }
+	          fixed[name] = {
+	            end: value.end,
+	            inputId,
+	            start: value.start
+	          };
+	        } else {
+	          fixed[name] = value;
+	        }
 	      }
 	    }
 
+	    let fixed = holderOfRoot[0];
 	    if (emitInputs) {
 	      fixed.inputs = [...inputs.keys()].map(input => input.toJSON());
 	    }
@@ -1539,18 +1642,25 @@ function requireContainer$1 () {
 	let AtRule, parse, Root, Rule;
 
 	function cleanSource(nodes) {
-	  return nodes.map(i => {
-	    if (i.nodes) i.nodes = cleanSource(i.nodes);
-	    delete i.source;
-	    return i
-	  })
+	  let stack = nodes.slice();
+	  while (stack.length > 0) {
+	    let node = stack.pop();
+	    delete node.source;
+	    if (node.nodes) {
+	      node.nodes = node.nodes.slice();
+	      for (let i of node.nodes) stack.push(i);
+	    }
+	  }
+	  return nodes.slice()
 	}
 
 	function markTreeDirty(node) {
-	  node[isClean] = false;
-	  if (node.proxyOf.nodes) {
-	    for (let i of node.proxyOf.nodes) {
-	      markTreeDirty(i);
+	  let stack = [node];
+	  while (stack.length > 0) {
+	    let next = stack.pop();
+	    next[isClean] = false;
+	    if (next.proxyOf.nodes) {
+	      for (let i of next.proxyOf.nodes) stack.push(i);
 	    }
 	  }
 	}
@@ -1578,9 +1688,18 @@ function requireContainer$1 () {
 	  }
 
 	  cleanRaws(keepBetween) {
-	    super.cleanRaws(keepBetween);
-	    if (this.nodes) {
-	      for (let node of this.nodes) node.cleanRaws(keepBetween);
+	    let stack = [this];
+	    while (stack.length > 0) {
+	      let node = stack.pop();
+	      if (node !== this && node.cleanRaws !== Container.prototype.cleanRaws) {
+	        // Subclass with own logic; let it handle its subtree
+	        node.cleanRaws(keepBetween);
+	        continue
+	      }
+	      Node.prototype.cleanRaws.call(node, keepBetween);
+	      if (node.nodes) {
+	        for (let child of node.nodes) stack.push(child);
+	      }
 	    }
 	  }
 
@@ -1840,19 +1959,48 @@ function requireContainer$1 () {
 	  }
 
 	  walk(callback) {
-	    return this.each((child, i) => {
+	    if (!this.proxyOf.nodes) return undefined
+
+	    // An explicit stack instead of recursive `each()` calls to survive
+	    // deeply nested trees. Each frame keeps a live `indexes` slot, so
+	    // insertion and removal during the walk behave like `each()`: the
+	    // slot stays at the current child until its subtree is finished.
+	    let stack = [{ iterator: this.getIterator(), node: this.proxyOf }];
+
+	    while (stack.length > 0) {
+	      let { iterator, node } = stack[stack.length - 1];
+	      let index = node.indexes[iterator];
+
+	      if (index >= node.proxyOf.nodes.length) {
+	        delete node.indexes[iterator];
+	        stack.pop();
+	        let parent = stack[stack.length - 1];
+	        // Finish the parent’s step for the child subtree we just left
+	        if (parent) parent.node.indexes[parent.iterator] += 1;
+	        continue
+	      }
+
+	      let child = node.proxyOf.nodes[index];
 	      let result;
 	      try {
-	        result = callback(child, i);
+	        result = callback(child, index);
 	      } catch (e) {
 	        throw child.addToError(e)
 	      }
-	      if (result !== false && child.walk) {
-	        result = child.walk(callback);
+	      if (result === false) {
+	        for (let opened of stack) {
+	          delete opened.node.indexes[opened.iterator];
+	        }
+	        return false
 	      }
+	      if (child.walk && child.proxyOf.nodes) {
+	        stack.push({ iterator: child.getIterator(), node: child });
+	      } else {
+	        node.indexes[iterator] += 1;
+	      }
+	    }
 
-	      return result
-	    })
+	    return undefined
 	  }
 
 	  walkAtRules(name, callback) {
@@ -1955,24 +2103,26 @@ function requireContainer$1 () {
 
 	/* c8 ignore start */
 	Container.rebuild = node => {
-	  if (node.type === 'atrule') {
-	    Object.setPrototypeOf(node, AtRule.prototype);
-	  } else if (node.type === 'rule') {
-	    Object.setPrototypeOf(node, Rule.prototype);
-	  } else if (node.type === 'decl') {
-	    Object.setPrototypeOf(node, Declaration.prototype);
-	  } else if (node.type === 'comment') {
-	    Object.setPrototypeOf(node, Comment.prototype);
-	  } else if (node.type === 'root') {
-	    Object.setPrototypeOf(node, Root.prototype);
-	  }
+	  let stack = [node];
+	  while (stack.length > 0) {
+	    let next = stack.pop();
+	    if (next.type === 'atrule') {
+	      Object.setPrototypeOf(next, AtRule.prototype);
+	    } else if (next.type === 'rule') {
+	      Object.setPrototypeOf(next, Rule.prototype);
+	    } else if (next.type === 'decl') {
+	      Object.setPrototypeOf(next, Declaration.prototype);
+	    } else if (next.type === 'comment') {
+	      Object.setPrototypeOf(next, Comment.prototype);
+	    } else if (next.type === 'root') {
+	      Object.setPrototypeOf(next, Root.prototype);
+	    }
 
-	  node[my] = true;
+	    next[my] = true;
 
-	  if (node.nodes) {
-	    node.nodes.forEach(child => {
-	      Container.rebuild(child);
-	    });
+	    if (next.nodes) {
+	      for (let child of next.nodes) stack.push(child);
+	    }
 	  }
 	};
 	/* c8 ignore stop */
@@ -2094,7 +2244,7 @@ function requirePreviousMap () {
 	hasRequiredPreviousMap = 1;
 
 	let { existsSync, readFileSync } = require$$2;
-	let { dirname, join } = require$$2;
+	let { dirname, isAbsolute, join, relative, sep } = require$$2;
 	let { SourceMapConsumer, SourceMapGenerator } = require$$2;
 
 	function fromBase64(str) {
@@ -2178,10 +2328,19 @@ function requirePreviousMap () {
 	  }
 
 	  loadFile(path, cssFile, trusted) {
-	    /* c8 ignore next 5 */
 	    if (!trusted && !this.unsafeMap) {
 	      if (!/\.map$/i.test(path)) {
 	        return undefined
+	      }
+	      if (cssFile) {
+	        let relativePath = relative(dirname(cssFile), path);
+	        if (
+	          relativePath === '..' ||
+	          relativePath.startsWith('..' + sep) ||
+	          isAbsolute(relativePath)
+	        ) {
+	          return undefined
+	        }
 	      }
 	    }
 	    this.root = dirname(path);
@@ -2473,10 +2632,16 @@ function requireInput () {
 
 	    let to;
 	    if (typeof endLine === 'number') {
-	      to = consumer.originalPositionFor({
+	      let toPosition = consumer.originalPositionFor({
 	        column: endColumn - 1,
 	        line: endLine
 	      });
+	      // The source map may not have a mapping that covers the end position
+	      // (`originalPositionFor()` then returns `null` for `line`/`column`
+	      // instead of omitting them). Treat that the same as not requesting
+	      // an end position at all, so `endLine`/`endColumn` stay a consistent
+	      // `undefined` pair instead of a mix of `null` and a bogus number.
+	      if (toPosition.source) to = toPosition;
 	    }
 
 	    let fromUrl;
@@ -2558,6 +2723,19 @@ function requireRoot () {
 	  }
 
 	  normalize(child, sample, type) {
+	    let keepBefore = new Set();
+	    for (let node of Array.isArray(child) ? child : [child]) {
+	      if (
+	        node &&
+	        typeof node === 'object' &&
+	        !node.parent &&
+	        node.raws &&
+	        typeof node.raws.before !== 'undefined'
+	      ) {
+	        keepBefore.add(node.raws);
+	      }
+	    }
+
 	    let nodes = super.normalize(child);
 
 	    if (sample) {
@@ -2569,7 +2747,9 @@ function requireRoot () {
 	        }
 	      } else if (this.first !== sample) {
 	        for (let node of nodes) {
-	          node.raws.before = sample.raws.before;
+	          if (!keepBefore.has(node.raws)) {
+	            node.raws.before = sample.raws.before;
+	          }
 	        }
 	      }
 	    }
@@ -2724,31 +2904,24 @@ function requireFromJSON () {
 	let Root = requireRoot();
 	let Rule = requireRule();
 
-	function fromJSON(json, inputs) {
-	  if (Array.isArray(json)) return json.map(n => fromJSON(n))
-
-	  let { inputs: ownInputs, ...defaults } = json;
-	  if (ownInputs) {
-	    inputs = [];
-	    for (let input of ownInputs) {
-	      let inputHydrated = { ...input, __proto__: Input.prototype };
-	      if (inputHydrated.map) {
-	        inputHydrated.map = {
-	          ...inputHydrated.map,
-	          __proto__: PreviousMap.prototype
-	        };
-	      }
-	      inputs.push(inputHydrated);
+	function hydrateInputs(json, inputs) {
+	  if (!json.inputs) return inputs
+	  return json.inputs.map(input => {
+	    let inputHydrated = { ...input, __proto__: Input.prototype };
+	    if (inputHydrated.map) {
+	      inputHydrated.map = {
+	        ...inputHydrated.map,
+	        __proto__: PreviousMap.prototype
+	      };
 	    }
-	  }
-	  // Rehydrate children separately and attach them after construction.
-	  // Passing them through the container constructor would re-run insertion
-	  // spacing normalization and overwrite each child's own `raws.before`.
-	  let nodes;
-	  if (defaults.nodes) {
-	    nodes = json.nodes.map(n => fromJSON(n, inputs));
-	    delete defaults.nodes;
-	  }
+	    return inputHydrated
+	  })
+	}
+
+	function constructNode(json, inputs, children) {
+	  let defaults = { ...json };
+	  delete defaults.inputs;
+	  delete defaults.nodes;
 	  if (defaults.source) {
 	    let { inputId, ...source } = defaults.source;
 	    defaults.source = source;
@@ -2772,12 +2945,58 @@ function requireFromJSON () {
 	    throw new Error('Unknown node type: ' + json.type)
 	  }
 
-	  if (nodes) {
-	    node.nodes = nodes;
-	    for (let child of nodes) child.parent = node;
+	  // Rehydrated children are attached after construction. Passing them
+	  // through the container constructor would re-run insertion spacing
+	  // normalization and overwrite each child's own `raws.before`.
+	  if (children) {
+	    node.nodes = children;
+	    for (let child of children) child.parent = node;
 	  }
 
 	  return node
+	}
+
+	function fromJSON(json, inputs) {
+	  if (Array.isArray(json)) return json.map(n => fromJSON(n))
+
+	  // An explicit stack instead of recursive calls to survive deeply
+	  // nested trees. Children are rehydrated before their parent node
+	  // is constructed.
+	  let result;
+	  let stack = [
+	    { childIndex: 0, children: [], inputs: hydrateInputs(json, inputs), json }
+	  ];
+
+	  while (stack.length > 0) {
+	    let frame = stack[stack.length - 1];
+	    let jsonNodes = frame.json.nodes;
+
+	    if (jsonNodes && frame.childIndex < jsonNodes.length) {
+	      let childJson = jsonNodes[frame.childIndex];
+	      frame.childIndex += 1;
+	      stack.push({
+	        childIndex: 0,
+	        children: [],
+	        inputs: hydrateInputs(childJson, frame.inputs),
+	        json: childJson
+	      });
+	      continue
+	    }
+
+	    stack.pop();
+	    let node = constructNode(
+	      frame.json,
+	      frame.inputs,
+	      jsonNodes ? frame.children : undefined
+	    );
+	    if (stack.length > 0) {
+	      stack[stack.length - 1].children.push(node);
+	    } else {
+	      result = node;
+	    }
+	  }
+
+	  return result
 	}
 
 	fromJSON_1 = fromJSON;
@@ -4344,8 +4563,14 @@ function requireLazyResult () {
 	}
 
 	function cleanMarks(node) {
-	  node[isClean] = false;
-	  if (node.nodes) node.nodes.forEach(i => cleanMarks(i));
+	  let stack = [node];
+	  while (stack.length > 0) {
+	    let next = stack.pop();
+	    next[isClean] = false;
+	    if (next.nodes) {
+	      for (let i of next.nodes) stack.push(i);
+	    }
+	  }
 	  return node
 	}
 
@@ -4776,21 +5001,57 @@ function requireLazyResult () {
 	  }
 
 	  walkSync(node) {
+	    // An explicit stack like in async `visitTick()` to survive deeply
+	    // nested trees. Unlike `visitTick()`, nodes are marked clean only
+	    // on entering, so a node dirtied by its own visitors is revisited
+	    // on the next pass.
 	    node[isClean] = true;
-	    let events = getEvents(node);
-	    for (let event of events) {
-	      if (event === CHILDREN) {
-	        if (node.nodes) {
-	          node.each(child => {
-	            if (!child[isClean]) this.walkSync(child);
-	          });
+	    let stack = [{ eventIndex: 0, events: getEvents(node), iterator: 0, node }];
+
+	    while (stack.length > 0) {
+	      let visit = stack[stack.length - 1];
+	      let visitNode = visit.node;
+
+	      if (visit.iterator !== 0) {
+	        let iterator = visit.iterator;
+	        let child;
+	        let descended = false;
+	        while ((child = visitNode.nodes[visitNode.indexes[iterator]])) {
+	          visitNode.indexes[iterator] += 1;
+	          if (!child[isClean]) {
+	            child[isClean] = true;
+	            stack.push({
+	              eventIndex: 0,
+	              events: getEvents(child),
+	              iterator: 0,
+	              node: child
+	            });
+	            descended = true;
+	            break
+	          }
 	        }
-	      } else {
-	        let visitors = this.listeners[event];
-	        if (visitors) {
-	          if (this.visitSync(visitors, node.toProxy())) return
-	        }
+	        if (descended) continue
+	        visit.iterator = 0;
+	        delete visitNode.indexes[iterator];
 	      }
+
+	      if (visit.eventIndex < visit.events.length) {
+	        let event = visit.events[visit.eventIndex];
+	        visit.eventIndex += 1;
+	        if (event === CHILDREN) {
+	          if (visitNode.nodes && visitNode.nodes.length) {
+	            visit.iterator = visitNode.getIterator();
+	          }
+	        } else {
+	          let visitors = this.listeners[event];
+	          if (visitors) {
+	            if (this.visitSync(visitors, visitNode.toProxy())) stack.pop();
+	          }
+	        }
+	        continue
+	      }
+
+	      stack.pop();
 	    }
 	  }
 
@@ -4970,7 +5231,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.16';
+	    this.version = '8.5.19';
 	    this.plugins = this.normalize(plugins);
 	  }
 

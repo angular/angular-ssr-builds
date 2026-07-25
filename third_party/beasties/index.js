@@ -605,6 +605,10 @@ function requireStringifier () {
 	const STYLE_TAG = /(<)(\/?style\b)/gi;
 	const COMMENT_OPEN = /(<)(!--)/g;
 
+	// Characters that end an at-rule name, mirroring RE_AT_END in the tokenizer.
+	// Params starting with anything else need a space to stay separate tokens.
+	const AT_NAME_END = /[\t\n\f\r "#'()/;[\\\]{}]/;
+
 	function escapeHTMLInCSS(str) {
 	  if (typeof str !== 'string') return str
 	  if (!str.includes('<')) return str
@@ -633,14 +637,15 @@ function requireStringifier () {
 	function atruleStart(str, node) {
 	  let name = '@' + node.name;
 	  let params = node.params ? str.rawValue(node, 'params') : '';
+	  let afterName = node.raws.afterName;
 
-	  if (typeof node.raws.afterName !== 'undefined') {
-	    name += node.raws.afterName;
-	  } else if (params) {
-	    name += ' ';
+	  if (typeof afterName === 'undefined') {
+	    afterName = params ? ' ' : '';
+	  } else if (afterName === '' && params && !AT_NAME_END.test(params[0])) {
+	    afterName = ' ';
 	  }
 
-	  return name + params
+	  return name + afterName + params
 	}
 
 	function pushBody(str, stack, node) {
@@ -654,10 +659,24 @@ function requireStringifier () {
 	  let semicolon = str.raw(node, 'semicolon');
 	  let isDocument = node.type === 'document';
 	  for (let i = nodes.length - 1; i >= 0; i--) {
+	    let child = nodes[i];
+	    let childSemicolon = last !== i || semicolon;
+	    // A childless at-rule or a custom property declaration that still has
+	    // following siblings must be terminated. Without the semicolon those
+	    // trailing comments are folded into the at-rule's prelude or the custom
+	    // property's value and disappear when the output is re-parsed.
+	    if (
+	      !childSemicolon &&
+	      i < nodes.length - 1 &&
+	      ((child.type === 'atrule' && !child.nodes) ||
+	        (child.type === 'decl' && child.prop.startsWith('--')))
+	    ) {
+	      childSemicolon = true;
+	    }
 	    stack.push({
 	      document: isDocument,
-	      node: nodes[i],
-	      semicolon: last !== i || semicolon
+	      node: child,
+	      semicolon: childSemicolon
 	    });
 	  }
 	}
@@ -4349,12 +4368,22 @@ function requireWarning () {
 	if (hasRequiredWarning) return warning;
 	hasRequiredWarning = 1;
 
+	let Container = requireContainer$1();
+	let { my } = requireSymbols();
+
 	class Warning {
 	  constructor(text, opts = {}) {
 	    this.type = 'warning';
 	    this.text = text;
 
 	    if (opts.node && opts.node.source) {
+	      if (!opts.node[my]) {
+	        // The node comes from another PostCSS copy in node_modules, so it does
+	        // not have this copy’s methods. Container#normalize() rebuilds such
+	        // nodes on insert, but a node passed straight to Result#warn() never
+	        // goes through it.
+	        Container.rebuild(opts.node);
+	      }
 	      let range = opts.node.rangeBy(opts);
 	      this.line = range.start.line;
 	      this.column = range.start.column;
@@ -5231,7 +5260,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.19';
+	    this.version = '8.5.22';
 	    this.plugins = this.normalize(plugins);
 	  }
 

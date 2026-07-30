@@ -1023,6 +1023,9 @@ function requireStringifier () {
 	  }
 
 	  root(node) {
+	    if (node.source && node.source.input.hasBOM) {
+	      this.builder('\uFEFF', node, 'start');
+	    }
 	    this.body(node);
 	    if (node.raws.after) {
 	      let after = node.raws.after;
@@ -2348,18 +2351,12 @@ function requirePreviousMap () {
 
 	  loadFile(path, cssFile, trusted) {
 	    if (!trusted && !this.unsafeMap) {
-	      if (!/\.map$/i.test(path)) {
+	      if (!/\.map$/i.test(path)) return undefined
+	      if (!cssFile) return undefined
+
+	      let rel = relative(dirname(cssFile), path);
+	      if (rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) {
 	        return undefined
-	      }
-	      if (cssFile) {
-	        let relativePath = relative(dirname(cssFile), path);
-	        if (
-	          relativePath === '..' ||
-	          relativePath.startsWith('..' + sep) ||
-	          isAbsolute(relativePath)
-	        ) {
-	          return undefined
-	        }
 	      }
 	    }
 	    this.root = dirname(path);
@@ -5260,7 +5257,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.22';
+	    this.version = '8.5.24';
 	    this.plugins = this.normalize(plugins);
 	  }
 

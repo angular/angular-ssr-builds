@@ -33,8 +33,7 @@ function sanitizeRequestHeaders(request, trustProxyHeaders) {
       headers.set(key, value);
     }
   }
-  return headersDeleted ? new Request(request.clone(), {
-    signal: request.signal,
+  return headersDeleted ? new Request(request, {
     headers
   }) : request;
 }

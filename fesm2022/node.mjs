@@ -303,7 +303,13 @@ function createNodeRequestHandler(handler) {
   return handler;
 }
 
+function isResponseDestroyedOrClosed(destination) {
+  return Boolean(destination.destroyed) || Boolean(destination.closed) || Boolean(destination.writableEnded) || 'stream' in destination && (!destination.stream || Boolean(destination.stream.destroyed) || Boolean(destination.stream.closed));
+}
 async function writeResponseToNodeResponse(source, destination) {
+  if (isResponseDestroyedOrClosed(destination)) {
+    return;
+  }
   const {
     status,
     headers,
@@ -326,32 +332,79 @@ async function writeResponseToNodeResponse(source, destination) {
     destination.flushHeaders();
   }
   if (!body) {
-    destination.end();
+    if (!isResponseDestroyedOrClosed(destination)) {
+      destination.end();
+    }
     return;
   }
-  try {
-    const reader = body.getReader();
-    destination.on('close', () => {
-      reader.cancel().catch(error => {
-        console.error(`An error occurred while writing the response body for: ${destination.req.url}.`, error);
-      });
+  let isClosed = isResponseDestroyedOrClosed(destination);
+  const isDestroyedOrClosed = () => isClosed || isResponseDestroyedOrClosed(destination);
+  let readerCancelled = false;
+  const reader = body.getReader();
+  const cancelReader = error => {
+    if (readerCancelled) {
+      return;
+    }
+    readerCancelled = true;
+    isClosed = true;
+    destination.off('close', cancelReader);
+    destination.off('error', cancelReader);
+    reader.cancel(error).catch(err => {
+      console.error(`An error occurred while writing the response body for: ${destination.req.url}.`, err);
     });
+  };
+  destination.once('close', cancelReader);
+  destination.once('error', cancelReader);
+  try {
     while (true) {
+      if (isDestroyedOrClosed()) {
+        cancelReader();
+        break;
+      }
       const {
         done,
         value
       } = await reader.read();
+      if (isDestroyedOrClosed()) {
+        cancelReader();
+        break;
+      }
       if (done) {
         destination.end();
         break;
       }
       const canContinue = destination.write(value);
       if (canContinue === false) {
-        await new Promise(resolve => destination.once('drain', resolve));
+        await new Promise(resolve => {
+          if (isDestroyedOrClosed()) {
+            resolve();
+            return;
+          }
+          const onDrain = () => {
+            destination.off('close', onClose);
+            destination.off('error', onClose);
+            resolve();
+          };
+          const onClose = () => {
+            destination.off('drain', onDrain);
+            destination.off('close', onClose);
+            destination.off('error', onClose);
+            cancelReader();
+            resolve();
+          };
+          destination.once('drain', onDrain);
+          destination.once('close', onClose);
+          destination.once('error', onClose);
+        });
       }
     }
   } catch {
-    destination.end('Internal server error.');
+    if (!isDestroyedOrClosed()) {
+      destination.end('Internal server error.');
+    }
+  } finally {
+    destination.off('close', cancelReader);
+    destination.off('error', cancelReader);
   }
 }
 

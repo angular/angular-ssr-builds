@@ -605,6 +605,10 @@ function requireStringifier () {
 	const STYLE_TAG = /(<)(\/?style\b)/gi;
 	const COMMENT_OPEN = /(<)(!--)/g;
 
+	// Characters that end an at-rule name, mirroring RE_AT_END in the tokenizer.
+	// Params starting with anything else need a space to stay separate tokens.
+	const AT_NAME_END = /[\t\n\f\r "#'()/;[\\\]{}]/;
+
 	function escapeHTMLInCSS(str) {
 	  if (typeof str !== 'string') return str
 	  if (!str.includes('<')) return str
@@ -633,14 +637,15 @@ function requireStringifier () {
 	function atruleStart(str, node) {
 	  let name = '@' + node.name;
 	  let params = node.params ? str.rawValue(node, 'params') : '';
+	  let afterName = node.raws.afterName;
 
-	  if (typeof node.raws.afterName !== 'undefined') {
-	    name += node.raws.afterName;
-	  } else if (params) {
-	    name += ' ';
+	  if (typeof afterName === 'undefined') {
+	    afterName = params ? ' ' : '';
+	  } else if (afterName === '' && params && !AT_NAME_END.test(params[0])) {
+	    afterName = ' ';
 	  }
 
-	  return name + params
+	  return name + afterName + params
 	}
 
 	function pushBody(str, stack, node) {
@@ -654,10 +659,24 @@ function requireStringifier () {
 	  let semicolon = str.raw(node, 'semicolon');
 	  let isDocument = node.type === 'document';
 	  for (let i = nodes.length - 1; i >= 0; i--) {
+	    let child = nodes[i];
+	    let childSemicolon = last !== i || semicolon;
+	    // A childless at-rule or a custom property declaration that still has
+	    // following siblings must be terminated. Without the semicolon those
+	    // trailing comments are folded into the at-rule's prelude or the custom
+	    // property's value and disappear when the output is re-parsed.
+	    if (
+	      !childSemicolon &&
+	      i < nodes.length - 1 &&
+	      ((child.type === 'atrule' && !child.nodes) ||
+	        (child.type === 'decl' && child.prop.startsWith('--')))
+	    ) {
+	      childSemicolon = true;
+	    }
 	    stack.push({
 	      document: isDocument,
-	      node: nodes[i],
-	      semicolon: last !== i || semicolon
+	      node: child,
+	      semicolon: childSemicolon
 	    });
 	  }
 	}
@@ -1004,6 +1023,9 @@ function requireStringifier () {
 	  }
 
 	  root(node) {
+	    if (node.source && node.source.input.hasBOM) {
+	      this.builder('\uFEFF', node, 'start');
+	    }
 	    this.body(node);
 	    if (node.raws.after) {
 	      let after = node.raws.after;
@@ -2329,18 +2351,12 @@ function requirePreviousMap () {
 
 	  loadFile(path, cssFile, trusted) {
 	    if (!trusted && !this.unsafeMap) {
-	      if (!/\.map$/i.test(path)) {
+	      if (!/\.map$/i.test(path)) return undefined
+	      if (!cssFile) return undefined
+
+	      let rel = relative(dirname(cssFile), path);
+	      if (rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) {
 	        return undefined
-	      }
-	      if (cssFile) {
-	        let relativePath = relative(dirname(cssFile), path);
-	        if (
-	          relativePath === '..' ||
-	          relativePath.startsWith('..' + sep) ||
-	          isAbsolute(relativePath)
-	        ) {
-	          return undefined
-	        }
 	      }
 	    }
 	    this.root = dirname(path);
@@ -2806,6 +2822,7 @@ function requireList () {
 	  },
 
 	  split(string, separators, last) {
+	    if (!string) return []
 	    let array = [];
 	    let current = '';
 	    let split = false;
@@ -4349,12 +4366,22 @@ function requireWarning () {
 	if (hasRequiredWarning) return warning;
 	hasRequiredWarning = 1;
 
+	let Container = requireContainer$1();
+	let { my } = requireSymbols();
+
 	class Warning {
 	  constructor(text, opts = {}) {
 	    this.type = 'warning';
 	    this.text = text;
 
 	    if (opts.node && opts.node.source) {
+	      if (!opts.node[my]) {
+	        // The node comes from another PostCSS copy in node_modules, so it does
+	        // not have this copy’s methods. Container#normalize() rebuilds such
+	        // nodes on insert, but a node passed straight to Result#warn() never
+	        // goes through it.
+	        Container.rebuild(opts.node);
+	      }
 	      let range = opts.node.rangeBy(opts);
 	      this.line = range.start.line;
 	      this.column = range.start.column;
@@ -4969,14 +4996,24 @@ function requireLazyResult () {
 
 	    if (visit.iterator !== 0) {
 	      let iterator = visit.iterator;
+	      // Advance past the child we just finished visiting. Like
+	      // `Container#each`, the index is incremented only after a child has
+	      // been fully processed, so a node inserted right after the current
+	      // child is not skipped by the `existIndex < index` adjustment in
+	      // `Container#insertAfter()` (which would fire exit events too early).
+	      if (visit.descending) {
+	        visit.descending = false;
+	        node.indexes[iterator] += 1;
+	      }
 	      let child;
 	      while ((child = node.nodes[node.indexes[iterator]])) {
-	        node.indexes[iterator] += 1;
 	        if (!child[isClean]) {
 	          child[isClean] = true;
+	          visit.descending = true;
 	          stack.push(toStack(child));
 	          return
 	        }
+	        node.indexes[iterator] += 1;
 	      }
 	      visit.iterator = 0;
 	      delete node.indexes[iterator];
@@ -5014,12 +5051,22 @@ function requireLazyResult () {
 
 	      if (visit.iterator !== 0) {
 	        let iterator = visit.iterator;
+	        // Advance past the child we just finished visiting. Like
+	        // `Container#each`, the index is incremented only after a child has
+	        // been fully processed. Incrementing before (as this loop used to)
+	        // makes a node inserted right after the current child get skipped by
+	        // the `existIndex < index` adjustment in `Container#insertAfter()`,
+	        // which fires exit events before those new siblings are visited.
+	        if (visit.descending) {
+	          visit.descending = false;
+	          visitNode.indexes[iterator] += 1;
+	        }
 	        let child;
 	        let descended = false;
 	        while ((child = visitNode.nodes[visitNode.indexes[iterator]])) {
-	          visitNode.indexes[iterator] += 1;
 	          if (!child[isClean]) {
 	            child[isClean] = true;
+	            visit.descending = true;
 	            stack.push({
 	              eventIndex: 0,
 	              events: getEvents(child),
@@ -5029,6 +5076,7 @@ function requireLazyResult () {
 	            descended = true;
 	            break
 	          }
+	          visitNode.indexes[iterator] += 1;
 	        }
 	        if (descended) continue
 	        visit.iterator = 0;
@@ -5231,7 +5279,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.19';
+	    this.version = '8.5.25';
 	    this.plugins = this.normalize(plugins);
 	  }
 

@@ -2822,6 +2822,7 @@ function requireList () {
 	  },
 
 	  split(string, separators, last) {
+	    if (!string) return []
 	    let array = [];
 	    let current = '';
 	    let split = false;
@@ -4995,14 +4996,24 @@ function requireLazyResult () {
 
 	    if (visit.iterator !== 0) {
 	      let iterator = visit.iterator;
+	      // Advance past the child we just finished visiting. Like
+	      // `Container#each`, the index is incremented only after a child has
+	      // been fully processed, so a node inserted right after the current
+	      // child is not skipped by the `existIndex < index` adjustment in
+	      // `Container#insertAfter()` (which would fire exit events too early).
+	      if (visit.descending) {
+	        visit.descending = false;
+	        node.indexes[iterator] += 1;
+	      }
 	      let child;
 	      while ((child = node.nodes[node.indexes[iterator]])) {
-	        node.indexes[iterator] += 1;
 	        if (!child[isClean]) {
 	          child[isClean] = true;
+	          visit.descending = true;
 	          stack.push(toStack(child));
 	          return
 	        }
+	        node.indexes[iterator] += 1;
 	      }
 	      visit.iterator = 0;
 	      delete node.indexes[iterator];
@@ -5040,12 +5051,22 @@ function requireLazyResult () {
 
 	      if (visit.iterator !== 0) {
 	        let iterator = visit.iterator;
+	        // Advance past the child we just finished visiting. Like
+	        // `Container#each`, the index is incremented only after a child has
+	        // been fully processed. Incrementing before (as this loop used to)
+	        // makes a node inserted right after the current child get skipped by
+	        // the `existIndex < index` adjustment in `Container#insertAfter()`,
+	        // which fires exit events before those new siblings are visited.
+	        if (visit.descending) {
+	          visit.descending = false;
+	          visitNode.indexes[iterator] += 1;
+	        }
 	        let child;
 	        let descended = false;
 	        while ((child = visitNode.nodes[visitNode.indexes[iterator]])) {
-	          visitNode.indexes[iterator] += 1;
 	          if (!child[isClean]) {
 	            child[isClean] = true;
+	            visit.descending = true;
 	            stack.push({
 	              eventIndex: 0,
 	              events: getEvents(child),
@@ -5055,6 +5076,7 @@ function requireLazyResult () {
 	            descended = true;
 	            break
 	          }
+	          visitNode.indexes[iterator] += 1;
 	        }
 	        if (descended) continue
 	        visit.iterator = 0;
@@ -5257,7 +5279,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.24';
+	    this.version = '8.5.25';
 	    this.plugins = this.normalize(plugins);
 	  }
 

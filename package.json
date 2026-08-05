@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "22.1.2+sha-4e54f3a",
+  "version": "22.1.2+sha-1d9122f",
   "description": "Angular server side rendering utilities",
   "type": "module",
   "keywords": [

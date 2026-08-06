@@ -2,7 +2,7 @@ import { Type, ApplicationRef, StaticProvider } from '@angular/core';
 import { BootstrapContext } from '@angular/platform-browser';
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Http2ServerRequest, Http2ServerResponse } from 'node:http2';
-import { AngularAppEngineOptions } from './_app-engine-chunk.js';
+import { AngularAppEngineOptions } from './ssr.js';
 
 /**
  * @deprecated Use `AngularNodeAppEngine` or `AngularAppEngine` instead.

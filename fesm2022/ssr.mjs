@@ -177,6 +177,7 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
       }
     }
     return {
+      destroy: () => void asyncDestroyPlatform(platformRef),
       hasNavigationError,
       redirectTo,
       content: () => new Promise((resolve, reject) => {
@@ -198,6 +199,9 @@ function isNgModule(value) {
   return 'ɵmod' in value;
 }
 function asyncDestroyPlatform(platformRef) {
+  if (platformRef.destroyed) {
+    return Promise.resolve();
+  }
   return new Promise(resolve => {
     setTimeout(() => {
       if (!platformRef.destroyed) {
@@ -1316,10 +1320,18 @@ class AngularServerApp {
     }
     const stream = new ReadableStream({
       start: async controller => {
-        const renderedHtml = await result.content();
-        const finalHtml = await this.inlineCriticalCssWithCache(renderedHtml, url);
-        controller.enqueue(finalHtml);
-        controller.close();
+        try {
+          const renderedHtml = await result.content();
+          const finalHtml = await this.inlineCriticalCssWithCache(renderedHtml, url);
+          controller.enqueue(finalHtml);
+          controller.close();
+        } catch (error) {
+          result.destroy();
+          controller.error(error);
+        }
+      },
+      cancel: () => {
+        result.destroy();
       }
     });
     return new Response(stream, responseInit);

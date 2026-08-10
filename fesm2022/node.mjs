@@ -304,7 +304,7 @@ function createNodeRequestHandler(handler) {
 }
 
 function isResponseDestroyedOrClosed(destination) {
-  return Boolean(destination.destroyed) || Boolean(destination.closed) || Boolean(destination.writableEnded) || 'stream' in destination && (!destination.stream || Boolean(destination.stream.destroyed) || Boolean(destination.stream.closed));
+  return destination.destroyed || destination.closed || destination.writableEnded || 'stream' in destination && (!destination.stream || destination.stream.destroyed || destination.stream.closed);
 }
 async function writeResponseToNodeResponse(source, destination) {
   if (isResponseDestroyedOrClosed(destination)) {

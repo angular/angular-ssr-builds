@@ -2265,9 +2265,19 @@ function requirePreviousMap () {
 	if (hasRequiredPreviousMap) return previousMap;
 	hasRequiredPreviousMap = 1;
 
-	let { existsSync, readFileSync } = require$$2;
+	let { existsSync, readFileSync, realpathSync } = require$$2;
 	let { dirname, isAbsolute, join, relative, sep } = require$$2;
 	let { SourceMapConsumer, SourceMapGenerator } = require$$2;
+
+	function realPath(path) {
+	  try {
+	    return realpathSync(path)
+	  } catch {
+	    // Missing or dangling: keep the literal path. The existsSync() check below
+	    // still gates the read, and a path that does not exist cannot escape.
+	    return path
+	  }
+	}
 
 	function fromBase64(str) {
 	  if (Buffer) {
@@ -2354,7 +2364,9 @@ function requirePreviousMap () {
 	      if (!/\.map$/i.test(path)) return undefined
 	      if (!cssFile) return undefined
 
-	      let rel = relative(dirname(cssFile), path);
+	      // Compare *resolved* paths: relative() is textual, so without this a
+	      // symlink at or below the CSS file's directory points the map outside it.
+	      let rel = relative(realPath(dirname(cssFile)), realPath(path));
 	      if (rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) {
 	        return undefined
 	      }
@@ -2822,7 +2834,7 @@ function requireList () {
 	  },
 
 	  split(string, separators, last) {
-	    if (!string) return []
+	    if (typeof string !== 'string') return []
 	    let array = [];
 	    let current = '';
 	    let split = false;
@@ -5279,7 +5291,7 @@ function requireProcessor () {
 
 	class Processor {
 	  constructor(plugins = []) {
-	    this.version = '8.5.25';
+	    this.version = '8.5.26';
 	    this.plugins = this.normalize(plugins);
 	  }
 

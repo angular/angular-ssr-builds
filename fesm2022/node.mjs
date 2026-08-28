@@ -2,7 +2,7 @@ import { ɵInlineCriticalCssProcessor as _InlineCriticalCssProcessor, AngularApp
 import { validateUrl, normalizeTrustProxyHeaders, isProxyHeaderAllowed, getFirstHeaderValue } from './_validation-chunk.mjs';
 import { renderApplication, ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule } from '@angular/platform-server';
 import * as fs from 'node:fs';
-import { dirname, join, normalize, resolve } from 'node:path';
+import { dirname, join, relative, isAbsolute, resolve } from 'node:path';
 import { URL as URL$1, fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { argv } from 'node:process';
@@ -165,11 +165,13 @@ class CommonEngine {
       pathname
     } = new URL$1(url, 'resolve://');
     const pagePath = join(publicPath, pathname, 'index.html');
+    const relativePath = relative(publicPath, pagePath);
+    const isOutside = relativePath === '..' || relativePath.startsWith('../') || relativePath.startsWith('..\\');
+    if (isOutside || isAbsolute(relativePath)) {
+      return undefined;
+    }
     if (this.pageIsSSG.get(pagePath)) {
       return fs.promises.readFile(pagePath, 'utf-8');
-    }
-    if (!pagePath.startsWith(normalize(publicPath))) {
-      return undefined;
     }
     if (pagePath === resolve(documentFilePath) || !(await exists(pagePath))) {
       this.pageIsSSG.set(pagePath, false);

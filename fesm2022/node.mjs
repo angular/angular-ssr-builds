@@ -1,6 +1,6 @@
 import { renderApplication, renderModule, ɵSERVER_CONTEXT as _SERVER_CONTEXT } from '@angular/platform-server';
 import * as fs from 'node:fs';
-import { dirname, join, normalize, resolve } from 'node:path';
+import { dirname, join, relative, isAbsolute, resolve } from 'node:path';
 import { URL as URL$1, fileURLToPath } from 'node:url';
 import { validateUrl, normalizeTrustProxyHeaders, isProxyHeaderAllowed, getFirstHeaderValue } from './validation.mjs';
 import { ɵInlineCriticalCssProcessor as _InlineCriticalCssProcessor, AngularAppEngine } from '@angular/ssr';
@@ -204,13 +204,14 @@ class CommonEngine {
         // Do not use `resolve` here as otherwise it can lead to path traversal vulnerability.
         // See: https://portswigger.net/web-security/file-path-traversal
         const pagePath = join(publicPath, pathname, 'index.html');
+        const relativePath = relative(publicPath, pagePath);
+        const isOutside = relativePath === '..' || relativePath.startsWith('../') || relativePath.startsWith('..\\');
+        if (isOutside || isAbsolute(relativePath)) {
+            return undefined;
+        }
         if (this.pageIsSSG.get(pagePath)) {
             // Serve pre-rendered page.
             return fs.promises.readFile(pagePath, 'utf-8');
-        }
-        if (!pagePath.startsWith(normalize(publicPath))) {
-            // Potential path traversal detected.
-            return undefined;
         }
         if (pagePath === resolve(documentFilePath) || !(await exists(pagePath))) {
             // View matches with prerender path or file does not exist.

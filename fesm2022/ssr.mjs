@@ -1377,6 +1377,9 @@ class AngularServerApp {
     let {
       pathname: assetPath
     } = new URL(request.url);
+    try {
+      assetPath = decodeURIComponent(assetPath);
+    } catch {}
     if (!assetPath.endsWith('/index.html')) {
       assetPath = joinUrlParts(assetPath, 'index.html');
     }

@@ -1,9 +1,9 @@
 import { Provider, EnvironmentProviders, Type, ApplicationRef, InjectionToken } from '@angular/core';
+import { CompactPlan } from 'beasties/runtime';
 import { DefaultExport } from '@angular/router';
 import { BootstrapContext } from '@angular/platform-browser';
 import { Hooks } from './_app-engine-chunk.js';
 export { AngularAppEngine, AngularAppEngineOptions } from './_app-engine-chunk.js';
-import Beasties from '../third_party/beasties';
 
 /**
  * Identifies a particular kind of `ServerRenderingFeatureKind`.
@@ -577,10 +577,13 @@ interface AngularAppManifest {
      */
     readonly bootstrap: () => Promise<AngularBootstrap>;
     /**
-     * Indicates whether critical CSS should be inlined into the HTML.
-     * If set to `true`, critical CSS will be inlined for faster page rendering.
+     * Pre-compiled critical CSS plans generated at build time.
      */
-    readonly inlineCriticalCss?: boolean;
+    readonly criticalCssPlans?: readonly CompactPlan[];
+    /**
+     * Content Security Policy (CSP) nonce to be used for inlined critical CSS.
+     */
+    readonly nonce?: string;
     /**
      * The route tree representation for the routing configuration of the application.
      * This represents the routing information of the application, mapping route paths to their corresponding metadata.
@@ -779,22 +782,15 @@ declare class AngularServerApp {
     /**
      * The `inlineCriticalCssProcessor` is responsible for handling critical CSS inlining.
      */
-    private inlineCriticalCssProcessor;
+    private inlineCriticalCssProcessor?;
     /**
      * The bootstrap mechanism for the server application.
      */
     private boostrap;
     /**
-     * Decorder used to convert a string to a Uint8Array.
+     * Encoder used to convert a string to a Uint8Array.
      */
-    private readonly textDecoder;
-    /**
-     * A cache that stores critical CSS to avoid re-processing for every request, improving performance.
-     * This cache uses a Least Recently Used (LRU) eviction policy.
-     *
-     * @see {@link MAX_INLINE_CSS_CACHE_ENTRIES} for the maximum number of entries this cache can hold.
-     */
-    private readonly criticalCssLRUCache;
+    private readonly textEncoder;
     /**
      * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
      * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.
@@ -832,19 +828,9 @@ declare class AngularServerApp {
      * Inlines critical CSS into the given HTML content.
      *
      * @param html The HTML content to process.
-     * @param url The URL associated with the request, for logging purposes.
-     * @returns A promise that resolves to the HTML with inlined critical CSS.
+     * @returns The HTML with inlined critical CSS.
      */
     private inlineCriticalCss;
-    /**
-     * Inlines critical CSS into the given HTML content.
-     * This method uses a cache to avoid reprocessing the same HTML content multiple times.
-     *
-     * @param html The HTML content to process.
-     * @param url The URL associated with the request, for logging purposes.
-     * @returns A promise that resolves to the HTML with inlined critical CSS.
-     */
-    private inlineCriticalCssWithCache;
     /**
      * Constructs the asset path on the server based on the provided HTTP request.
      *
@@ -885,12 +871,6 @@ declare function getOrCreateAngularServerApp(options?: Readonly<AngularServerApp
  */
 declare function destroyAngularServerApp(): void;
 
-declare class InlineCriticalCssProcessor extends Beasties {
-    readFile: (path: string) => Promise<string>;
-    readonly outputPath?: string | undefined;
-    constructor(readFile: (path: string) => Promise<string>, outputPath?: string | undefined);
-}
-
 /**
  * Function for handling HTTP requests in a web environment.
  *
@@ -923,5 +903,5 @@ type RequestHandlerFunction = (request: Request) => Promise<Response | null> | n
  */
 declare function createRequestHandler(handler: RequestHandlerFunction): RequestHandlerFunction;
 
-export { IS_DISCOVERING_ROUTES, PrerenderFallback, RenderMode, createRequestHandler, provideServerRendering, withAppShell, withRoutes, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
+export { IS_DISCOVERING_ROUTES, PrerenderFallback, RenderMode, createRequestHandler, provideServerRendering, withAppShell, withRoutes, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
 export type { RequestHandlerFunction, ServerRenderingOptions, ServerRoute, ServerRouteClient, ServerRouteCommon, ServerRoutePrerender, ServerRoutePrerenderWithParams, ServerRouteServer };

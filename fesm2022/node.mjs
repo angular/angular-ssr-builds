@@ -1,9 +1,10 @@
-import { ɵInlineCriticalCssProcessor as _InlineCriticalCssProcessor, AngularAppEngine } from '@angular/ssr';
+import { AngularAppEngine } from '@angular/ssr';
 import { validateUrl, normalizeTrustProxyHeaders, parseForwardedHeader, isProxyHeaderAllowed, getFirstHeaderValue } from './_validation-chunk.mjs';
 import { renderApplication, ɵSERVER_CONTEXT as _SERVER_CONTEXT, renderModule } from '@angular/platform-server';
 import * as fs from 'node:fs';
 import { dirname, join, relative, isAbsolute, resolve } from 'node:path';
 import { URL as URL$1, fileURLToPath } from 'node:url';
+import Beasties from 'beasties';
 import { readFile } from 'node:fs/promises';
 import { argv } from 'node:process';
 
@@ -43,15 +44,37 @@ function attachNodeGlobalErrorHandlers() {
 class CommonEngineInlineCriticalCssProcessor {
   resourceCache = new Map();
   async process(html, outputPath) {
-    const beasties = new _InlineCriticalCssProcessor(async path => {
+    const processor = new Beasties({
+      logger: {
+        warn: s => console.warn(s),
+        error: s => console.error(s),
+        info: () => {}
+      },
+      logLevel: 'warn',
+      path: outputPath,
+      publicPath: undefined,
+      compress: false,
+      pruneSource: false,
+      reduceInlineStyles: false,
+      mergeStylesheets: false,
+      preload: 'media-script',
+      nonce: document => {
+        const nonceElement = document.querySelector('[ngCspNonce], [ngcspnonce]');
+        const cspNonce = nonceElement?.getAttribute('ngCspNonce') || nonceElement?.getAttribute('ngcspnonce');
+        return cspNonce;
+      },
+      noscriptFallback: true,
+      inlineFonts: true
+    });
+    processor.readFile = async path => {
       let resourceContent = this.resourceCache.get(path);
       if (resourceContent === undefined) {
         resourceContent = await readFile(path, 'utf-8');
         this.resourceCache.set(path, resourceContent);
       }
       return resourceContent;
-    }, outputPath);
-    return beasties.process(html);
+    };
+    return processor.process(html);
   }
 }
 

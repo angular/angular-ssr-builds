@@ -3,7 +3,7 @@ import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import { ɵConsole as _Console, ApplicationRef, REQUEST, makeEnvironmentProviders, provideEnvironmentInitializer, inject, InjectionToken, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, Compiler, createEnvironmentInjector, EnvironmentInjector, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
 import { platformServer, INITIAL_CONFIG, ɵSERVER_CONTEXT as _SERVER_CONTEXT, ɵrenderInternal as _renderInternal, provideServerRendering as provideServerRendering$1 } from '@angular/platform-server';
 import { ActivatedRoute, Router, ROUTES, ɵloadChildren as _loadChildren } from '@angular/router';
-import Beasties from '../third_party/beasties/index.js';
+import { createProcessor } from 'beasties/runtime';
 
 class ServerAssets {
   manifest;
@@ -962,123 +962,7 @@ class ServerRouter {
   }
 }
 
-async function sha256(data) {
-  const encodedData = new TextEncoder().encode(data);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', encodedData);
-  const hashParts = [];
-  for (const h of new Uint8Array(hashBuffer)) {
-    hashParts.push(h.toString(16).padStart(2, '0'));
-  }
-  return hashParts.join('');
-}
-
-class InlineCriticalCssProcessor extends Beasties {
-  readFile;
-  outputPath;
-  constructor(readFile, outputPath) {
-    super({
-      logger: {
-        warn: s => console.warn(s),
-        error: s => console.error(s),
-        info: () => {}
-      },
-      logLevel: 'warn',
-      path: outputPath,
-      publicPath: undefined,
-      compress: false,
-      pruneSource: false,
-      reduceInlineStyles: false,
-      mergeStylesheets: false,
-      preload: 'media-script',
-      nonce: document => {
-        const nonceElement = document.querySelector('[ngCspNonce], [ngcspnonce]');
-        const cspNonce = nonceElement?.getAttribute('ngCspNonce') || nonceElement?.getAttribute('ngcspnonce');
-        return cspNonce ?? undefined;
-      },
-      noscriptFallback: true,
-      inlineFonts: true
-    });
-    this.readFile = readFile;
-    this.outputPath = outputPath;
-  }
-}
-
-class LRUCache {
-  capacity;
-  cache = new Map();
-  head;
-  tail;
-  constructor(capacity) {
-    this.capacity = capacity;
-  }
-  get(key) {
-    const node = this.cache.get(key);
-    if (node) {
-      this.moveToHead(node);
-      return node.value;
-    }
-    return undefined;
-  }
-  put(key, value) {
-    const cachedNode = this.cache.get(key);
-    if (cachedNode) {
-      cachedNode.value = value;
-      this.moveToHead(cachedNode);
-      return;
-    }
-    const newNode = {
-      key,
-      value,
-      prev: undefined,
-      next: undefined
-    };
-    this.cache.set(key, newNode);
-    this.addToHead(newNode);
-    if (this.cache.size > this.capacity) {
-      const tail = this.removeTail();
-      if (tail) {
-        this.cache.delete(tail.key);
-      }
-    }
-  }
-  addToHead(node) {
-    node.next = this.head;
-    node.prev = undefined;
-    if (this.head) {
-      this.head.prev = node;
-    }
-    this.head = node;
-    if (!this.tail) {
-      this.tail = node;
-    }
-  }
-  removeNode(node) {
-    if (node.prev) {
-      node.prev.next = node.next;
-    } else {
-      this.head = node.next;
-    }
-    if (node.next) {
-      node.next.prev = node.prev;
-    } else {
-      this.tail = node.prev;
-    }
-  }
-  moveToHead(node) {
-    this.removeNode(node);
-    this.addToHead(node);
-  }
-  removeTail() {
-    const node = this.tail;
-    if (node) {
-      this.removeNode(node);
-    }
-    return node;
-  }
-}
-
 const WELL_KNOWN_NON_ANGULAR_URLS = new Set(['/favicon.ico', '/.well-known/appspecific/com.chrome.devtools.json']);
-const MAX_INLINE_CSS_CACHE_ENTRIES = 50;
 const SERVER_CONTEXT_VALUE = {
   [RenderMode.Prerender]: 'ssg',
   [RenderMode.Server]: 'ssr',
@@ -1092,20 +976,13 @@ class AngularServerApp {
     this.options = options;
     this.allowStaticRouteRender = this.options.allowStaticRouteRender ?? false;
     this.hooks = options.hooks ?? new Hooks();
-    if (this.manifest.inlineCriticalCss) {
-      this.inlineCriticalCssProcessor = new InlineCriticalCssProcessor(path => {
-        const fileName = path.split('/').pop() ?? path;
-        return this.assets.getServerAsset(fileName).text();
-      });
-    }
   }
   manifest = getAngularAppManifest();
   assets = new ServerAssets(this.manifest);
   router;
   inlineCriticalCssProcessor;
   boostrap;
-  textDecoder = new TextEncoder();
-  criticalCssLRUCache = new LRUCache(MAX_INLINE_CSS_CACHE_ENTRIES);
+  textEncoder = new TextEncoder();
   async handle(request, requestContext) {
     const url = new URL(request.url);
     if (WELL_KNOWN_NON_ANGULAR_URLS.has(url.pathname)) {
@@ -1241,15 +1118,15 @@ class AngularServerApp {
     }
     if (renderMode === RenderMode.Prerender) {
       const renderedHtml = await result.content();
-      const finalHtml = await this.inlineCriticalCss(renderedHtml, url);
+      const finalHtml = this.inlineCriticalCss(renderedHtml);
       return new Response(finalHtml, responseInit);
     }
     const stream = new ReadableStream({
       start: async controller => {
         try {
-          const renderedHtml = await result.content();
-          const finalHtml = await this.inlineCriticalCssWithCache(renderedHtml, url);
-          controller.enqueue(finalHtml);
+          let renderedHtml = await result.content();
+          renderedHtml = this.inlineCriticalCss(renderedHtml);
+          controller.enqueue(this.textEncoder.encode(renderedHtml));
           controller.close();
         } catch (error) {
           result.destroy();
@@ -1262,42 +1139,31 @@ class AngularServerApp {
     });
     return new Response(stream, responseInit);
   }
-  async inlineCriticalCss(html, url) {
+  inlineCriticalCss(html) {
     const {
-      inlineCriticalCssProcessor
-    } = this;
-    if (!inlineCriticalCssProcessor) {
+      criticalCssPlans,
+      nonce
+    } = this.manifest;
+    if (!criticalCssPlans?.length) {
       return html;
     }
     try {
-      return await inlineCriticalCssProcessor.process(html);
+      this.inlineCriticalCssProcessor ??= createProcessor([...criticalCssPlans], {
+        preload: 'media-script',
+        nonce,
+        preloadFonts: true,
+        inlineFonts: true,
+        noscriptFallback: true,
+        cache: true,
+        logger: {
+          warn: console.warn
+        }
+      }).process;
+      return this.inlineCriticalCssProcessor(html);
     } catch (error) {
-      console.error(`An error occurred while inlining critical CSS for: ${url}.`, error);
+      console.error('An error occurred while inlining critical CSS.', error);
       return html;
     }
-  }
-  async inlineCriticalCssWithCache(html, url) {
-    const {
-      inlineCriticalCssProcessor,
-      criticalCssLRUCache,
-      textDecoder
-    } = this;
-    if (!inlineCriticalCssProcessor) {
-      return textDecoder.encode(html);
-    }
-    const cacheKey = url.toString();
-    const cached = criticalCssLRUCache.get(cacheKey);
-    const shaOfContentPreInlinedCss = await sha256(html);
-    if (cached?.shaOfContentPreInlinedCss === shaOfContentPreInlinedCss) {
-      return cached.contentWithCriticialCSS;
-    }
-    const processedHtml = await this.inlineCriticalCss(html, url);
-    const finalHtml = textDecoder.encode(processedHtml);
-    criticalCssLRUCache.put(cacheKey, {
-      shaOfContentPreInlinedCss,
-      contentWithCriticialCSS: finalHtml
-    });
-    return finalHtml;
   }
   buildServerAssetPathFromRequest(request) {
     let {
@@ -1541,5 +1407,5 @@ function createRequestHandler(handler) {
   return handler;
 }
 
-export { AngularAppEngine, IS_DISCOVERING_ROUTES, PrerenderFallback, RenderMode, createRequestHandler, provideServerRendering, withAppShell, withRoutes, InlineCriticalCssProcessor as ɵInlineCriticalCssProcessor, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
+export { AngularAppEngine, IS_DISCOVERING_ROUTES, PrerenderFallback, RenderMode, createRequestHandler, provideServerRendering, withAppShell, withRoutes, destroyAngularServerApp as ɵdestroyAngularServerApp, extractRoutesAndCreateRouteTree as ɵextractRoutesAndCreateRouteTree, getOrCreateAngularServerApp as ɵgetOrCreateAngularServerApp, getRoutesFromAngularRouterConfig as ɵgetRoutesFromAngularRouterConfig, setAngularAppEngineManifest as ɵsetAngularAppEngineManifest, setAngularAppManifest as ɵsetAngularAppManifest };
 //# sourceMappingURL=ssr.mjs.map

@@ -972,39 +972,9 @@ async function sha256(data) {
   return hashParts.join('');
 }
 
-const MEDIA_SET_HANDLER_PATTERN = /^this\.media=["'](.*)["'];?$/;
-const CSP_MEDIA_ATTR = 'ngCspMedia';
-const LINK_LOAD_SCRIPT_CONTENT = /* @__PURE__ */(() => `(() => {
-  const CSP_MEDIA_ATTR = '${CSP_MEDIA_ATTR}';
-  const documentElement = document.documentElement;
-
-  // Listener for load events on link tags.
-  const listener = (e) => {
-    const target = e.target;
-    if (
-      !target ||
-      target.tagName !== 'LINK' ||
-      !target.hasAttribute(CSP_MEDIA_ATTR)
-    ) {
-      return;
-    }
-
-    target.media = target.getAttribute(CSP_MEDIA_ATTR);
-    target.removeAttribute(CSP_MEDIA_ATTR);
-
-    if (!document.head.querySelector(\`link[\${CSP_MEDIA_ATTR}]\`)) {
-      documentElement.removeEventListener('load', listener);
-    }
-  };
-
-  documentElement.addEventListener('load', listener, true);
-})();`)();
-class BeastiesBase extends Beasties {}
-class InlineCriticalCssProcessor extends BeastiesBase {
+class InlineCriticalCssProcessor extends Beasties {
   readFile;
   outputPath;
-  addedCspScriptsDocuments = new WeakSet();
-  documentNonces = new WeakMap();
   constructor(readFile, outputPath) {
     super({
       logger: {
@@ -1019,61 +989,17 @@ class InlineCriticalCssProcessor extends BeastiesBase {
       pruneSource: false,
       reduceInlineStyles: false,
       mergeStylesheets: false,
-      preload: 'media',
+      preload: 'media-script',
+      nonce: document => {
+        const nonceElement = document.querySelector('[ngCspNonce], [ngcspnonce]');
+        const cspNonce = nonceElement?.getAttribute('ngCspNonce') || nonceElement?.getAttribute('ngcspnonce');
+        return cspNonce ?? undefined;
+      },
       noscriptFallback: true,
       inlineFonts: true
     });
     this.readFile = readFile;
     this.outputPath = outputPath;
-  }
-  async embedLinkedStylesheet(link, document) {
-    if (link.getAttribute('media') === 'print' && link.next?.name === 'noscript') {
-      const media = link.getAttribute('onload')?.match(MEDIA_SET_HANDLER_PATTERN);
-      if (media) {
-        link.removeAttribute('onload');
-        link.setAttribute('media', media[1]);
-        link?.next?.remove();
-      }
-    }
-    const returnValue = await super.embedLinkedStylesheet(link, document);
-    const cspNonce = this.findCspNonce(document);
-    if (cspNonce) {
-      const beastiesMedia = link.getAttribute('onload')?.match(MEDIA_SET_HANDLER_PATTERN);
-      if (beastiesMedia) {
-        link.removeAttribute('onload');
-        link.setAttribute(CSP_MEDIA_ATTR, beastiesMedia[1]);
-        this.conditionallyInsertCspLoadingScript(document, cspNonce, link);
-      }
-      document.head.children.forEach(child => {
-        if (child.tagName === 'style' && !child.hasAttribute('nonce')) {
-          child.setAttribute('nonce', cspNonce);
-        }
-      });
-    }
-    return returnValue;
-  }
-  findCspNonce(document) {
-    if (this.documentNonces.has(document)) {
-      return this.documentNonces.get(document);
-    }
-    const nonceElement = document.querySelector('[ngCspNonce], [ngcspnonce]');
-    const cspNonce = nonceElement?.getAttribute('ngCspNonce') || nonceElement?.getAttribute('ngcspnonce') || null;
-    this.documentNonces.set(document, cspNonce);
-    return cspNonce;
-  }
-  conditionallyInsertCspLoadingScript(document, nonce, link) {
-    if (this.addedCspScriptsDocuments.has(document)) {
-      return;
-    }
-    if (document.head.textContent.includes(LINK_LOAD_SCRIPT_CONTENT)) {
-      this.addedCspScriptsDocuments.add(document);
-      return;
-    }
-    const script = document.createElement('script');
-    script.setAttribute('nonce', nonce);
-    script.textContent = LINK_LOAD_SCRIPT_CONTENT;
-    document.head.insertBefore(script, link);
-    this.addedCspScriptsDocuments.add(document);
   }
 }
 

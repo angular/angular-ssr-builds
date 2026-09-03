@@ -6185,26 +6185,14 @@ function requireSafeParse () {
 var safeParseExports = requireSafeParse();
 var safeParser = /*@__PURE__*/getDefaultExportFromCjs(safeParseExports);
 
-var boolbase$1;
-var hasRequiredBoolbase;
-
-function requireBoolbase () {
-	if (hasRequiredBoolbase) return boolbase$1;
-	hasRequiredBoolbase = 1;
-	boolbase$1 = {
-		trueFunc: function trueFunc(){
-			return true;
-		},
-		falseFunc: function falseFunc(){
-			return false;
-		}
-	};
-	return boolbase$1;
+function trueFunc() {
+    return true;
+}
+function falseFunc() {
+    return false;
 }
 
-var boolbaseExports = requireBoolbase();
-var boolbase = /*@__PURE__*/getDefaultExportFromCjs(boolbaseExports);
-
+/** Discriminants for selector token kinds. */
 var SelectorType;
 (function (SelectorType) {
     SelectorType["Attribute"] = "attribute";
@@ -6220,6 +6208,7 @@ var SelectorType;
     SelectorType["Sibling"] = "sibling";
     SelectorType["ColumnCombinator"] = "column-combinator";
 })(SelectorType || (SelectorType = {}));
+/** Operators available for attribute selectors. */
 var AttributeAction;
 (function (AttributeAction) {
     AttributeAction["Any"] = "any";
@@ -6289,7 +6278,6 @@ const unpackPseudos = new Set([
 /**
  * Pseudo elements defined in CSS Level 1 and CSS Level 2 can be written with
  * a single colon; eg. :before will turn into ::before.
- *
  * @see {@link https://www.w3.org/TR/2018/WD-selectors-4-20181121/#pseudo-element-syntax}
  */
 const pseudosToPseudoElements = new Set([
@@ -6302,7 +6290,6 @@ const pseudosToPseudoElements = new Set([
  * Checks whether a specific selector is a traversal.
  * This is useful eg. in swapping the order of elements that
  * are not traversals.
- *
  * @param selector Selector to check.
  */
 function isTraversal$1(selector) {
@@ -6315,7 +6302,11 @@ function isTraversal$1(selector) {
         case SelectorType.ColumnCombinator: {
             return true;
         }
-        default: {
+        case SelectorType.Attribute:
+        case SelectorType.Pseudo:
+        case SelectorType.PseudoElement:
+        case SelectorType.Tag:
+        case SelectorType.Universal: {
             return false;
         }
     }
@@ -6323,15 +6314,15 @@ function isTraversal$1(selector) {
 const stripQuotesFromPseudos = new Set(["contains", "icontains"]);
 // Unescape function taken from https://github.com/jquery/sizzle/blob/master/src/sizzle.js#L152
 function funescape(_, escaped, escapedWhitespace) {
-    const high = Number.parseInt(escaped, 16) - 65536;
+    const high = Number.parseInt(escaped, 16) - 0x1_00_00;
     // NaN means non-codepoint
-    return high !== high || escapedWhitespace
+    return Number.isNaN(high) || escapedWhitespace
         ? escaped
         : high < 0
             ? // BMP codepoint
-                String.fromCharCode(high + 65536)
+                String.fromCharCode(high + 0x1_00_00)
             : // Supplemental Plane codepoint (surrogate pair)
-                String.fromCharCode((high >> 10) | 55296, (high & 1023) | 56320);
+                String.fromCharCode((high >> 10) | 0xd8_00, (high & 0x3_ff) | 0xdc_00);
 }
 function unescapeCSS(cssString) {
     return cssString.replace(reEscape, funescape);
@@ -6348,7 +6339,6 @@ function isWhitespace$1(c) {
 }
 /**
  * Parses `selector`.
- *
  * @param selector Selector to parse.
  * @returns Returns a two-dimensional array.
  * The first dimension represents selectors separated by commas (eg. `sub1, sub2`),
@@ -6665,7 +6655,7 @@ function parseSelector(subselects, selector, selectorIndex) {
             default: {
                 if (selector.startsWith("/*", selectorIndex)) {
                     const endIndex = selector.indexOf("*/", selectorIndex + 2);
-                    if (endIndex < 0) {
+                    if (endIndex === -1) {
                         throw new Error("Comment was not terminated");
                     }
                     selectorIndex = endIndex + 2;
@@ -6741,51 +6731,58 @@ var ElementType;
 })(ElementType || (ElementType = {}));
 /**
  * Tests whether an element is a tag or not.
- *
- * @param elem Element to test
+ * @param element Element to test
+ * @param element.type Node type discriminator to check.
  */
-function isTag$1(elem) {
-    return (elem.type === ElementType.Tag ||
-        elem.type === ElementType.Script ||
-        elem.type === ElementType.Style);
+function isTag$1(element) {
+    return (element.type === ElementType.Tag ||
+        element.type === ElementType.Script ||
+        element.type === ElementType.Style);
 }
 // Exports for backwards compatibility
 /** Type for the root element of a document */
+// eslint-disable-next-line prefer-destructuring
 const Root = ElementType.Root;
 /** Type for Text */
+// eslint-disable-next-line prefer-destructuring
 const Text$1 = ElementType.Text;
 /** Type for <? ... ?> */
+// eslint-disable-next-line prefer-destructuring
 const Directive = ElementType.Directive;
 /** Type for <!-- ... --> */
+// eslint-disable-next-line prefer-destructuring
 const Comment$1 = ElementType.Comment;
 /** Type for <script> tags */
+// eslint-disable-next-line prefer-destructuring
 const Script = ElementType.Script;
 /** Type for <style> tags */
+// eslint-disable-next-line prefer-destructuring
 const Style = ElementType.Style;
 /** Type for Any tag */
+// eslint-disable-next-line prefer-destructuring
 const Tag = ElementType.Tag;
 /** Type for <![CDATA[ ... ]]> */
+// eslint-disable-next-line prefer-destructuring
 const CDATA$1 = ElementType.CDATA;
 /** Type for <!doctype ...> */
-const Doctype = ElementType.Doctype;
+// eslint-disable-next-line prefer-destructuring
+ElementType.Doctype;
 
 /**
  * This object will be used as the prototype for Nodes when creating a
  * DOM-Level-1-compliant structure.
  */
 class Node {
-    constructor() {
-        /** Parent of the node */
-        this.parent = null;
-        /** Previous sibling */
-        this.prev = null;
-        /** Next sibling */
-        this.next = null;
-        /** The start index of the node. Requires `withStartIndices` on the handler to be `true. */
-        this.startIndex = null;
-        /** The end index of the node. Requires `withEndIndices` on the handler to be `true. */
-        this.endIndex = null;
-    }
+    /** Parent of the node */
+    parent = null;
+    /** Previous sibling */
+    prev = null;
+    /** Next sibling */
+    next = null;
+    /** The start index of the node. Requires `withStartIndices` on the handler to be `true. */
+    startIndex = null;
+    /** The end index of the node. Requires `withEndIndices` on the handler to be `true. */
+    endIndex = null;
     // Read-write aliases for properties
     /**
      * Same as {@link parent}.
@@ -6804,8 +6801,8 @@ class Node {
     get previousSibling() {
         return this.prev;
     }
-    set previousSibling(prev) {
-        this.prev = prev;
+    set previousSibling(previous) {
+        this.prev = previous;
     }
     /**
      * Same as {@link next}.
@@ -6819,7 +6816,6 @@ class Node {
     }
     /**
      * Clone this node, and optionally its children.
-     *
      * @param recursive Clone child nodes as well.
      * @returns A clone of the node.
      */
@@ -6831,6 +6827,7 @@ class Node {
  * A node that contains some data.
  */
 class DataNode extends Node {
+    data;
     /**
      * @param data The content of the data node
      */
@@ -6853,10 +6850,7 @@ class DataNode extends Node {
  * Text within the document.
  */
 class Text extends DataNode {
-    constructor() {
-        super(...arguments);
-        this.type = ElementType.Text;
-    }
+    type = ElementType.Text;
     get nodeType() {
         return 3;
     }
@@ -6865,10 +6859,7 @@ class Text extends DataNode {
  * Comments within the document.
  */
 class Comment extends DataNode {
-    constructor() {
-        super(...arguments);
-        this.type = ElementType.Comment;
-    }
+    type = ElementType.Comment;
     get nodeType() {
         return 8;
     }
@@ -6877,19 +6868,27 @@ class Comment extends DataNode {
  * Processing instructions, including doc types.
  */
 class ProcessingInstruction extends DataNode {
+    type = ElementType.Directive;
+    name;
     constructor(name, data) {
         super(data);
         this.name = name;
-        this.type = ElementType.Directive;
     }
     get nodeType() {
         return 1;
     }
+    /** If this is a doctype, the document type name (parse5 only). */
+    "x-name";
+    /** If this is a doctype, the document type public identifier (parse5 only). */
+    "x-publicId";
+    /** If this is a doctype, the document type system identifier (parse5 only). */
+    "x-systemId";
 }
 /**
- * A `Node` that can have children.
+ * A node that can have children.
  */
 class NodeWithChildren extends Node {
+    children;
     /**
      * @param children Children of the node. Only certain node types can have children.
      */
@@ -6900,8 +6899,7 @@ class NodeWithChildren extends Node {
     // Aliases
     /** First child of the node. */
     get firstChild() {
-        var _a;
-        return (_a = this.children[0]) !== null && _a !== void 0 ? _a : null;
+        return this.children[0] ?? null;
     }
     /** Last child of the node. */
     get lastChild() {
@@ -6920,11 +6918,11 @@ class NodeWithChildren extends Node {
         this.children = children;
     }
 }
+/**
+ * CDATA nodes.
+ */
 class CDATA extends NodeWithChildren {
-    constructor() {
-        super(...arguments);
-        this.type = ElementType.CDATA;
-    }
+    type = ElementType.CDATA;
     get nodeType() {
         return 4;
     }
@@ -6933,10 +6931,7 @@ class CDATA extends NodeWithChildren {
  * The root node of the document.
  */
 class Document extends NodeWithChildren {
-    constructor() {
-        super(...arguments);
-        this.type = ElementType.Root;
-    }
+    type = ElementType.Root;
     get nodeType() {
         return 9;
     }
@@ -6945,10 +6940,14 @@ class Document extends NodeWithChildren {
  * An element within the DOM.
  */
 class Element extends NodeWithChildren {
+    name;
+    attribs;
+    type;
     /**
      * @param name Name of the tag, eg. `div`, `span`.
      * @param attribs Object mapping attribute names to attribute values.
      * @param children Children of the node.
+     * @param type Node type used for the new node instance.
      */
     constructor(name, attribs, children = [], type = name === "script"
         ? ElementType.Script
@@ -6975,69 +6974,79 @@ class Element extends NodeWithChildren {
         this.name = name;
     }
     get attributes() {
-        return Object.keys(this.attribs).map((name) => {
-            var _a, _b;
-            return ({
-                name,
-                value: this.attribs[name],
-                namespace: (_a = this["x-attribsNamespace"]) === null || _a === void 0 ? void 0 : _a[name],
-                prefix: (_b = this["x-attribsPrefix"]) === null || _b === void 0 ? void 0 : _b[name],
-            });
-        });
+        return Object.keys(this.attribs).map((name) => ({
+            name,
+            value: this.attribs[name],
+            namespace: this["x-attribsNamespace"]?.[name],
+            prefix: this["x-attribsPrefix"]?.[name],
+        }));
     }
+    /** Element namespace (parse5 only). */
+    namespace;
+    /** Element attribute namespaces (parse5 only). */
+    "x-attribsNamespace";
+    /** Element attribute namespace-related prefixes (parse5 only). */
+    "x-attribsPrefix";
 }
 /**
+ * Checks if `node` is an element node.
  * @param node Node to check.
- * @returns `true` if the node is a `Element`, `false` otherwise.
+ * @returns `true` if the node is an element node.
  */
 function isTag(node) {
     return isTag$1(node);
 }
 /**
+ * Checks if `node` is a CDATA node.
  * @param node Node to check.
- * @returns `true` if the node has the type `CDATA`, `false` otherwise.
+ * @returns `true` if the node is a CDATA node.
  */
 function isCDATA(node) {
     return node.type === ElementType.CDATA;
 }
 /**
+ * Checks if `node` is a text node.
  * @param node Node to check.
- * @returns `true` if the node has the type `Text`, `false` otherwise.
+ * @returns `true` if the node is a text node.
  */
 function isText(node) {
     return node.type === ElementType.Text;
 }
 /**
+ * Checks if `node` is a comment node.
  * @param node Node to check.
- * @returns `true` if the node has the type `Comment`, `false` otherwise.
+ * @returns `true` if the node is a comment node.
  */
 function isComment(node) {
     return node.type === ElementType.Comment;
 }
 /**
+ * Checks if `node` is a directive node.
  * @param node Node to check.
- * @returns `true` if the node has the type `ProcessingInstruction`, `false` otherwise.
+ * @returns `true` if the node is a directive node.
  */
 function isDirective(node) {
     return node.type === ElementType.Directive;
 }
 /**
+ * Checks if `node` is a document node.
  * @param node Node to check.
- * @returns `true` if the node has the type `ProcessingInstruction`, `false` otherwise.
+ * @returns `true` if the node is a document node.
  */
 function isDocument(node) {
     return node.type === ElementType.Root;
 }
 /**
+ * Checks if `node` has children.
  * @param node Node to check.
- * @returns `true` if the node has children, `false` otherwise.
+ * @returns `true` if the node has children.
  */
 function hasChildren(node) {
-    return Object.prototype.hasOwnProperty.call(node, "children");
+    return Object.hasOwn(node, "children");
 }
 /**
  * Clone a node, and optionally its children.
- *
+ * @param node Node to clone.
  * @param recursive Clone child nodes as well.
  * @returns A clone of the node.
  */
@@ -7052,7 +7061,9 @@ function cloneNode(node, recursive = false) {
     else if (isTag(node)) {
         const children = recursive ? cloneChildren(node.children) : [];
         const clone = new Element(node.name, { ...node.attribs }, children);
-        children.forEach((child) => (child.parent = clone));
+        for (const child of children) {
+            child.parent = clone;
+        }
         if (node.namespace != null) {
             clone.namespace = node.namespace;
         }
@@ -7067,13 +7078,17 @@ function cloneNode(node, recursive = false) {
     else if (isCDATA(node)) {
         const children = recursive ? cloneChildren(node.children) : [];
         const clone = new CDATA(children);
-        children.forEach((child) => (child.parent = clone));
+        for (const child of children) {
+            child.parent = clone;
+        }
         result = clone;
     }
     else if (isDocument(node)) {
         const children = recursive ? cloneChildren(node.children) : [];
         const clone = new Document(children);
-        children.forEach((child) => (child.parent = clone));
+        for (const child of children) {
+            child.parent = clone;
+        }
         if (node["x-mode"]) {
             clone["x-mode"] = node["x-mode"];
         }
@@ -7098,52 +7113,66 @@ function cloneNode(node, recursive = false) {
     }
     return result;
 }
+/**
+ * Clone a list of child nodes.
+ * @param childs The child nodes to clone.
+ * @returns A list of cloned child nodes.
+ */
 function cloneChildren(childs) {
     const children = childs.map((child) => cloneNode(child, true));
-    for (let i = 1; i < children.length; i++) {
-        children[i].prev = children[i - 1];
-        children[i - 1].next = children[i];
+    for (let index = 1; index < children.length; index++) {
+        children[index].prev = children[index - 1];
+        children[index - 1].next = children[index];
     }
     return children;
 }
 
 // Default options
-const defaultOpts = {
+const defaultOptions$1 = {
     withStartIndices: false,
     withEndIndices: false,
     xmlMode: false,
 };
+/**
+ * Event-based handler that builds a DOM tree from parser callbacks.
+ */
 class DomHandler {
+    /** The elements of the DOM */
+    dom = [];
+    /** The root element for the DOM */
+    root = new Document(this.dom);
+    /** Called once parsing has completed. */
+    callback;
+    /** Settings for the handler. */
+    options;
+    /** Callback whenever a tag is closed. */
+    elementCB;
+    /** Indicated whether parsing has been completed. */
+    done = false;
+    /** Stack of open tags. */
+    tagStack = [this.root];
+    /** A data node that is still being written to. */
+    lastNode = null;
+    /** Reference to the parser instance. Used for location information. */
+    parser = null;
     /**
      * @param callback Called once parsing has completed.
      * @param options Settings for the handler.
      * @param elementCB Callback whenever a tag is closed.
      */
     constructor(callback, options, elementCB) {
-        /** The elements of the DOM */
-        this.dom = [];
-        /** The root element for the DOM */
-        this.root = new Document(this.dom);
-        /** Indicated whether parsing has been completed. */
-        this.done = false;
-        /** Stack of open tags. */
-        this.tagStack = [this.root];
-        /** A data node that is still being written to. */
-        this.lastNode = null;
-        /** Reference to the parser instance. Used for location information. */
-        this.parser = null;
         // Make it possible to skip arguments, for backwards-compatibility
         if (typeof options === "function") {
             elementCB = options;
-            options = defaultOpts;
+            options = defaultOptions$1;
         }
         if (typeof callback === "object") {
             options = callback;
             callback = undefined;
         }
-        this.callback = callback !== null && callback !== void 0 ? callback : null;
-        this.options = options !== null && options !== void 0 ? options : defaultOpts;
-        this.elementCB = elementCB !== null && elementCB !== void 0 ? elementCB : null;
+        this.callback = callback ?? null;
+        this.options = options ?? defaultOptions$1;
+        this.elementCB = elementCB ?? null;
     }
     onparserinit(parser) {
         this.parser = parser;
@@ -7170,12 +7199,12 @@ class DomHandler {
     }
     onclosetag() {
         this.lastNode = null;
-        const elem = this.tagStack.pop();
-        if (this.options.withEndIndices) {
-            elem.endIndex = this.parser.endIndex;
+        const element = this.tagStack.pop();
+        if (this.options.withEndIndices && this.parser) {
+            element.endIndex = this.parser.endIndex;
         }
         if (this.elementCB)
-            this.elementCB(elem);
+            this.elementCB(element);
     }
     onopentag(name, attribs) {
         const type = this.options.xmlMode ? ElementType.Tag : undefined;
@@ -7187,7 +7216,7 @@ class DomHandler {
         const { lastNode } = this;
         if (lastNode && lastNode.type === ElementType.Text) {
             lastNode.data += data;
-            if (this.options.withEndIndices) {
+            if (this.options.withEndIndices && this.parser) {
                 lastNode.endIndex = this.parser.endIndex;
             }
         }
@@ -7234,10 +7263,10 @@ class DomHandler {
     addNode(node) {
         const parent = this.tagStack[this.tagStack.length - 1];
         const previousSibling = parent.children[parent.children.length - 1];
-        if (this.options.withStartIndices) {
+        if (this.options.withStartIndices && this.parser) {
             node.startIndex = this.parser.startIndex;
         }
-        if (this.options.withEndIndices) {
+        if (this.options.withEndIndices && this.parser) {
             node.endIndex = this.parser.endIndex;
         }
         parent.children.push(node);
@@ -7250,709 +7279,6 @@ class DomHandler {
     }
 }
 
-const xmlReplacer = /["&'<>$\x80-\uFFFF]/g;
-const xmlCodeMap = new Map([
-    [34, "&quot;"],
-    [38, "&amp;"],
-    [39, "&apos;"],
-    [60, "&lt;"],
-    [62, "&gt;"],
-]);
-// For compatibility with node < 4, we wrap `codePointAt`
-const getCodePoint = 
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-String.prototype.codePointAt != null
-    ? (str, index) => str.codePointAt(index)
-    : // http://mathiasbynens.be/notes/javascript-encoding#surrogate-formulae
-        (c, index) => (c.charCodeAt(index) & 0xfc00) === 0xd800
-            ? (c.charCodeAt(index) - 0xd800) * 0x400 +
-                c.charCodeAt(index + 1) -
-                0xdc00 +
-                0x10000
-            : c.charCodeAt(index);
-/**
- * Encodes all non-ASCII characters, as well as characters not valid in XML
- * documents using XML entities.
- *
- * If a character has no equivalent entity, a
- * numeric hexadecimal reference (eg. `&#xfc;`) will be used.
- */
-function encodeXML(str) {
-    let ret = "";
-    let lastIdx = 0;
-    let match;
-    while ((match = xmlReplacer.exec(str)) !== null) {
-        const i = match.index;
-        const char = str.charCodeAt(i);
-        const next = xmlCodeMap.get(char);
-        if (next !== undefined) {
-            ret += str.substring(lastIdx, i) + next;
-            lastIdx = i + 1;
-        }
-        else {
-            ret += `${str.substring(lastIdx, i)}&#x${getCodePoint(str, i).toString(16)};`;
-            // Increase by 1 if we have a surrogate pair
-            lastIdx = xmlReplacer.lastIndex += Number((char & 0xfc00) === 0xd800);
-        }
-    }
-    return ret + str.substr(lastIdx);
-}
-/**
- * Creates a function that escapes all characters matched by the given regular
- * expression using the given map of characters to escape to their entities.
- *
- * @param regex Regular expression to match characters to escape.
- * @param map Map of characters to escape to their entities.
- *
- * @returns Function that escapes all characters matched by the given regular
- * expression using the given map of characters to escape to their entities.
- */
-function getEscaper(regex, map) {
-    return function escape(data) {
-        let match;
-        let lastIdx = 0;
-        let result = "";
-        while ((match = regex.exec(data))) {
-            if (lastIdx !== match.index) {
-                result += data.substring(lastIdx, match.index);
-            }
-            // We know that this character will be in the map.
-            result += map.get(match[0].charCodeAt(0));
-            // Every match will be of length 1
-            lastIdx = match.index + 1;
-        }
-        return result + data.substring(lastIdx);
-    };
-}
-/**
- * Encodes all characters that have to be escaped in HTML attributes,
- * following {@link https://html.spec.whatwg.org/multipage/parsing.html#escapingString}.
- *
- * @param data String to escape.
- */
-const escapeAttribute = getEscaper(/["&\u00A0]/g, new Map([
-    [34, "&quot;"],
-    [38, "&amp;"],
-    [160, "&nbsp;"],
-]));
-/**
- * Encodes all characters that have to be escaped in HTML text,
- * following {@link https://html.spec.whatwg.org/multipage/parsing.html#escapingString}.
- *
- * @param data String to escape.
- */
-const escapeText = getEscaper(/[&<>\u00A0]/g, new Map([
-    [38, "&amp;"],
-    [60, "&lt;"],
-    [62, "&gt;"],
-    [160, "&nbsp;"],
-]));
-
-const elementNames = new Map([
-    "altGlyph",
-    "altGlyphDef",
-    "altGlyphItem",
-    "animateColor",
-    "animateMotion",
-    "animateTransform",
-    "clipPath",
-    "feBlend",
-    "feColorMatrix",
-    "feComponentTransfer",
-    "feComposite",
-    "feConvolveMatrix",
-    "feDiffuseLighting",
-    "feDisplacementMap",
-    "feDistantLight",
-    "feDropShadow",
-    "feFlood",
-    "feFuncA",
-    "feFuncB",
-    "feFuncG",
-    "feFuncR",
-    "feGaussianBlur",
-    "feImage",
-    "feMerge",
-    "feMergeNode",
-    "feMorphology",
-    "feOffset",
-    "fePointLight",
-    "feSpecularLighting",
-    "feSpotLight",
-    "feTile",
-    "feTurbulence",
-    "foreignObject",
-    "glyphRef",
-    "linearGradient",
-    "radialGradient",
-    "textPath",
-].map((val) => [val.toLowerCase(), val]));
-const attributeNames = new Map([
-    "definitionURL",
-    "attributeName",
-    "attributeType",
-    "baseFrequency",
-    "baseProfile",
-    "calcMode",
-    "clipPathUnits",
-    "diffuseConstant",
-    "edgeMode",
-    "filterUnits",
-    "glyphRef",
-    "gradientTransform",
-    "gradientUnits",
-    "kernelMatrix",
-    "kernelUnitLength",
-    "keyPoints",
-    "keySplines",
-    "keyTimes",
-    "lengthAdjust",
-    "limitingConeAngle",
-    "markerHeight",
-    "markerUnits",
-    "markerWidth",
-    "maskContentUnits",
-    "maskUnits",
-    "numOctaves",
-    "pathLength",
-    "patternContentUnits",
-    "patternTransform",
-    "patternUnits",
-    "pointsAtX",
-    "pointsAtY",
-    "pointsAtZ",
-    "preserveAlpha",
-    "preserveAspectRatio",
-    "primitiveUnits",
-    "refX",
-    "refY",
-    "repeatCount",
-    "repeatDur",
-    "requiredExtensions",
-    "requiredFeatures",
-    "specularConstant",
-    "specularExponent",
-    "spreadMethod",
-    "startOffset",
-    "stdDeviation",
-    "stitchTiles",
-    "surfaceScale",
-    "systemLanguage",
-    "tableValues",
-    "targetX",
-    "targetY",
-    "textLength",
-    "viewBox",
-    "viewTarget",
-    "xChannelSelector",
-    "yChannelSelector",
-    "zoomAndPan",
-].map((val) => [val.toLowerCase(), val]));
-
-/*
- * Module dependencies
- */
-const unencodedElements = new Set([
-    "style",
-    "script",
-    "xmp",
-    "iframe",
-    "noembed",
-    "noframes",
-    "plaintext",
-    "noscript",
-]);
-function replaceQuotes(value) {
-    return value.replace(/"/g, "&quot;");
-}
-/**
- * Format attributes
- */
-function formatAttributes(attributes, opts) {
-    var _a;
-    if (!attributes)
-        return;
-    const encode = ((_a = opts.encodeEntities) !== null && _a !== void 0 ? _a : opts.decodeEntities) === false
-        ? replaceQuotes
-        : opts.xmlMode || opts.encodeEntities !== "utf8"
-            ? encodeXML
-            : escapeAttribute;
-    return Object.keys(attributes)
-        .map((key) => {
-        var _a, _b;
-        const value = (_a = attributes[key]) !== null && _a !== void 0 ? _a : "";
-        if (opts.xmlMode === "foreign") {
-            /* Fix up mixed-case attribute names */
-            key = (_b = attributeNames.get(key)) !== null && _b !== void 0 ? _b : key;
-        }
-        if (!opts.emptyAttrs && !opts.xmlMode && value === "") {
-            return key;
-        }
-        return `${key}="${encode(value)}"`;
-    })
-        .join(" ");
-}
-/**
- * Self-enclosing tags
- */
-const singleTag = new Set([
-    "area",
-    "base",
-    "basefont",
-    "br",
-    "col",
-    "command",
-    "embed",
-    "frame",
-    "hr",
-    "img",
-    "input",
-    "isindex",
-    "keygen",
-    "link",
-    "meta",
-    "param",
-    "source",
-    "track",
-    "wbr",
-]);
-/**
- * Renders a DOM node or an array of DOM nodes to a string.
- *
- * Can be thought of as the equivalent of the `outerHTML` of the passed node(s).
- *
- * @param node Node to be rendered.
- * @param options Changes serialization behavior
- */
-function render(node, options = {}) {
-    const nodes = "length" in node ? node : [node];
-    let output = "";
-    for (let i = 0; i < nodes.length; i++) {
-        output += renderNode(nodes[i], options);
-    }
-    return output;
-}
-function renderNode(node, options) {
-    switch (node.type) {
-        case Root:
-            return render(node.children, options);
-        // @ts-expect-error We don't use `Doctype` yet
-        case Doctype:
-        case Directive:
-            return renderDirective(node);
-        case Comment$1:
-            return renderComment(node);
-        case CDATA$1:
-            return renderCdata(node);
-        case Script:
-        case Style:
-        case Tag:
-            return renderTag(node, options);
-        case Text$1:
-            return renderText(node, options);
-    }
-}
-const foreignModeIntegrationPoints = new Set([
-    "mi",
-    "mo",
-    "mn",
-    "ms",
-    "mtext",
-    "annotation-xml",
-    "foreignObject",
-    "desc",
-    "title",
-]);
-const foreignElements = new Set(["svg", "math"]);
-function renderTag(elem, opts) {
-    var _a;
-    // Handle SVG / MathML in HTML
-    if (opts.xmlMode === "foreign") {
-        /* Fix up mixed-case element names */
-        elem.name = (_a = elementNames.get(elem.name)) !== null && _a !== void 0 ? _a : elem.name;
-        /* Exit foreign mode at integration points */
-        if (elem.parent &&
-            foreignModeIntegrationPoints.has(elem.parent.name)) {
-            opts = { ...opts, xmlMode: false };
-        }
-    }
-    if (!opts.xmlMode && foreignElements.has(elem.name)) {
-        opts = { ...opts, xmlMode: "foreign" };
-    }
-    let tag = `<${elem.name}`;
-    const attribs = formatAttributes(elem.attribs, opts);
-    if (attribs) {
-        tag += ` ${attribs}`;
-    }
-    if (elem.children.length === 0 &&
-        (opts.xmlMode
-            ? // In XML mode or foreign mode, and user hasn't explicitly turned off self-closing tags
-                opts.selfClosingTags !== false
-            : // User explicitly asked for self-closing tags, even in HTML mode
-                opts.selfClosingTags && singleTag.has(elem.name))) {
-        if (!opts.xmlMode)
-            tag += " ";
-        tag += "/>";
-    }
-    else {
-        tag += ">";
-        if (elem.children.length > 0) {
-            tag += render(elem.children, opts);
-        }
-        if (opts.xmlMode || !singleTag.has(elem.name)) {
-            tag += `</${elem.name}>`;
-        }
-    }
-    return tag;
-}
-function renderDirective(elem) {
-    return `<${elem.data}>`;
-}
-function renderText(elem, opts) {
-    var _a;
-    let data = elem.data || "";
-    // If entities weren't decoded, no need to encode them back
-    if (((_a = opts.encodeEntities) !== null && _a !== void 0 ? _a : opts.decodeEntities) !== false &&
-        !(!opts.xmlMode &&
-            elem.parent &&
-            unencodedElements.has(elem.parent.name))) {
-        data =
-            opts.xmlMode || opts.encodeEntities !== "utf8"
-                ? encodeXML(data)
-                : escapeText(data);
-    }
-    return data;
-}
-function renderCdata(elem) {
-    return `<![CDATA[${elem.children[0].data}]]>`;
-}
-function renderComment(elem) {
-    return `<!--${elem.data}-->`;
-}
-
-/**
- * @category Stringify
- * @deprecated Use the `dom-serializer` module directly.
- * @param node Node to get the outer HTML of.
- * @param options Options for serialization.
- * @returns `node`'s outer HTML.
- */
-function getOuterHTML(node, options) {
-    return render(node, options);
-}
-/**
- * @category Stringify
- * @deprecated Use the `dom-serializer` module directly.
- * @param node Node to get the inner HTML of.
- * @param options Options for serialization.
- * @returns `node`'s inner HTML.
- */
-function getInnerHTML(node, options) {
-    return hasChildren(node)
-        ? node.children.map((node) => getOuterHTML(node, options)).join("")
-        : "";
-}
-/**
- * Get a node's inner text. Same as `textContent`, but inserts newlines for `<br>` tags. Ignores comments.
- *
- * @category Stringify
- * @deprecated Use `textContent` instead.
- * @param node Node to get the inner text of.
- * @returns `node`'s inner text.
- */
-function getText(node) {
-    if (Array.isArray(node))
-        return node.map(getText).join("");
-    if (isTag(node))
-        return node.name === "br" ? "\n" : getText(node.children);
-    if (isCDATA(node))
-        return getText(node.children);
-    if (isText(node))
-        return node.data;
-    return "";
-}
-/**
- * Get a node's text content. Ignores comments.
- *
- * @category Stringify
- * @param node Node to get the text content of.
- * @returns `node`'s text content.
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent}
- */
-function textContent(node) {
-    if (Array.isArray(node))
-        return node.map(textContent).join("");
-    if (hasChildren(node) && !isComment(node)) {
-        return textContent(node.children);
-    }
-    if (isText(node))
-        return node.data;
-    return "";
-}
-/**
- * Get a node's inner text, ignoring `<script>` and `<style>` tags. Ignores comments.
- *
- * @category Stringify
- * @param node Node to get the inner text of.
- * @returns `node`'s inner text.
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Node/innerText}
- */
-function innerText(node) {
-    if (Array.isArray(node))
-        return node.map(innerText).join("");
-    if (hasChildren(node) && (node.type === ElementType.Tag || isCDATA(node))) {
-        return innerText(node.children);
-    }
-    if (isText(node))
-        return node.data;
-    return "";
-}
-
-/**
- * Get a node's children.
- *
- * @category Traversal
- * @param elem Node to get the children of.
- * @returns `elem`'s children, or an empty array.
- */
-function getChildren(elem) {
-    return hasChildren(elem) ? elem.children : [];
-}
-/**
- * Get a node's parent.
- *
- * @category Traversal
- * @param elem Node to get the parent of.
- * @returns `elem`'s parent node, or `null` if `elem` is a root node.
- */
-function getParent(elem) {
-    return elem.parent || null;
-}
-/**
- * Gets an elements siblings, including the element itself.
- *
- * Attempts to get the children through the element's parent first. If we don't
- * have a parent (the element is a root node), we walk the element's `prev` &
- * `next` to get all remaining nodes.
- *
- * @category Traversal
- * @param elem Element to get the siblings of.
- * @returns `elem`'s siblings, including `elem`.
- */
-function getSiblings(elem) {
-    const parent = getParent(elem);
-    if (parent != null)
-        return getChildren(parent);
-    const siblings = [elem];
-    let { prev, next } = elem;
-    while (prev != null) {
-        siblings.unshift(prev);
-        ({ prev } = prev);
-    }
-    while (next != null) {
-        siblings.push(next);
-        ({ next } = next);
-    }
-    return siblings;
-}
-/**
- * Gets an attribute from an element.
- *
- * @category Traversal
- * @param elem Element to check.
- * @param name Attribute name to retrieve.
- * @returns The element's attribute value, or `undefined`.
- */
-function getAttributeValue(elem, name) {
-    var _a;
-    return (_a = elem.attribs) === null || _a === void 0 ? void 0 : _a[name];
-}
-/**
- * Checks whether an element has an attribute.
- *
- * @category Traversal
- * @param elem Element to check.
- * @param name Attribute name to look for.
- * @returns Returns whether `elem` has the attribute `name`.
- */
-function hasAttrib(elem, name) {
-    return (elem.attribs != null &&
-        Object.prototype.hasOwnProperty.call(elem.attribs, name) &&
-        elem.attribs[name] != null);
-}
-/**
- * Get the tag name of an element.
- *
- * @category Traversal
- * @param elem The element to get the name for.
- * @returns The tag name of `elem`.
- */
-function getName(elem) {
-    return elem.name;
-}
-/**
- * Returns the next element sibling of a node.
- *
- * @category Traversal
- * @param elem The element to get the next sibling of.
- * @returns `elem`'s next sibling that is a tag, or `null` if there is no next
- * sibling.
- */
-function nextElementSibling(elem) {
-    let { next } = elem;
-    while (next !== null && !isTag(next))
-        ({ next } = next);
-    return next;
-}
-/**
- * Returns the previous element sibling of a node.
- *
- * @category Traversal
- * @param elem The element to get the previous sibling of.
- * @returns `elem`'s previous sibling that is a tag, or `null` if there is no
- * previous sibling.
- */
-function prevElementSibling(elem) {
-    let { prev } = elem;
-    while (prev !== null && !isTag(prev))
-        ({ prev } = prev);
-    return prev;
-}
-
-/**
- * Remove an element from the dom
- *
- * @category Manipulation
- * @param elem The element to be removed
- */
-function removeElement(elem) {
-    if (elem.prev)
-        elem.prev.next = elem.next;
-    if (elem.next)
-        elem.next.prev = elem.prev;
-    if (elem.parent) {
-        const childs = elem.parent.children;
-        const childsIndex = childs.lastIndexOf(elem);
-        if (childsIndex >= 0) {
-            childs.splice(childsIndex, 1);
-        }
-    }
-    elem.next = null;
-    elem.prev = null;
-    elem.parent = null;
-}
-/**
- * Replace an element in the dom
- *
- * @category Manipulation
- * @param elem The element to be replaced
- * @param replacement The element to be added
- */
-function replaceElement(elem, replacement) {
-    const prev = (replacement.prev = elem.prev);
-    if (prev) {
-        prev.next = replacement;
-    }
-    const next = (replacement.next = elem.next);
-    if (next) {
-        next.prev = replacement;
-    }
-    const parent = (replacement.parent = elem.parent);
-    if (parent) {
-        const childs = parent.children;
-        childs[childs.lastIndexOf(elem)] = replacement;
-        elem.parent = null;
-    }
-}
-/**
- * Append a child to an element.
- *
- * @category Manipulation
- * @param parent The element to append to.
- * @param child The element to be added as a child.
- */
-function appendChild(parent, child) {
-    removeElement(child);
-    child.next = null;
-    child.parent = parent;
-    if (parent.children.push(child) > 1) {
-        const sibling = parent.children[parent.children.length - 2];
-        sibling.next = child;
-        child.prev = sibling;
-    }
-    else {
-        child.prev = null;
-    }
-}
-/**
- * Append an element after another.
- *
- * @category Manipulation
- * @param elem The element to append after.
- * @param next The element be added.
- */
-function append(elem, next) {
-    removeElement(next);
-    const { parent } = elem;
-    const currNext = elem.next;
-    next.next = currNext;
-    next.prev = elem;
-    elem.next = next;
-    next.parent = parent;
-    if (currNext) {
-        currNext.prev = next;
-        if (parent) {
-            const childs = parent.children;
-            childs.splice(childs.lastIndexOf(currNext), 0, next);
-        }
-    }
-    else if (parent) {
-        parent.children.push(next);
-    }
-}
-/**
- * Prepend a child to an element.
- *
- * @category Manipulation
- * @param parent The element to prepend before.
- * @param child The element to be added as a child.
- */
-function prependChild(parent, child) {
-    removeElement(child);
-    child.parent = parent;
-    child.prev = null;
-    if (parent.children.unshift(child) !== 1) {
-        const sibling = parent.children[1];
-        sibling.prev = child;
-        child.next = sibling;
-    }
-    else {
-        child.next = null;
-    }
-}
-/**
- * Prepend an element before another.
- *
- * @category Manipulation
- * @param elem The element to prepend before.
- * @param prev The element be added.
- */
-function prepend(elem, prev) {
-    removeElement(prev);
-    const { parent } = elem;
-    if (parent) {
-        const childs = parent.children;
-        childs.splice(childs.indexOf(elem), 0, prev);
-    }
-    if (elem.prev) {
-        elem.prev.next = prev;
-    }
-    prev.parent = parent;
-    prev.prev = elem.prev;
-    prev.next = elem;
-    elem.prev = prev;
-}
-
 /**
  * Search a node and its children for nodes passing a test function. If `node` is not an array, it will be wrapped in one.
  *
@@ -7963,7 +7289,7 @@ function prepend(elem, prev) {
  * @param limit Maximum number of nodes to return.
  * @returns All nodes passing `test`.
  */
-function filter(test, node, recurse = true, limit = Infinity) {
+function filter(test, node, recurse = true, limit = Number.POSITIVE_INFINITY) {
     return find(test, Array.isArray(node) ? node : [node], recurse, limit);
 }
 /**
@@ -7995,33 +7321,21 @@ function find(test, nodes, recurse, limit) {
             // Loop back to the start to continue with the next array.
             continue;
         }
-        const elem = nodeStack[0][indexStack[0]++];
-        if (test(elem)) {
-            result.push(elem);
+        const element = nodeStack[0][indexStack[0]++];
+        if (test(element)) {
+            result.push(element);
             if (--limit <= 0)
                 return result;
         }
-        if (recurse && hasChildren(elem) && elem.children.length > 0) {
+        if (recurse && hasChildren(element) && element.children.length > 0) {
             /*
              * Add the children to the stack. We are depth-first, so this is
              * the next array we look at.
              */
             indexStack.unshift(0);
-            nodeStack.unshift(elem.children);
+            nodeStack.unshift(element.children);
         }
     }
-}
-/**
- * Finds the first element inside of an array that matches a test function. This is an alias for `Array.prototype.find`.
- *
- * @category Querying
- * @param test Function to test nodes on.
- * @param nodes Array of nodes to search.
- * @returns The first node in the array that passes `test`.
- * @deprecated Use `Array.prototype.find` directly.
- */
-function findOneChild(test, nodes) {
-    return nodes.find(test);
 }
 /**
  * Finds one element in a tree that passes a test.
@@ -8034,8 +7348,7 @@ function findOneChild(test, nodes) {
  */
 function findOne$1(test, nodes, recurse = true) {
     const searchedNodes = Array.isArray(nodes) ? nodes : [nodes];
-    for (let i = 0; i < searchedNodes.length; i++) {
-        const node = searchedNodes[i];
+    for (const node of searchedNodes) {
         if (isTag(node) && test(node)) {
             return node;
         }
@@ -8084,12 +7397,12 @@ function findAll$1(test, nodes) {
             // Loop back to the start to continue with the next array.
             continue;
         }
-        const elem = nodeStack[0][indexStack[0]++];
-        if (isTag(elem) && test(elem))
-            result.push(elem);
-        if (hasChildren(elem) && elem.children.length > 0) {
+        const element = nodeStack[0][indexStack[0]++];
+        if (isTag(element) && test(element))
+            result.push(element);
+        if (hasChildren(element) && element.children.length > 0) {
             indexStack.unshift(0);
-            nodeStack.unshift(elem.children);
+            nodeStack.unshift(element.children);
         }
     }
 }
@@ -8100,24 +7413,24 @@ function findAll$1(test, nodes) {
 const Checks = {
     tag_name(name) {
         if (typeof name === "function") {
-            return (elem) => isTag(elem) && name(elem.name);
+            return (element) => isTag(element) && name(element.name);
         }
-        else if (name === "*") {
+        if (name === "*") {
             return isTag;
         }
-        return (elem) => isTag(elem) && elem.name === name;
+        return (element) => isTag(element) && element.name === name;
     },
     tag_type(type) {
         if (typeof type === "function") {
-            return (elem) => type(elem.type);
+            return (element) => type(element.type);
         }
-        return (elem) => elem.type === type;
+        return (element) => element.type === type;
     },
     tag_contains(data) {
         if (typeof data === "function") {
-            return (elem) => isText(elem) && data(elem.data);
+            return (element) => isText(element) && data(element.data);
         }
-        return (elem) => isText(elem) && elem.data === data;
+        return (element) => isText(element) && element.data === data;
     },
 };
 /**
@@ -8131,9 +7444,9 @@ const Checks = {
  */
 function getAttribCheck(attrib, value) {
     if (typeof value === "function") {
-        return (elem) => isTag(elem) && value(elem.attribs[attrib]);
+        return (element) => isTag(element) && value(element.attribs[attrib]);
     }
-    return (elem) => isTag(elem) && elem.attribs[attrib] === value;
+    return (element) => isTag(element) && element.attribs[attrib] === value;
 }
 /**
  * Returns a function that returns `true` if either of the input functions
@@ -8145,7 +7458,7 @@ function getAttribCheck(attrib, value) {
  *   functions returns `true` for the node.
  */
 function combineFuncs(a, b) {
-    return (elem) => a(elem) || b(elem);
+    return (element) => a(element) || b(element);
 }
 /**
  * Returns a function that executes all checks in `options` and returns `true`
@@ -8158,7 +7471,7 @@ function combineFuncs(a, b) {
 function compileTest(options) {
     const funcs = Object.keys(options).map((key) => {
         const value = options[key];
-        return Object.prototype.hasOwnProperty.call(Checks, key)
+        return Object.hasOwn(Checks, key)
             ? Checks[key](value)
             : getAttribCheck(key, value);
     });
@@ -8186,7 +7499,7 @@ function testElement(options, node) {
  * @param limit Maximum number of nodes to return.
  * @returns All nodes that match `options`.
  */
-function getElements(options, nodes, recurse, limit = Infinity) {
+function getElements(options, nodes, recurse, limit = Number.POSITIVE_INFINITY) {
     const test = compileTest(options);
     return test ? filter(test, nodes, recurse, limit) : [];
 }
@@ -8214,7 +7527,7 @@ function getElementById(id, nodes, recurse = true) {
  * @param limit Maximum number of nodes to return.
  * @returns All nodes with the supplied `tagName`.
  */
-function getElementsByTagName(tagName, nodes, recurse = true, limit = Infinity) {
+function getElementsByTagName(tagName, nodes, recurse = true, limit = Number.POSITIVE_INFINITY) {
     return filter(Checks["tag_name"](tagName), nodes, recurse, limit);
 }
 /**
@@ -8227,7 +7540,7 @@ function getElementsByTagName(tagName, nodes, recurse = true, limit = Infinity) 
  * @param limit Maximum number of nodes to return.
  * @returns All nodes with the supplied `className`.
  */
-function getElementsByClassName(className, nodes, recurse = true, limit = Infinity) {
+function getElementsByClassName(className, nodes, recurse = true, limit = Number.POSITIVE_INFINITY) {
     return filter(getAttribCheck("class", className), nodes, recurse, limit);
 }
 /**
@@ -8240,1749 +7553,13 @@ function getElementsByClassName(className, nodes, recurse = true, limit = Infini
  * @param limit Maximum number of nodes to return.
  * @returns All nodes with the supplied `type`.
  */
-function getElementsByTagType(type, nodes, recurse = true, limit = Infinity) {
+function getElementsByTagType(type, nodes, recurse = true, limit = Number.POSITIVE_INFINITY) {
     return filter(Checks["tag_type"](type), nodes, recurse, limit);
 }
 
-/**
- * Given an array of nodes, remove any member that is contained by another
- * member.
- *
- * @category Helpers
- * @param nodes Nodes to filter.
- * @returns Remaining nodes that aren't contained by other nodes.
- */
-function removeSubsets(nodes) {
-    let idx = nodes.length;
-    /*
-     * Check if each node (or one of its ancestors) is already contained in the
-     * array.
-     */
-    while (--idx >= 0) {
-        const node = nodes[idx];
-        /*
-         * Remove the node if it is not unique.
-         * We are going through the array from the end, so we only
-         * have to check nodes that preceed the node under consideration in the array.
-         */
-        if (idx > 0 && nodes.lastIndexOf(node, idx - 1) >= 0) {
-            nodes.splice(idx, 1);
-            continue;
-        }
-        for (let ancestor = node.parent; ancestor; ancestor = ancestor.parent) {
-            if (nodes.includes(ancestor)) {
-                nodes.splice(idx, 1);
-                break;
-            }
-        }
-    }
-    return nodes;
-}
-/**
- * @category Helpers
- * @see {@link http://dom.spec.whatwg.org/#dom-node-comparedocumentposition}
- */
-var DocumentPosition;
-(function (DocumentPosition) {
-    DocumentPosition[DocumentPosition["DISCONNECTED"] = 1] = "DISCONNECTED";
-    DocumentPosition[DocumentPosition["PRECEDING"] = 2] = "PRECEDING";
-    DocumentPosition[DocumentPosition["FOLLOWING"] = 4] = "FOLLOWING";
-    DocumentPosition[DocumentPosition["CONTAINS"] = 8] = "CONTAINS";
-    DocumentPosition[DocumentPosition["CONTAINED_BY"] = 16] = "CONTAINED_BY";
-})(DocumentPosition || (DocumentPosition = {}));
-/**
- * Compare the position of one node against another node in any other document,
- * returning a bitmask with the values from {@link DocumentPosition}.
- *
- * Document order:
- * > There is an ordering, document order, defined on all the nodes in the
- * > document corresponding to the order in which the first character of the
- * > XML representation of each node occurs in the XML representation of the
- * > document after expansion of general entities. Thus, the document element
- * > node will be the first node. Element nodes occur before their children.
- * > Thus, document order orders element nodes in order of the occurrence of
- * > their start-tag in the XML (after expansion of entities). The attribute
- * > nodes of an element occur after the element and before its children. The
- * > relative order of attribute nodes is implementation-dependent.
- *
- * Source:
- * http://www.w3.org/TR/DOM-Level-3-Core/glossary.html#dt-document-order
- *
- * @category Helpers
- * @param nodeA The first node to use in the comparison
- * @param nodeB The second node to use in the comparison
- * @returns A bitmask describing the input nodes' relative position.
- *
- * See http://dom.spec.whatwg.org/#dom-node-comparedocumentposition for
- * a description of these values.
- */
-function compareDocumentPosition(nodeA, nodeB) {
-    const aParents = [];
-    const bParents = [];
-    if (nodeA === nodeB) {
-        return 0;
-    }
-    let current = hasChildren(nodeA) ? nodeA : nodeA.parent;
-    while (current) {
-        aParents.unshift(current);
-        current = current.parent;
-    }
-    current = hasChildren(nodeB) ? nodeB : nodeB.parent;
-    while (current) {
-        bParents.unshift(current);
-        current = current.parent;
-    }
-    const maxIdx = Math.min(aParents.length, bParents.length);
-    let idx = 0;
-    while (idx < maxIdx && aParents[idx] === bParents[idx]) {
-        idx++;
-    }
-    if (idx === 0) {
-        return DocumentPosition.DISCONNECTED;
-    }
-    const sharedParent = aParents[idx - 1];
-    const siblings = sharedParent.children;
-    const aSibling = aParents[idx];
-    const bSibling = bParents[idx];
-    if (siblings.indexOf(aSibling) > siblings.indexOf(bSibling)) {
-        if (sharedParent === nodeB) {
-            return DocumentPosition.FOLLOWING | DocumentPosition.CONTAINED_BY;
-        }
-        return DocumentPosition.FOLLOWING;
-    }
-    if (sharedParent === nodeA) {
-        return DocumentPosition.PRECEDING | DocumentPosition.CONTAINS;
-    }
-    return DocumentPosition.PRECEDING;
-}
-/**
- * Sort an array of nodes based on their relative position in the document,
- * removing any duplicate nodes. If the array contains nodes that do not belong
- * to the same document, sort order is unspecified.
- *
- * @category Helpers
- * @param nodes Array of DOM nodes.
- * @returns Collection of unique nodes, sorted in document order.
- */
-function uniqueSort(nodes) {
-    nodes = nodes.filter((node, i, arr) => !arr.includes(node, i + 1));
-    nodes.sort((a, b) => {
-        const relative = compareDocumentPosition(a, b);
-        if (relative & DocumentPosition.PRECEDING) {
-            return -1;
-        }
-        else if (relative & DocumentPosition.FOLLOWING) {
-            return 1;
-        }
-        return 0;
-    });
-    return nodes;
-}
-
-/**
- * Get the feed object from the root of a DOM tree.
- *
- * @category Feeds
- * @param doc - The DOM to to extract the feed from.
- * @returns The feed.
- */
-function getFeed(doc) {
-    const feedRoot = getOneElement(isValidFeed, doc);
-    return !feedRoot
-        ? null
-        : feedRoot.name === "feed"
-            ? getAtomFeed(feedRoot)
-            : getRssFeed(feedRoot);
-}
-/**
- * Parse an Atom feed.
- *
- * @param feedRoot The root of the feed.
- * @returns The parsed feed.
- */
-function getAtomFeed(feedRoot) {
-    var _a;
-    const childs = feedRoot.children;
-    const feed = {
-        type: "atom",
-        items: getElementsByTagName("entry", childs).map((item) => {
-            var _a;
-            const { children } = item;
-            const entry = { media: getMediaElements(children) };
-            addConditionally(entry, "id", "id", children);
-            addConditionally(entry, "title", "title", children);
-            const href = (_a = getOneElement("link", children)) === null || _a === void 0 ? void 0 : _a.attribs["href"];
-            if (href) {
-                entry.link = href;
-            }
-            const description = fetch$1("summary", children) || fetch$1("content", children);
-            if (description) {
-                entry.description = description;
-            }
-            const pubDate = fetch$1("updated", children);
-            if (pubDate) {
-                entry.pubDate = new Date(pubDate);
-            }
-            return entry;
-        }),
-    };
-    addConditionally(feed, "id", "id", childs);
-    addConditionally(feed, "title", "title", childs);
-    const href = (_a = getOneElement("link", childs)) === null || _a === void 0 ? void 0 : _a.attribs["href"];
-    if (href) {
-        feed.link = href;
-    }
-    addConditionally(feed, "description", "subtitle", childs);
-    const updated = fetch$1("updated", childs);
-    if (updated) {
-        feed.updated = new Date(updated);
-    }
-    addConditionally(feed, "author", "email", childs, true);
-    return feed;
-}
-/**
- * Parse a RSS feed.
- *
- * @param feedRoot The root of the feed.
- * @returns The parsed feed.
- */
-function getRssFeed(feedRoot) {
-    var _a, _b;
-    const childs = (_b = (_a = getOneElement("channel", feedRoot.children)) === null || _a === void 0 ? void 0 : _a.children) !== null && _b !== void 0 ? _b : [];
-    const feed = {
-        type: feedRoot.name.substr(0, 3),
-        id: "",
-        items: getElementsByTagName("item", feedRoot.children).map((item) => {
-            const { children } = item;
-            const entry = { media: getMediaElements(children) };
-            addConditionally(entry, "id", "guid", children);
-            addConditionally(entry, "title", "title", children);
-            addConditionally(entry, "link", "link", children);
-            addConditionally(entry, "description", "description", children);
-            const pubDate = fetch$1("pubDate", children) || fetch$1("dc:date", children);
-            if (pubDate)
-                entry.pubDate = new Date(pubDate);
-            return entry;
-        }),
-    };
-    addConditionally(feed, "title", "title", childs);
-    addConditionally(feed, "link", "link", childs);
-    addConditionally(feed, "description", "description", childs);
-    const updated = fetch$1("lastBuildDate", childs);
-    if (updated) {
-        feed.updated = new Date(updated);
-    }
-    addConditionally(feed, "author", "managingEditor", childs, true);
-    return feed;
-}
-const MEDIA_KEYS_STRING = ["url", "type", "lang"];
-const MEDIA_KEYS_INT = [
-    "fileSize",
-    "bitrate",
-    "framerate",
-    "samplingrate",
-    "channels",
-    "duration",
-    "height",
-    "width",
-];
-/**
- * Get all media elements of a feed item.
- *
- * @param where Nodes to search in.
- * @returns Media elements.
- */
-function getMediaElements(where) {
-    return getElementsByTagName("media:content", where).map((elem) => {
-        const { attribs } = elem;
-        const media = {
-            medium: attribs["medium"],
-            isDefault: !!attribs["isDefault"],
-        };
-        for (const attrib of MEDIA_KEYS_STRING) {
-            if (attribs[attrib]) {
-                media[attrib] = attribs[attrib];
-            }
-        }
-        for (const attrib of MEDIA_KEYS_INT) {
-            if (attribs[attrib]) {
-                media[attrib] = parseInt(attribs[attrib], 10);
-            }
-        }
-        if (attribs["expression"]) {
-            media.expression = attribs["expression"];
-        }
-        return media;
-    });
-}
-/**
- * Get one element by tag name.
- *
- * @param tagName Tag name to look for
- * @param node Node to search in
- * @returns The element or null
- */
-function getOneElement(tagName, node) {
-    return getElementsByTagName(tagName, node, true, 1)[0];
-}
-/**
- * Get the text content of an element with a certain tag name.
- *
- * @param tagName Tag name to look for.
- * @param where Node to search in.
- * @param recurse Whether to recurse into child nodes.
- * @returns The text content of the element.
- */
-function fetch$1(tagName, where, recurse = false) {
-    return textContent(getElementsByTagName(tagName, where, recurse, 1)).trim();
-}
-/**
- * Adds a property to an object if it has a value.
- *
- * @param obj Object to be extended
- * @param prop Property name
- * @param tagName Tag name that contains the conditionally added property
- * @param where Element to search for the property
- * @param recurse Whether to recurse into child nodes.
- */
-function addConditionally(obj, prop, tagName, where, recurse = false) {
-    const val = fetch$1(tagName, where, recurse);
-    if (val)
-        obj[prop] = val;
-}
-/**
- * Checks if an element is a feed root node.
- *
- * @param value The name of the element to check.
- * @returns Whether an element is a feed root node.
- */
-function isValidFeed(value) {
-    return value === "rss" || value === "feed" || value === "rdf:RDF";
-}
-
-var DomUtils = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  get DocumentPosition () { return DocumentPosition; },
-  append: append,
-  appendChild: appendChild,
-  compareDocumentPosition: compareDocumentPosition,
-  existsOne: existsOne,
-  filter: filter,
-  find: find,
-  findAll: findAll$1,
-  findOne: findOne$1,
-  findOneChild: findOneChild,
-  getAttributeValue: getAttributeValue,
-  getChildren: getChildren,
-  getElementById: getElementById,
-  getElements: getElements,
-  getElementsByClassName: getElementsByClassName,
-  getElementsByTagName: getElementsByTagName,
-  getElementsByTagType: getElementsByTagType,
-  getFeed: getFeed,
-  getInnerHTML: getInnerHTML,
-  getName: getName,
-  getOuterHTML: getOuterHTML,
-  getParent: getParent,
-  getSiblings: getSiblings,
-  getText: getText,
-  hasAttrib: hasAttrib,
-  hasChildren: hasChildren,
-  innerText: innerText,
-  isCDATA: isCDATA,
-  isComment: isComment,
-  isDocument: isDocument,
-  isTag: isTag,
-  isText: isText,
-  nextElementSibling: nextElementSibling,
-  prepend: prepend,
-  prependChild: prependChild,
-  prevElementSibling: prevElementSibling,
-  removeElement: removeElement,
-  removeSubsets: removeSubsets,
-  replaceElement: replaceElement,
-  testElement: testElement,
-  textContent: textContent,
-  uniqueSort: uniqueSort
-});
-
-/**
- * All reserved characters in a regex, used for escaping.
- *
- * Taken from XRegExp, (c) 2007-2020 Steven Levithan under the MIT license
- * https://github.com/slevithan/xregexp/blob/95eeebeb8fac8754d54eafe2b4743661ac1cf028/src/xregexp.js#L794
- */
-const reChars = /[-[\]{}()*+?.,\\^$|#\s]/g;
-function escapeRegex(value) {
-    return value.replace(reChars, "\\$&");
-}
-/**
- * Attributes that are case-insensitive in HTML.
- *
- * @private
- * @see https://html.spec.whatwg.org/multipage/semantics-other.html#case-sensitivity-of-selectors
- */
-const caseInsensitiveAttributes = new Set([
-    "accept",
-    "accept-charset",
-    "align",
-    "alink",
-    "axis",
-    "bgcolor",
-    "charset",
-    "checked",
-    "clear",
-    "codetype",
-    "color",
-    "compact",
-    "declare",
-    "defer",
-    "dir",
-    "direction",
-    "disabled",
-    "enctype",
-    "face",
-    "frame",
-    "hreflang",
-    "http-equiv",
-    "lang",
-    "language",
-    "link",
-    "media",
-    "method",
-    "multiple",
-    "nohref",
-    "noresize",
-    "noshade",
-    "nowrap",
-    "readonly",
-    "rel",
-    "rev",
-    "rules",
-    "scope",
-    "scrolling",
-    "selected",
-    "shape",
-    "target",
-    "text",
-    "type",
-    "valign",
-    "valuetype",
-    "vlink",
-]);
-function shouldIgnoreCase(selector, options) {
-    return typeof selector.ignoreCase === "boolean"
-        ? selector.ignoreCase
-        : selector.ignoreCase === "quirks"
-            ? !!options.quirksMode
-            : !options.xmlMode && caseInsensitiveAttributes.has(selector.name);
-}
-/**
- * Attribute selectors
- */
-const attributeRules = {
-    equals(next, data, options) {
-        const { adapter } = options;
-        const { name } = data;
-        let { value } = data;
-        if (shouldIgnoreCase(data, options)) {
-            value = value.toLowerCase();
-            return (elem) => {
-                const attr = adapter.getAttributeValue(elem, name);
-                return (attr != null &&
-                    attr.length === value.length &&
-                    attr.toLowerCase() === value &&
-                    next(elem));
-            };
-        }
-        return (elem) => adapter.getAttributeValue(elem, name) === value && next(elem);
-    },
-    hyphen(next, data, options) {
-        const { adapter } = options;
-        const { name } = data;
-        let { value } = data;
-        const len = value.length;
-        if (shouldIgnoreCase(data, options)) {
-            value = value.toLowerCase();
-            return function hyphenIC(elem) {
-                const attr = adapter.getAttributeValue(elem, name);
-                return (attr != null &&
-                    (attr.length === len || attr.charAt(len) === "-") &&
-                    attr.substr(0, len).toLowerCase() === value &&
-                    next(elem));
-            };
-        }
-        return function hyphen(elem) {
-            const attr = adapter.getAttributeValue(elem, name);
-            return (attr != null &&
-                (attr.length === len || attr.charAt(len) === "-") &&
-                attr.substr(0, len) === value &&
-                next(elem));
-        };
-    },
-    element(next, data, options) {
-        const { adapter } = options;
-        const { name, value } = data;
-        if (/\s/.test(value)) {
-            return boolbaseExports.falseFunc;
-        }
-        const regex = new RegExp(`(?:^|\\s)${escapeRegex(value)}(?:$|\\s)`, shouldIgnoreCase(data, options) ? "i" : "");
-        return function element(elem) {
-            const attr = adapter.getAttributeValue(elem, name);
-            return (attr != null &&
-                attr.length >= value.length &&
-                regex.test(attr) &&
-                next(elem));
-        };
-    },
-    exists(next, { name }, { adapter }) {
-        return (elem) => adapter.hasAttrib(elem, name) && next(elem);
-    },
-    start(next, data, options) {
-        const { adapter } = options;
-        const { name } = data;
-        let { value } = data;
-        const len = value.length;
-        if (len === 0) {
-            return boolbaseExports.falseFunc;
-        }
-        if (shouldIgnoreCase(data, options)) {
-            value = value.toLowerCase();
-            return (elem) => {
-                const attr = adapter.getAttributeValue(elem, name);
-                return (attr != null &&
-                    attr.length >= len &&
-                    attr.substr(0, len).toLowerCase() === value &&
-                    next(elem));
-            };
-        }
-        return (elem) => !!adapter.getAttributeValue(elem, name)?.startsWith(value) &&
-            next(elem);
-    },
-    end(next, data, options) {
-        const { adapter } = options;
-        const { name } = data;
-        let { value } = data;
-        const len = -value.length;
-        if (len === 0) {
-            return boolbaseExports.falseFunc;
-        }
-        if (shouldIgnoreCase(data, options)) {
-            value = value.toLowerCase();
-            return (elem) => adapter
-                .getAttributeValue(elem, name)
-                ?.substr(len)
-                .toLowerCase() === value && next(elem);
-        }
-        return (elem) => !!adapter.getAttributeValue(elem, name)?.endsWith(value) &&
-            next(elem);
-    },
-    any(next, data, options) {
-        const { adapter } = options;
-        const { name, value } = data;
-        if (value === "") {
-            return boolbaseExports.falseFunc;
-        }
-        if (shouldIgnoreCase(data, options)) {
-            const regex = new RegExp(escapeRegex(value), "i");
-            return function anyIC(elem) {
-                const attr = adapter.getAttributeValue(elem, name);
-                return (attr != null &&
-                    attr.length >= value.length &&
-                    regex.test(attr) &&
-                    next(elem));
-            };
-        }
-        return (elem) => !!adapter.getAttributeValue(elem, name)?.includes(value) &&
-            next(elem);
-    },
-    not(next, data, options) {
-        const { adapter } = options;
-        const { name } = data;
-        let { value } = data;
-        if (value === "") {
-            return (elem) => !!adapter.getAttributeValue(elem, name) && next(elem);
-        }
-        if (shouldIgnoreCase(data, options)) {
-            value = value.toLowerCase();
-            return (elem) => {
-                const attr = adapter.getAttributeValue(elem, name);
-                return ((attr == null ||
-                    attr.length !== value.length ||
-                    attr.toLowerCase() !== value) &&
-                    next(elem));
-            };
-        }
-        return (elem) => adapter.getAttributeValue(elem, name) !== value && next(elem);
-    },
-};
-
-/**
- * Find all elements matching the query. If not in XML mode, the query will ignore
- * the contents of `<template>` elements.
- *
- * @param query - Function that returns true if the element matches the query.
- * @param elems - Nodes to query. If a node is an element, its children will be queried.
- * @param options - Options for querying the document.
- * @returns All matching elements.
- */
-function findAll(query, elems, options) {
-    const { adapter, xmlMode = false } = options;
-    const result = [];
-    /** Stack of the arrays we are looking at. */
-    const nodeStack = [elems];
-    /** Stack of the indices within the arrays. */
-    const indexStack = [0];
-    for (;;) {
-        // First, check if the current array has any more elements to look at.
-        if (indexStack[0] >= nodeStack[0].length) {
-            // If we have no more arrays to look at, we are done.
-            if (nodeStack.length === 1) {
-                return result;
-            }
-            nodeStack.shift();
-            indexStack.shift();
-            // Loop back to the start to continue with the next array.
-            continue;
-        }
-        const elem = nodeStack[0][indexStack[0]++];
-        if (!adapter.isTag(elem)) {
-            continue;
-        }
-        if (query(elem)) {
-            result.push(elem);
-        }
-        if (xmlMode || adapter.getName(elem) !== "template") {
-            /*
-             * Add the children to the stack. We are depth-first, so this is
-             * the next array we look at.
-             */
-            const children = adapter.getChildren(elem);
-            if (children.length > 0) {
-                nodeStack.unshift(children);
-                indexStack.unshift(0);
-            }
-        }
-    }
-}
-/**
- * Find the first element matching the query. If not in XML mode, the query will ignore
- * the contents of `<template>` elements.
- *
- * @param query - Function that returns true if the element matches the query.
- * @param elems - Nodes to query. If a node is an element, its children will be queried.
- * @param options - Options for querying the document.
- * @returns The first matching element, or null if there was no match.
- */
-function findOne(query, elems, options) {
-    const { adapter, xmlMode = false } = options;
-    /** Stack of the arrays we are looking at. */
-    const nodeStack = [elems];
-    /** Stack of the indices within the arrays. */
-    const indexStack = [0];
-    for (;;) {
-        // First, check if the current array has any more elements to look at.
-        if (indexStack[0] >= nodeStack[0].length) {
-            // If we have no more arrays to look at, we are done.
-            if (nodeStack.length === 1) {
-                return null;
-            }
-            nodeStack.shift();
-            indexStack.shift();
-            // Loop back to the start to continue with the next array.
-            continue;
-        }
-        const elem = nodeStack[0][indexStack[0]++];
-        if (!adapter.isTag(elem)) {
-            continue;
-        }
-        if (query(elem)) {
-            return elem;
-        }
-        if (xmlMode || adapter.getName(elem) !== "template") {
-            /*
-             * Add the children to the stack. We are depth-first, so this is
-             * the next array we look at.
-             */
-            const children = adapter.getChildren(elem);
-            if (children.length > 0) {
-                nodeStack.unshift(children);
-                indexStack.unshift(0);
-            }
-        }
-    }
-}
-function getNextSiblings(elem, adapter) {
-    const siblings = adapter.getSiblings(elem);
-    if (siblings.length <= 1) {
-        return [];
-    }
-    const elemIndex = siblings.indexOf(elem);
-    if (elemIndex < 0 || elemIndex === siblings.length - 1) {
-        return [];
-    }
-    return siblings.slice(elemIndex + 1).filter(adapter.isTag);
-}
-function getElementParent(node, adapter) {
-    const parent = adapter.getParent(node);
-    return parent != null && adapter.isTag(parent) ? parent : null;
-}
-
-/**
- * Only text controls can be made read-only, since for other controls (such
- * as checkboxes and buttons) there is no useful distinction between being
- * read-only and being disabled.
- *
- * @see {@link https://html.spec.whatwg.org/multipage/input.html#attr-input-readonly}
- */
-const textControl = "input:is([type=text i],[type=search i],[type=url i],[type=tel i],[type=email i],[type=password i],[type=date i],[type=month i],[type=week i],[type=time i],[type=datetime-local i],[type=number i])";
-/**
- * Aliases are pseudos that are expressed as selectors.
- */
-const aliases = {
-    // Links
-    "any-link": ":is(a, area, link)[href]",
-    link: ":any-link:not(:visited)",
-    // Forms
-    // https://html.spec.whatwg.org/multipage/scripting.html#disabled-elements
-    disabled: `:is(
-        :is(button, input, select, textarea, optgroup, option)[disabled],
-        optgroup[disabled] > option,
-        fieldset[disabled]:not(fieldset[disabled] legend:first-of-type *)
-    )`,
-    enabled: ":not(:disabled)",
-    checked: ":is(:is(input[type=radio], input[type=checkbox])[checked], :selected)",
-    required: ":is(input, select, textarea)[required]",
-    optional: ":is(input, select, textarea):not([required])",
-    "read-only": `[readonly]:is(textarea, ${textControl})`,
-    "read-write": `:not([readonly]):is(textarea, ${textControl})`,
-    // JQuery extensions
-    /**
-     * `:selected` matches option elements that have the `selected` attribute,
-     * or are the first option element in a select element that does not have
-     * the `multiple` attribute and does not have any option elements with the
-     * `selected` attribute.
-     *
-     * @see https://html.spec.whatwg.org/multipage/form-elements.html#concept-option-selectedness
-     */
-    selected: "option:is([selected], select:not([multiple]):not(:has(> option[selected])) > :first-of-type)",
-    checkbox: "[type=checkbox]",
-    file: "[type=file]",
-    password: "[type=password]",
-    radio: "[type=radio]",
-    reset: "[type=reset]",
-    image: "[type=image]",
-    submit: "[type=submit]",
-    parent: ":not(:empty)",
-    header: ":is(h1, h2, h3, h4, h5, h6)",
-    button: ":is(button, input[type=button])",
-    input: ":is(input, textarea, select, button)",
-    text: "input:is(:not([type!='']), [type=text])",
-};
-
-// Following http://www.w3.org/TR/css3-selectors/#nth-child-pseudo
-// Whitespace as per https://www.w3.org/TR/selectors-3/#lex is " \t\r\n\f"
-const whitespace = new Set([9, 10, 12, 13, 32]);
-const ZERO = "0".charCodeAt(0);
-const NINE = "9".charCodeAt(0);
-/**
- * Parses an expression.
- *
- * @throws An `Error` if parsing fails.
- * @returns An array containing the integer step size and the integer offset of the nth rule.
- * @example nthCheck.parse("2n+3"); // returns [2, 3]
- */
-function parse(formula) {
-    formula = formula.trim().toLowerCase();
-    if (formula === "even") {
-        return [2, 0];
-    }
-    else if (formula === "odd") {
-        return [2, 1];
-    }
-    // Parse [ ['-'|'+']? INTEGER? {N} [ S* ['-'|'+'] S* INTEGER ]?
-    let idx = 0;
-    let a = 0;
-    let sign = readSign();
-    let number = readNumber();
-    if (idx < formula.length && formula.charAt(idx) === "n") {
-        idx++;
-        a = sign * (number !== null && number !== void 0 ? number : 1);
-        skipWhitespace();
-        if (idx < formula.length) {
-            sign = readSign();
-            skipWhitespace();
-            number = readNumber();
-        }
-        else {
-            sign = number = 0;
-        }
-    }
-    // Throw if there is anything else
-    if (number === null || idx < formula.length) {
-        throw new Error(`n-th rule couldn't be parsed ('${formula}')`);
-    }
-    return [a, sign * number];
-    function readSign() {
-        if (formula.charAt(idx) === "-") {
-            idx++;
-            return -1;
-        }
-        if (formula.charAt(idx) === "+") {
-            idx++;
-        }
-        return 1;
-    }
-    function readNumber() {
-        const start = idx;
-        let value = 0;
-        while (idx < formula.length &&
-            formula.charCodeAt(idx) >= ZERO &&
-            formula.charCodeAt(idx) <= NINE) {
-            value = value * 10 + (formula.charCodeAt(idx) - ZERO);
-            idx++;
-        }
-        // Return `null` if we didn't read anything.
-        return idx === start ? null : value;
-    }
-    function skipWhitespace() {
-        while (idx < formula.length &&
-            whitespace.has(formula.charCodeAt(idx))) {
-            idx++;
-        }
-    }
-}
-
-/**
- * Returns a function that checks if an elements index matches the given rule
- * highly optimized to return the fastest solution.
- *
- * @param parsed A tuple [a, b], as returned by `parse`.
- * @returns A highly optimized function that returns whether an index matches the nth-check.
- * @example
- *
- * ```js
- * const check = nthCheck.compile([2, 3]);
- *
- * check(0); // `false`
- * check(1); // `false`
- * check(2); // `true`
- * check(3); // `false`
- * check(4); // `true`
- * check(5); // `false`
- * check(6); // `true`
- * ```
- */
-function compile(parsed) {
-    const a = parsed[0];
-    // Subtract 1 from `b`, to convert from one- to zero-indexed.
-    const b = parsed[1] - 1;
-    /*
-     * When `b <= 0`, `a * n` won't be lead to any matches for `a < 0`.
-     * Besides, the specification states that no elements are
-     * matched when `a` and `b` are 0.
-     *
-     * `b < 0` here as we subtracted 1 from `b` above.
-     */
-    if (b < 0 && a <= 0)
-        return boolbase.falseFunc;
-    // When `a` is in the range -1..1, it matches any element (so only `b` is checked).
-    if (a === -1)
-        return (index) => index <= b;
-    if (a === 0)
-        return (index) => index === b;
-    // When `b <= 0` and `a === 1`, they match any element.
-    if (a === 1)
-        return b < 0 ? boolbase.trueFunc : (index) => index >= b;
-    /*
-     * Otherwise, modulo can be used to check if there is a match.
-     *
-     * Modulo doesn't care about the sign, so let's use `a`s absolute value.
-     */
-    const absA = Math.abs(a);
-    // Get `b mod a`, + a if this is negative.
-    const bMod = ((b % absA) + absA) % absA;
-    return a > 1
-        ? (index) => index >= b && index % absA === bMod
-        : (index) => index <= b && index % absA === bMod;
-}
-
-/**
- * Parses and compiles a formula to a highly optimized function.
- * Combination of {@link parse} and {@link compile}.
- *
- * If the formula doesn't match any elements,
- * it returns [`boolbase`](https://github.com/fb55/boolbase)'s `falseFunc`.
- * Otherwise, a function accepting an _index_ is returned, which returns
- * whether or not the passed _index_ matches the formula.
- *
- * Note: The nth-rule starts counting at `1`, the returned function at `0`.
- *
- * @param formula The formula to compile.
- * @example
- * const check = nthCheck("2n+3");
- *
- * check(0); // `false`
- * check(1); // `false`
- * check(2); // `true`
- * check(3); // `false`
- * check(4); // `true`
- * check(5); // `false`
- * check(6); // `true`
- */
-function nthCheck(formula) {
-    return compile(parse(formula));
-}
-
-/**
- * Some selectors such as `:contains` and (non-relative) `:has` will only be
- * able to match elements if their parents match the selector (as they contain
- * a subset of the elements that the parent contains).
- *
- * This function wraps the given `matches` function in a function that caches
- * the results of the parent elements, so that the `matches` function only
- * needs to be called once for each subtree.
- */
-function cacheParentResults(next, { adapter, cacheResults }, matches) {
-    if (cacheResults === false || typeof WeakMap === "undefined") {
-        return (elem) => next(elem) && matches(elem);
-    }
-    // Use a cache to avoid re-checking children of an element.
-    // @ts-expect-error `Node` is not extending object
-    const resultCache = new WeakMap();
-    function addResultToCache(elem) {
-        const result = matches(elem);
-        resultCache.set(elem, result);
-        return result;
-    }
-    return function cachedMatcher(elem) {
-        if (!next(elem)) {
-            return false;
-        }
-        if (resultCache.has(elem)) {
-            return resultCache.get(elem);
-        }
-        // Check all of the element's parents.
-        let node = elem;
-        do {
-            const parent = getElementParent(node, adapter);
-            if (parent === null) {
-                return addResultToCache(elem);
-            }
-            node = parent;
-        } while (!resultCache.has(node));
-        return resultCache.get(node) && addResultToCache(elem);
-    };
-}
-
-const filters = {
-    contains(next, text, options) {
-        const { getText } = options.adapter;
-        return cacheParentResults(next, options, (elem) => getText(elem).includes(text));
-    },
-    icontains(next, text, options) {
-        const itext = text.toLowerCase();
-        const { getText } = options.adapter;
-        return cacheParentResults(next, options, (elem) => getText(elem).toLowerCase().includes(itext));
-    },
-    // Location specific methods
-    "nth-child"(next, rule, { adapter, equals }) {
-        const func = nthCheck(rule);
-        if (func === boolbaseExports.falseFunc) {
-            return boolbaseExports.falseFunc;
-        }
-        if (func === boolbaseExports.trueFunc) {
-            return (elem) => getElementParent(elem, adapter) !== null && next(elem);
-        }
-        return function nthChild(elem) {
-            const siblings = adapter.getSiblings(elem);
-            let pos = 0;
-            for (let i = 0; i < siblings.length; i++) {
-                if (equals(elem, siblings[i])) {
-                    break;
-                }
-                if (adapter.isTag(siblings[i])) {
-                    pos++;
-                }
-            }
-            return func(pos) && next(elem);
-        };
-    },
-    "nth-last-child"(next, rule, { adapter, equals }) {
-        const func = nthCheck(rule);
-        if (func === boolbaseExports.falseFunc) {
-            return boolbaseExports.falseFunc;
-        }
-        if (func === boolbaseExports.trueFunc) {
-            return (elem) => getElementParent(elem, adapter) !== null && next(elem);
-        }
-        return function nthLastChild(elem) {
-            const siblings = adapter.getSiblings(elem);
-            let pos = 0;
-            for (let i = siblings.length - 1; i >= 0; i--) {
-                if (equals(elem, siblings[i])) {
-                    break;
-                }
-                if (adapter.isTag(siblings[i])) {
-                    pos++;
-                }
-            }
-            return func(pos) && next(elem);
-        };
-    },
-    "nth-of-type"(next, rule, { adapter, equals }) {
-        const func = nthCheck(rule);
-        if (func === boolbaseExports.falseFunc) {
-            return boolbaseExports.falseFunc;
-        }
-        if (func === boolbaseExports.trueFunc) {
-            return (elem) => getElementParent(elem, adapter) !== null && next(elem);
-        }
-        return function nthOfType(elem) {
-            const siblings = adapter.getSiblings(elem);
-            let pos = 0;
-            for (let i = 0; i < siblings.length; i++) {
-                const currentSibling = siblings[i];
-                if (equals(elem, currentSibling)) {
-                    break;
-                }
-                if (adapter.isTag(currentSibling) &&
-                    adapter.getName(currentSibling) === adapter.getName(elem)) {
-                    pos++;
-                }
-            }
-            return func(pos) && next(elem);
-        };
-    },
-    "nth-last-of-type"(next, rule, { adapter, equals }) {
-        const func = nthCheck(rule);
-        if (func === boolbaseExports.falseFunc) {
-            return boolbaseExports.falseFunc;
-        }
-        if (func === boolbaseExports.trueFunc) {
-            return (elem) => getElementParent(elem, adapter) !== null && next(elem);
-        }
-        return function nthLastOfType(elem) {
-            const siblings = adapter.getSiblings(elem);
-            let pos = 0;
-            for (let i = siblings.length - 1; i >= 0; i--) {
-                const currentSibling = siblings[i];
-                if (equals(elem, currentSibling)) {
-                    break;
-                }
-                if (adapter.isTag(currentSibling) &&
-                    adapter.getName(currentSibling) === adapter.getName(elem)) {
-                    pos++;
-                }
-            }
-            return func(pos) && next(elem);
-        };
-    },
-    // TODO determine the actual root element
-    root(next, _rule, { adapter }) {
-        return (elem) => getElementParent(elem, adapter) === null && next(elem);
-    },
-    scope(next, rule, options, context) {
-        const { equals } = options;
-        if (!context || context.length === 0) {
-            // Equivalent to :root
-            return filters["root"](next, rule, options);
-        }
-        if (context.length === 1) {
-            // NOTE: can't be unpacked, as :has uses this for side-effects
-            return (elem) => equals(context[0], elem) && next(elem);
-        }
-        return (elem) => context.includes(elem) && next(elem);
-    },
-    hover: dynamicStatePseudo("isHovered"),
-    visited: dynamicStatePseudo("isVisited"),
-    active: dynamicStatePseudo("isActive"),
-};
-/**
- * Dynamic state pseudos. These depend on optional Adapter methods.
- *
- * @param name The name of the adapter method to call.
- * @returns Pseudo for the `filters` object.
- */
-function dynamicStatePseudo(name) {
-    return function dynamicPseudo(next, _rule, { adapter }) {
-        const func = adapter[name];
-        if (typeof func !== "function") {
-            return boolbaseExports.falseFunc;
-        }
-        return function active(elem) {
-            return func(elem) && next(elem);
-        };
-    };
-}
-
-/**
- * CSS limits the characters considered as whitespace to space, tab & line
- * feed. We add carriage returns as htmlparser2 doesn't normalize them to
- * line feeds.
- *
- * @see {@link https://www.w3.org/TR/css-text-3/#white-space}
- */
-const isDocumentWhiteSpace = /^[ \t\r\n]*$/;
-// While filters are precompiled, pseudos get called when they are needed
-const pseudos = {
-    empty(elem, { adapter }) {
-        const children = adapter.getChildren(elem);
-        return (
-        // First, make sure the tag does not have any element children.
-        children.every((elem) => !adapter.isTag(elem)) &&
-            // Then, check that the text content is only whitespace.
-            children.every((elem) => 
-            // FIXME: `getText` call is potentially expensive.
-            isDocumentWhiteSpace.test(adapter.getText(elem))));
-    },
-    "first-child"(elem, { adapter, equals }) {
-        if (adapter.prevElementSibling) {
-            return adapter.prevElementSibling(elem) == null;
-        }
-        const firstChild = adapter
-            .getSiblings(elem)
-            .find((elem) => adapter.isTag(elem));
-        return firstChild != null && equals(elem, firstChild);
-    },
-    "last-child"(elem, { adapter, equals }) {
-        const siblings = adapter.getSiblings(elem);
-        for (let i = siblings.length - 1; i >= 0; i--) {
-            if (equals(elem, siblings[i])) {
-                return true;
-            }
-            if (adapter.isTag(siblings[i])) {
-                break;
-            }
-        }
-        return false;
-    },
-    "first-of-type"(elem, { adapter, equals }) {
-        const siblings = adapter.getSiblings(elem);
-        const elemName = adapter.getName(elem);
-        for (let i = 0; i < siblings.length; i++) {
-            const currentSibling = siblings[i];
-            if (equals(elem, currentSibling)) {
-                return true;
-            }
-            if (adapter.isTag(currentSibling) &&
-                adapter.getName(currentSibling) === elemName) {
-                break;
-            }
-        }
-        return false;
-    },
-    "last-of-type"(elem, { adapter, equals }) {
-        const siblings = adapter.getSiblings(elem);
-        const elemName = adapter.getName(elem);
-        for (let i = siblings.length - 1; i >= 0; i--) {
-            const currentSibling = siblings[i];
-            if (equals(elem, currentSibling)) {
-                return true;
-            }
-            if (adapter.isTag(currentSibling) &&
-                adapter.getName(currentSibling) === elemName) {
-                break;
-            }
-        }
-        return false;
-    },
-    "only-of-type"(elem, { adapter, equals }) {
-        const elemName = adapter.getName(elem);
-        return adapter
-            .getSiblings(elem)
-            .every((sibling) => equals(elem, sibling) ||
-            !adapter.isTag(sibling) ||
-            adapter.getName(sibling) !== elemName);
-    },
-    "only-child"(elem, { adapter, equals }) {
-        return adapter
-            .getSiblings(elem)
-            .every((sibling) => equals(elem, sibling) || !adapter.isTag(sibling));
-    },
-};
-function verifyPseudoArgs(func, name, subselect, argIndex) {
-    if (subselect === null) {
-        if (func.length > argIndex) {
-            throw new Error(`Pseudo-class :${name} requires an argument`);
-        }
-    }
-    else if (func.length === argIndex) {
-        throw new Error(`Pseudo-class :${name} doesn't have any arguments`);
-    }
-}
-
-function isTraversal(token) {
-    return token.type === "_flexibleDescendant" || isTraversal$1(token);
-}
-/**
- * Sort the parts of the passed selector, as there is potential for
- * optimization (some types of selectors are faster than others).
- *
- * @param arr Selector to sort
- */
-function sortRules(arr) {
-    const ratings = arr.map(getQuality);
-    for (let i = 1; i < arr.length; i++) {
-        const procNew = ratings[i];
-        if (procNew < 0) {
-            continue;
-        }
-        // Use insertion sort to move the token to the correct position.
-        for (let j = i; j > 0 && procNew < ratings[j - 1]; j--) {
-            const token = arr[j];
-            arr[j] = arr[j - 1];
-            arr[j - 1] = token;
-            ratings[j] = ratings[j - 1];
-            ratings[j - 1] = procNew;
-        }
-    }
-}
-function getAttributeQuality(token) {
-    switch (token.action) {
-        case AttributeAction.Exists: {
-            return 10;
-        }
-        case AttributeAction.Equals: {
-            // Prefer ID selectors (eg. #ID)
-            return token.name === "id" ? 9 : 8;
-        }
-        case AttributeAction.Not: {
-            return 7;
-        }
-        case AttributeAction.Start: {
-            return 6;
-        }
-        case AttributeAction.End: {
-            return 6;
-        }
-        case AttributeAction.Any: {
-            return 5;
-        }
-        case AttributeAction.Hyphen: {
-            return 4;
-        }
-        case AttributeAction.Element: {
-            return 3;
-        }
-    }
-}
-/**
- * Determine the quality of the passed token. The higher the number, the
- * faster the token is to execute.
- *
- * @param token Token to get the quality of.
- * @returns The token's quality.
- */
-function getQuality(token) {
-    switch (token.type) {
-        case SelectorType.Universal: {
-            return 50;
-        }
-        case SelectorType.Tag: {
-            return 30;
-        }
-        case SelectorType.Attribute: {
-            return Math.floor(getAttributeQuality(token) /
-                // `ignoreCase` adds some overhead, half the result if applicable.
-                (token.ignoreCase ? 2 : 1));
-        }
-        case SelectorType.Pseudo: {
-            return !token.data
-                ? 3
-                : token.name === "has" ||
-                    token.name === "contains" ||
-                    token.name === "icontains"
-                    ? // Expensive in any case — run as late as possible.
-                        0
-                    : Array.isArray(token.data)
-                        ? // Eg. `:is`, `:not`
-                            Math.max(
-                            // If we have traversals, try to avoid executing this selector
-                            0, Math.min(...token.data.map((d) => Math.min(...d.map(getQuality)))))
-                        : 2;
-        }
-        default: {
-            return -1;
-        }
-    }
-}
-function includesScopePseudo(t) {
-    return (t.type === SelectorType.Pseudo &&
-        (t.name === "scope" ||
-            (Array.isArray(t.data) &&
-                t.data.some((data) => data.some(includesScopePseudo)))));
-}
-
-/** Used as a placeholder for :has. Will be replaced with the actual element. */
-const PLACEHOLDER_ELEMENT = {};
-/**
- * Check if the selector has any properties that rely on the current element.
- * If not, we can cache the result of the selector.
- *
- * We can't cache selectors that start with a traversal (e.g. `>`, `+`, `~`),
- * or include a `:scope`.
- *
- * @param selector - The selector to check.
- * @returns Whether the selector has any properties that rely on the current element.
- */
-function hasDependsOnCurrentElement(selector) {
-    return selector.some((sel) => sel.length > 0 &&
-        (isTraversal(sel[0]) || sel.some(includesScopePseudo)));
-}
-function copyOptions(options) {
-    // Not copied: context, rootFunc
-    return {
-        xmlMode: !!options.xmlMode,
-        lowerCaseAttributeNames: !!options.lowerCaseAttributeNames,
-        lowerCaseTags: !!options.lowerCaseTags,
-        quirksMode: !!options.quirksMode,
-        cacheResults: !!options.cacheResults,
-        pseudos: options.pseudos,
-        adapter: options.adapter,
-        equals: options.equals,
-    };
-}
-const is = (next, token, options, context, compileToken) => {
-    const func = compileToken(token, copyOptions(options), context);
-    return func === boolbaseExports.trueFunc
-        ? next
-        : func === boolbaseExports.falseFunc
-            ? boolbaseExports.falseFunc
-            : (elem) => func(elem) && next(elem);
-};
-/*
- * :not, :has, :is, :matches and :where have to compile selectors
- * doing this in src/pseudos.ts would lead to circular dependencies,
- * so we add them here
- */
-const subselects = {
-    is,
-    /**
-     * `:matches` and `:where` are aliases for `:is`.
-     */
-    matches: is,
-    where: is,
-    not(next, token, options, context, compileToken) {
-        const func = compileToken(token, copyOptions(options), context);
-        return func === boolbaseExports.falseFunc
-            ? next
-            : func === boolbaseExports.trueFunc
-                ? boolbaseExports.falseFunc
-                : (elem) => !func(elem) && next(elem);
-    },
-    has(next, subselect, options, _context, compileToken) {
-        const { adapter } = options;
-        const opts = copyOptions(options);
-        opts.relativeSelector = true;
-        const context = subselect.some((s) => s.some(isTraversal))
-            ? // Used as a placeholder. Will be replaced with the actual element.
-                [PLACEHOLDER_ELEMENT]
-            : undefined;
-        const skipCache = hasDependsOnCurrentElement(subselect);
-        const compiled = compileToken(subselect, opts, context);
-        if (compiled === boolbaseExports.falseFunc) {
-            return boolbaseExports.falseFunc;
-        }
-        // If `compiled` is `trueFunc`, we can skip this.
-        if (context && compiled !== boolbaseExports.trueFunc) {
-            return skipCache
-                ? (elem) => {
-                    if (!next(elem)) {
-                        return false;
-                    }
-                    context[0] = elem;
-                    const childs = adapter.getChildren(elem);
-                    return (findOne(compiled, compiled.shouldTestNextSiblings
-                        ? [
-                            ...childs,
-                            ...getNextSiblings(elem, adapter),
-                        ]
-                        : childs, options) !== null);
-                }
-                : cacheParentResults(next, options, (elem) => {
-                    context[0] = elem;
-                    return (findOne(compiled, adapter.getChildren(elem), options) !== null);
-                });
-        }
-        const hasOne = (elem) => findOne(compiled, adapter.getChildren(elem), options) !== null;
-        return skipCache
-            ? (elem) => next(elem) && hasOne(elem)
-            : cacheParentResults(next, options, hasOne);
-    },
-};
-
-/*
- * Pseudo selectors
- *
- * Pseudo selectors are available in three forms:
- *
- * 1. Filters are called when the selector is compiled and return a function
- *  that has to return either false, or the results of `next()`.
- * 2. Pseudos are called on execution. They have to return a boolean.
- * 3. Subselects work like filters, but have an embedded selector that will be run separately.
- *
- * Filters are great if you want to do some pre-processing, or change the call order
- * of `next()` and your code.
- * Pseudos should be used to implement simple checks.
- */
-function compilePseudoSelector(next, selector, options, context, compileToken) {
-    const { name, data } = selector;
-    if (Array.isArray(data)) {
-        if (!(name in subselects)) {
-            throw new Error(`Unknown pseudo-class :${name}(${data})`);
-        }
-        return subselects[name](next, data, options, context, compileToken);
-    }
-    const userPseudo = options.pseudos?.[name];
-    const stringPseudo = typeof userPseudo === "string" ? userPseudo : aliases[name];
-    if (typeof stringPseudo === "string") {
-        if (data != null) {
-            throw new Error(`Pseudo ${name} doesn't have any arguments`);
-        }
-        // The alias has to be parsed here, to make sure options are respected.
-        const alias = parse$1(stringPseudo);
-        return subselects["is"](next, alias, options, context, compileToken);
-    }
-    if (typeof userPseudo === "function") {
-        verifyPseudoArgs(userPseudo, name, data, 1);
-        return (elem) => userPseudo(elem, data) && next(elem);
-    }
-    if (name in filters) {
-        return filters[name](next, data, options, context);
-    }
-    if (name in pseudos) {
-        const pseudo = pseudos[name];
-        verifyPseudoArgs(pseudo, name, data, 2);
-        return (elem) => pseudo(elem, options, data) && next(elem);
-    }
-    throw new Error(`Unknown pseudo-class :${name}`);
-}
-
-/*
- * All available rules
- */
-function compileGeneralSelector(next, selector, options, context, compileToken, hasExpensiveSubselector) {
-    const { adapter, equals, cacheResults } = options;
-    switch (selector.type) {
-        case SelectorType.PseudoElement: {
-            throw new Error("Pseudo-elements are not supported by css-select");
-        }
-        case SelectorType.ColumnCombinator: {
-            throw new Error("Column combinators are not yet supported by css-select");
-        }
-        case SelectorType.Attribute: {
-            if (selector.namespace != null) {
-                throw new Error("Namespaced attributes are not yet supported by css-select");
-            }
-            if (!options.xmlMode || options.lowerCaseAttributeNames) {
-                selector.name = selector.name.toLowerCase();
-            }
-            return attributeRules[selector.action](next, selector, options);
-        }
-        case SelectorType.Pseudo: {
-            return compilePseudoSelector(next, selector, options, context, compileToken);
-        }
-        // Tags
-        case SelectorType.Tag: {
-            if (selector.namespace != null) {
-                throw new Error("Namespaced tag names are not yet supported by css-select");
-            }
-            let { name } = selector;
-            if (!options.xmlMode || options.lowerCaseTags) {
-                name = name.toLowerCase();
-            }
-            return function tag(elem) {
-                return adapter.getName(elem) === name && next(elem);
-            };
-        }
-        // Traversal
-        case SelectorType.Descendant: {
-            if (!hasExpensiveSubselector ||
-                cacheResults === false ||
-                typeof WeakMap === "undefined") {
-                return function descendant(elem) {
-                    let current = elem;
-                    // biome-ignore lint/suspicious/noAssignInExpressions: TODO
-                    while ((current = getElementParent(current, adapter))) {
-                        if (next(current)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                };
-            }
-            const resultCache = new WeakMap();
-            return function cachedDescendant(elem) {
-                let current = elem;
-                let result;
-                // biome-ignore lint/suspicious/noAssignInExpressions: TODO
-                while ((current = getElementParent(current, adapter))) {
-                    const cached = resultCache.get(current);
-                    if (cached === undefined) {
-                        result ?? (result = { matches: false });
-                        result.matches = next(current);
-                        resultCache.set(current, result);
-                        if (result.matches) {
-                            return true;
-                        }
-                    }
-                    else {
-                        if (result) {
-                            result.matches = cached.matches;
-                        }
-                        return cached.matches;
-                    }
-                }
-                return false;
-            };
-        }
-        case "_flexibleDescendant": {
-            // Include element itself, only used while querying an array
-            return function flexibleDescendant(elem) {
-                let current = elem;
-                do {
-                    if (next(current)) {
-                        return true;
-                    }
-                    current = getElementParent(current, adapter);
-                } while (current);
-                return false;
-            };
-        }
-        case SelectorType.Parent: {
-            return function parent(elem) {
-                return adapter
-                    .getChildren(elem)
-                    .some((elem) => adapter.isTag(elem) && next(elem));
-            };
-        }
-        case SelectorType.Child: {
-            return function child(elem) {
-                const parent = getElementParent(elem, adapter);
-                return parent !== null && next(parent);
-            };
-        }
-        case SelectorType.Sibling: {
-            return function sibling(elem) {
-                const siblings = adapter.getSiblings(elem);
-                for (let i = 0; i < siblings.length; i++) {
-                    const currentSibling = siblings[i];
-                    if (equals(elem, currentSibling)) {
-                        break;
-                    }
-                    if (adapter.isTag(currentSibling) && next(currentSibling)) {
-                        return true;
-                    }
-                }
-                return false;
-            };
-        }
-        case SelectorType.Adjacent: {
-            if (adapter.prevElementSibling) {
-                return function adjacent(elem) {
-                    const previous = adapter.prevElementSibling(elem);
-                    return previous != null && next(previous);
-                };
-            }
-            return function adjacent(elem) {
-                const siblings = adapter.getSiblings(elem);
-                let lastElement;
-                for (let i = 0; i < siblings.length; i++) {
-                    const currentSibling = siblings[i];
-                    if (equals(elem, currentSibling)) {
-                        break;
-                    }
-                    if (adapter.isTag(currentSibling)) {
-                        lastElement = currentSibling;
-                    }
-                }
-                return !!lastElement && next(lastElement);
-            };
-        }
-        case SelectorType.Universal: {
-            if (selector.namespace != null && selector.namespace !== "*") {
-                throw new Error("Namespaced universal selectors are not yet supported by css-select");
-            }
-            return next;
-        }
-    }
-}
-
-const DESCENDANT_TOKEN = { type: SelectorType.Descendant };
-const FLEXIBLE_DESCENDANT_TOKEN = {
-    type: "_flexibleDescendant",
-};
-const SCOPE_TOKEN = {
-    type: SelectorType.Pseudo,
-    name: "scope",
-    data: null,
-};
-/*
- * CSS 4 Spec (Draft): 3.4.1. Absolutizing a Relative Selector
- * http://www.w3.org/TR/selectors4/#absolutizing
- */
-function absolutize(token, { adapter }, context) {
-    // TODO Use better check if the context is a document
-    const hasContext = !!context?.every((e) => e === PLACEHOLDER_ELEMENT ||
-        (adapter.isTag(e) && getElementParent(e, adapter) !== null));
-    for (const t of token) {
-        if (t.length > 0 &&
-            isTraversal(t[0]) &&
-            t[0].type !== SelectorType.Descendant) ;
-        else if (hasContext && !t.some(includesScopePseudo)) {
-            t.unshift(DESCENDANT_TOKEN);
-        }
-        else {
-            continue;
-        }
-        t.unshift(SCOPE_TOKEN);
-    }
-}
-function compileToken(token, options, ctx) {
-    token.forEach(sortRules);
-    const { context = ctx, rootFunc = boolbaseExports.trueFunc } = options;
-    const isArrayContext = Array.isArray(context);
-    const finalContext = context && (Array.isArray(context) ? context : [context]);
-    // Check if the selector is relative
-    if (options.relativeSelector !== false) {
-        absolutize(token, options, finalContext);
-    }
-    else if (token.some((t) => t.length > 0 && isTraversal(t[0]))) {
-        throw new Error("Relative selectors are not allowed when the `relativeSelector` option is disabled");
-    }
-    let shouldTestNextSiblings = false;
-    let query = boolbaseExports.falseFunc;
-    combineLoop: for (const rules of token) {
-        if (rules.length >= 2) {
-            const [first, second] = rules;
-            if (first.type !== SelectorType.Pseudo || first.name !== "scope") ;
-            else if (isArrayContext &&
-                second.type === SelectorType.Descendant) {
-                rules[1] = FLEXIBLE_DESCENDANT_TOKEN;
-            }
-            else if (second.type === SelectorType.Adjacent ||
-                second.type === SelectorType.Sibling) {
-                shouldTestNextSiblings = true;
-            }
-        }
-        let next = rootFunc;
-        let hasExpensiveSubselector = false;
-        for (const rule of rules) {
-            next = compileGeneralSelector(next, rule, options, finalContext, compileToken, hasExpensiveSubselector);
-            const quality = getQuality(rule);
-            if (quality === 0) {
-                hasExpensiveSubselector = true;
-            }
-            // If the sub-selector won't match any elements, skip it.
-            if (next === boolbaseExports.falseFunc) {
-                continue combineLoop;
-            }
-        }
-        // If we have a function that always returns true, we can stop here.
-        if (next === rootFunc) {
-            return rootFunc;
-        }
-        query = query === boolbaseExports.falseFunc ? next : or(query, next);
-    }
-    query.shouldTestNextSiblings = shouldTestNextSiblings;
-    return query;
-}
-function or(a, b) {
-    return (elem) => a(elem) || b(elem);
-}
-
-const defaultEquals = (a, b) => a === b;
-const defaultOptions = {
-    adapter: DomUtils,
-    equals: defaultEquals,
-};
-function convertOptionFormats(options) {
-    /*
-     * We force one format of options to the other one.
-     */
-    // @ts-expect-error Default options may have incompatible `Node` / `ElementNode`.
-    const opts = options ?? defaultOptions;
-    // @ts-expect-error Same as above.
-    opts.adapter ?? (opts.adapter = DomUtils);
-    // @ts-expect-error `equals` does not exist on `Options`
-    opts.equals ?? (opts.equals = opts.adapter?.equals ?? defaultEquals);
-    return opts;
-}
-/**
- * Like `compile`, but does not add a check if elements are tags.
- */
-function _compileUnsafe(selector, options, context) {
-    return _compileToken(typeof selector === "string" ? parse$1(selector) : selector, options, context);
-}
-/**
- * @deprecated Use `_compileUnsafe` instead.
- */
-function _compileToken(selector, options, context) {
-    return compileToken(selector, convertOptionFormats(options), context);
-}
-function getSelectorFunc(searchFunc) {
-    return function select(query, elements, options) {
-        const opts = convertOptionFormats(options);
-        if (typeof query !== "function") {
-            query = _compileUnsafe(query, opts, elements);
-        }
-        const filteredElements = prepareContext(elements, opts.adapter, query.shouldTestNextSiblings);
-        return searchFunc(query, filteredElements, opts);
-    };
-}
-function prepareContext(elems, adapter, shouldTestNextSiblings = false) {
-    /*
-     * Add siblings if the query requires them.
-     * See https://github.com/fb55/css-select/pull/43#issuecomment-225414692
-     */
-    if (shouldTestNextSiblings) {
-        elems = appendNextSiblings(elems, adapter);
-    }
-    return Array.isArray(elems)
-        ? adapter.removeSubsets(elems)
-        : adapter.getChildren(elems);
-}
-function appendNextSiblings(elem, adapter) {
-    // Order matters because jQuery seems to check the children before the siblings
-    const elems = Array.isArray(elem) ? elem.slice(0) : [elem];
-    const elemsLength = elems.length;
-    for (let i = 0; i < elemsLength; i++) {
-        const nextSiblings = getNextSiblings(elems[i], adapter);
-        elems.push(...nextSiblings);
-    }
-    return elems;
-}
-/**
- * @template Node The generic Node type for the DOM adapter being used.
- * @template ElementNode The Node type for elements for the DOM adapter being used.
- * @param elems Elements to query. If it is an element, its children will be queried.
- * @param query can be either a CSS selector string or a compiled query function.
- * @param [options] options for querying the document.
- * @see compile for supported selector queries.
- * @returns All matching elements.
- *
- */
-const selectAll = getSelectorFunc((query, elems, options) => query === boolbaseExports.falseFunc || !elems || elems.length === 0
-    ? []
-    : findAll(query, elems, options));
-/**
- * @template Node The generic Node type for the DOM adapter being used.
- * @template ElementNode The Node type for elements for the DOM adapter being used.
- * @param elems Elements to query. If it is an element, its children will be queried.
- * @param query can be either a CSS selector string or a compiled query function.
- * @param [options] options for querying the document.
- * @see compile for supported selector queries.
- * @returns the first match, or null if there was no match.
- */
-const selectOne = getSelectorFunc((query, elems, options) => query === boolbaseExports.falseFunc || !elems || elems.length === 0
-    ? null
-    : findOne(query, elems, options));
-
 // Adapted from https://github.com/mathiasbynens/he/blob/36afe179392226cf1b6ccdb16ebbb7a5a844d93a/src/he.js#L106-L134
-var _a;
 const decodeMap = new Map([
-    [0, 65533],
+    [0, 65_533],
     // C1 Unicode control character reference replacements
     [128, 8364],
     [130, 8218],
@@ -10013,52 +7590,26 @@ const decodeMap = new Map([
     [159, 376],
 ]);
 /**
- * Polyfill for `String.fromCodePoint`. It is used to create a string from a Unicode code point.
- */
-const fromCodePoint = 
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, n/no-unsupported-features/es-builtins
-(_a = String.fromCodePoint) !== null && _a !== void 0 ? _a : ((codePoint) => {
-    let output = "";
-    if (codePoint > 65535) {
-        codePoint -= 65536;
-        output += String.fromCharCode(((codePoint >>> 10) & 1023) | 55296);
-        codePoint = 56320 | (codePoint & 1023);
-    }
-    output += String.fromCharCode(codePoint);
-    return output;
-});
-/**
  * Replace the given code point with a replacement character if it is a
  * surrogate or is outside the valid range. Otherwise return the code
  * point unchanged.
+ * @param codePoint Unicode code point to convert.
  */
 function replaceCodePoint(codePoint) {
-    var _a;
-    if ((codePoint >= 55296 && codePoint <= 57343) ||
-        codePoint > 1114111) {
-        return 65533;
+    if ((codePoint >= 0xd8_00 && codePoint <= 0xdf_ff) ||
+        codePoint > 0x10_ff_ff) {
+        return 0xff_fd;
     }
-    return (_a = decodeMap.get(codePoint)) !== null && _a !== void 0 ? _a : codePoint;
+    return decodeMap.get(codePoint) ?? codePoint;
 }
 
-/*
+/**
  * Shared base64 decode helper for generated decode data.
  * Assumes global atob is available.
+ * @param input Input string to encode or decode.
  */
 function decodeBase64(input) {
-    const binary = 
-    // eslint-disable-next-line n/no-unsupported-features/node-builtins
-    typeof atob === "function"
-        ? // Browser (and Node >=16)
-            // eslint-disable-next-line n/no-unsupported-features/node-builtins
-            atob(input)
-        : // Older Node versions (<16)
-            // eslint-disable-next-line n/no-unsupported-features/node-builtins
-            typeof Buffer.from === "function"
-                ? // eslint-disable-next-line n/no-unsupported-features/node-builtins
-                    Buffer.from(input, "base64").toString("binary")
-                : // eslint-disable-next-line unicorn/no-new-buffer, n/no-deprecated-api
-                    new Buffer(input, "base64").toString("binary");
+    const binary = atob(input);
     const evenLength = binary.length & -2; // Round down to even length
     const out = new Uint16Array(evenLength / 2);
     for (let index = 0, outIndex = 0; index < evenLength; index += 2) {
@@ -10070,9 +7621,11 @@ function decodeBase64(input) {
 }
 
 // Generated using scripts/write-decode-map.ts
+/** Packed HTML decode trie data. */
 const htmlDecodeTree = /* #__PURE__ */ decodeBase64("QR08ALkAAgH6AYsDNQR2BO0EPgXZBQEGLAbdBxMISQrvCmQLfQurDKQNLw4fD4YPpA+6D/IPAAAAAAAAAAAAAAAAKhBMEY8TmxUWF2EYLBkxGuAa3RsJHDscWR8YIC8jSCSIJcMl6ie3Ku8rEC0CLjoupS7kLgAIRU1hYmNmZ2xtbm9wcnN0dVQAWgBeAGUAaQBzAHcAfgCBAIQAhwCSAJoAoACsALMAbABpAGcAO4DGAMZAUAA7gCYAJkBjAHUAdABlADuAwQDBQHIiZXZlAAJhAAFpeW0AcgByAGMAO4DCAMJAEGRyAADgNdgE3XIAYQB2AGUAO4DAAMBA8CFoYZFj4SFjcgBhZAAAoFMqAAFncIsAjgBvAG4ABGFmAADgNdg43fAlbHlGdW5jdGlvbgCgYSBpAG4AZwA7gMUAxUAAAWNzpACoAHIAAOA12Jzc6SFnbgCgVCJpAGwAZABlADuAwwDDQG0AbAA7gMQAxEAABGFjZWZvcnN1xQDYANoA7QDxAPYA+QD8AAABY3LJAM8AayNzbGFzaAAAoBYidgHTANUAAKDnKmUAZAAAoAYjeQARZIABY3J0AOAA5QDrAGEidXNlAACgNSLuI291bGxpcwCgLCFhAJJjcgAA4DXYBd1wAGYAAOA12Dnd5SF2ZdhiYwDyAOoAbSJwZXEAAKBOIgAHSE9hY2RlZmhpbG9yc3UXARoBHwE6AVIBVQFiAWQBZgGCAakB6QHtAfIBYwB5ACdkUABZADuAqQCpQIABY3B5ACUBKAE1AfUhdGUGYWmg0iJ0KGFsRGlmZmVyZW50aWFsRAAAoEUhbCJleXMAAKAtIQACYWVpb0EBRAFKAU0B8iFvbgxhZABpAGwAO4DHAMdAcgBjAAhhbiJpbnQAAKAwIm8AdAAKYQABZG5ZAV0BaSJsbGEAuGB0I2VyRG90ALdg8gA5AWkAp2NyImNsZQAAAkRNUFRwAXQBeQF9AW8AdAAAoJkiaSJudXMAAKCWIuwhdXMAoJUiaSJtZXMAAKCXIm8AAAFjc4cBlAFrKndpc2VDb250b3VySW50ZWdyYWwAAKAyImUjQ3VybHkAAAFEUZwBpAFvJXVibGVRdW90ZQAAoB0gdSJvdGUAAKAZIAACbG5wdbABtgHNAdgBbwBuAGWgNyIAoHQqgAFnaXQAvAHBAcUB8iJ1ZW50AKBhIm4AdAAAoC8i7yV1ckludGVncmFsAKAuIgABZnLRAdMBAKACIe8iZHVjdACgECJuLnRlckNsb2Nrd2lzZUNvbnRvdXJJbnRlZ3JhbAAAoDMi7yFzcwCgLypjAHIAAOA12J7ccABDoNMiYQBwAACgTSKABURKU1phY2VmaW9zAAsCEgIVAhgCGwIsAjQCOQI9AnMCfwNvoEUh9CJyYWhkAKARKWMAeQACZGMAeQAFZGMAeQAPZIABZ3JzACECJQIoAuchZXIAoCEgcgAAoKEhaAB2AACg5CoAAWF5MAIzAvIhb24OYRRkbAB0oAciYQCUY3IAAOA12AfdAAFhZkECawIAAWNtRQJnAvIjaXRpY2FsAAJBREdUUAJUAl8CYwJjInV0ZQC0YG8AdAFZAloC2WJiJGxlQWN1dGUA3WJyImF2ZQBgYGkibGRlANxi7yFuZACgxCJmJWVyZW50aWFsRAAAoEYhcAR9AgAAAAAAAIECjgIAABoDZgAA4DXYO91EoagAhQKJAm8AdAAAoNwgcSJ1YWwAAKBQIuIhbGUAA0NETFJVVpkCqAK1Au8C/wIRA28AbgB0AG8AdQByAEkAbgB0AGUAZwByAGEA7ADEAW8AdAKvAgAAAACwAqhgbiNBcnJvdwAAoNMhAAFlb7kC0AJmAHQAgAFBUlQAwQLGAs0CciJyb3cAAKDQIekkZ2h0QXJyb3cAoNQhZQDlACsCbgBnAAABTFLWAugC5SFmdAABQVLcAuECciJyb3cAAKD4J+kkZ2h0QXJyb3cAoPon6SRnaHRBcnJvdwCg+SdpImdodAAAAUFU9gL7AnIicm93AACg0iFlAGUAAKCoInAAQQIGAwAAAAALA3Iicm93AACg0SFvJHduQXJyb3cAAKDVIWUlcnRpY2FsQmFyAACgJSJuAAADQUJMUlRhJAM2AzoDWgNxA3oDciJyb3cAAKGTIUJVLAMwA2EAcgAAoBMpcCNBcnJvdwAAoPUhciJldmUAEWPlIWZ00gJDAwAASwMAAFIDaSVnaHRWZWN0b3IAAKBQKWUkZVZlY3RvcgAAoF4p5SJjdG9yQqC9IWEAcgAAoFYpaSJnaHQA1AFiAwAAaQNlJGVWZWN0b3IAAKBfKeUiY3RvckKgwSFhAHIAAKBXKWUAZQBBoKQiciJyb3cAAKCnIXIAcgBvAPcAtAIAAWN0gwOHA3IA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YwAAoN8i4SFycnCgtiEAoD0pgKIqImJjZG9zACsVMBU6FT4VQRVyImNhcAAAoEgqAAFhdTQVNxVwAACgRipwAACgSipvAHQAAKCNInIAAKBFKgDgKiIA/gACYWxydksVURVuFXMVcgByAG2gtyEAoDwpeQCAAWV2dwBYFWUVaRVxAHACXxUAAAAAYxVyAGUA4wAXFXUA4wAZFWUAZQAAoM4iZSJkZ2UAAKDPImUAbgA7gKQApEBlI2Fycm93AAABbHJ7FX8V5SFmdACgtiFpImdodAAAoLchZQDkAG0VAAFjaYsVkRVvAG4AaQBuAPQAkwFuAHQAAKAxImwiY3R5AACgLSOACUFIYWJjZGVmaGlqbG9yc3R1d3oAuBW7Fb8V1RXgFegV+RUKFhUWHxZUFlcWZRbFFtsW7xb7FgUXChdyAPIAtAJhAHIAAKBlKQACZ2xyc8YVyhXOFdAV5yFlcgCgICDlIXRoAKA4IfIA9QxoAHagECAAoKMiawHZFd4VYSJyb3cAAKAPKWEA4wBfAgABYXnkFecV8iFvbg9hNGQAoUYhYW/tFfQVAAFnciEC8RVyAACgyiF0InNlcQAAoHcqgAFnbG0A/xUCFgUWO4CwALBAdABhALRjcCJ0eXYAAKCxKQABaXIOFhIW8yFodACgfykA4DXYId1hAHIAAAFschsWHRYAoMMhAKDCIYACYWVnc3YAKBauAjYWOhY+Fm0AAKHEIm9zLhY0Fm4AZABzoMQi9SFpdACgZiZhIm1tYQDdY2kAbgAAoPIiAKH3AGlvQxZRFmQAZQAAgfcAO29KFksW90BuI3RpbWVzAACgxyJuAPgAUBZjAHkAUmRjAG8CXhYAAAAAYhZyAG4AAKAeI28AcAAAoA0jgAJscHR1dwBuFnEWdRaSFp4W7CFhciRgZgAA4DXYVd0AotkCZW1wc30WhBaJFo0WcQBkoFAibwB0AACgUSJpIm51cwAAoDgi7CF1cwCgFCLxInVhcmUAoKEiYgBsAGUAYgBhAHIAdwBlAGQAZwDlANcAbgCAAWFkaAClFqoWtBZyAHIAbwD3APUMbwB3AG4AYQByAHIAbwB3APMA8xVhI3Jwb29uAAABbHK8FsAWZQBmAPQAHBZpAGcAaAD0AB4WYgHJFs8WawBhAHIAbwD3AJILbwLUFgAAAADYFnIAbgAAoB8jbwBwAACgDCOAAWNvdADhFukW7BYAAXJ55RboFgDgNdi53FVkbAAAoPYp8iFvaxFhAAFkcvMW9xZvAHQAAKDxImkA5qC/JVsSAAFhaP8WAhdyAPIANQNhAPIA1wvhIm5nbGUAoKYpAAFjaQ4XEBd5AF9k5yJyYXJyAKD/JwAJRGFjZGVmZ2xtbm9wcXJzdHV4MRc4F0YXWxcyBF4XaRd5F40XrBe0F78X2RcVGCEYLRg1GEAYAAFEbzUXgRZvAPQA+BUAAWNzPBdCF3UAdABlADuA6QDpQPQhZXIAoG4qAAJhaW95TRdQF1YXWhfyIW9uG2FyAGOgViI7gOoA6kDsIW9uAKBVIk1kbwB0ABdhAAFEcmIXZhdvAHQAAKBSIgDgNdgi3XKhmipuF3QXYQB2AGUAO4DoAOhAZKCWKm8AdAAAoJgqgKGZKmlscwCAF4UXhxfuInRlcnMAoOcjAKATIWSglSpvAHQAAKCXKoABYXBzAJMXlheiF2MAcgATYXQAeQBzogUinxcAAAAAoRdlAHQAAKAFInAAMaADIDMBqRerFwCgBCAAoAUgAAFnc7AXsRdLYXAAAKACIAABZ3C4F7sXbwBuABlhZgAA4DXYVt2AAWFscwDFF8sXzxdyAHOg1SJsAACg4yl1AHMAAKBxKmkAAKG1A2x21RfYF28AbgC1Y/VjAAJjc3V24BfoF/0XEBgAAWlv5BdWF3IAYwAAoFYiaQLuFwAAAADwF+0ADQThIW50AAFnbPUX+Rd0AHIAAKCWKuUhc3MAoJUqgAFhZWkAAxgGGAoYbABzAD1gcwB0AACgXyJ2AESgYSJEAACgeCrwImFyc2wAoOUpAAFEYRkYHRhvAHQAAKBTInIAcgAAoHEpgAFjZGkAJxgqGO0XcgAAoC8hbwD0AIwCAAFhaDEYMhi3YzuA8ADwQAABbXI5GD0YbAA7gOsA60BvAACgrCCAAWNpcABGGEgYSxhsACFgcwD0ACwEAAFlb08YVxhjAHQAYQB0AGkAbwDuABoEbgBlAG4AdABpAGEAbADlADME4Ql1GAAAgRgAAIMYiBgAAAAAoRilGAAAqhgAALsYvhjRGAAA1xgnGWwAbABpAG4AZwBkAG8AdABzAGUA8QBlF3kARGRtImFsZQAAoEAmgAFpbHIAjRiRGJ0Y7CFpZwCgA/tpApcYAAAAAJoYZwAAoAD7aQBnAACgBPsA4DXYI93sIWlnAKAB++whaWcA4GYAagCAAWFsdACvGLIYthh0AACgbSZpAGcAAKAC+24AcwAAoLElbwBmAJJh8AHCGAAAxhhmAADgNdhX3QABYWvJGMwYbADsAGsEdqDUIgCg2SphI3J0aW50AACgDSoAAWFv2hgiGQABY3PeGB8ZsQPnGP0YBRkSGRUZAAAdGbID7xjyGPQY9xj5GAAA+xg7gL0AvUAAoFMhO4C8ALxAAKBVIQCgWSEAoFshswEBGQAAAxkAoFQhAKBWIbQCCxkOGQAAAAAQGTuAvgC+QACgVyEAoFwhNQAAoFghtgEZGQAAGxkAoFohAKBdITgAAKBeIWwAAKBEIHcAbgAAoCIjYwByAADgNdi73IAIRWFiY2RlZmdpamxub3JzdHYARhlKGVoZXhlmGWkZkhmWGZkZnRmgGa0ZxhnLGc8Z4BkjGmygZyIAoIwqgAFjbXAAUBlTGVgZ9SF0ZfVhbQBhAOSgswM6FgCghipyImV2ZQAfYQABaXliGWUZcgBjAB1hM2RvAHQAIWGAoWUibHFzAMYEcBl6GfGhZSLOBAAAdhlsAGEAbgD0AN8EgKF+KmNkbACBGYQZjBljAACgqSpvAHQAb6CAKmyggioAoIQqZeDbIgD+cwAAoJQqcgAA4DXYJN3noGsirATtIWVsAKA3IWMAeQBTZIChdyJFYWoApxmpGasZAKCSKgCgpSoAoKQqAAJFYWVztBm2Gb0ZwhkAoGkicABwoIoq8iFveACgiipxoIgq8aCIKrUZaQBtAACg5yJwAGYAAOA12FjdYQB2AOUAYwIAAWNp0xnWGXIAAKAKIW0AAKFzImVs3BneGQCgjioAoJAqAIM+ADtjZGxxco0E6xn0GfgZ/BkBGgABY2nvGfEZAKCnKnIAAKB6Km8AdAAAoNci0CFhcgCglSl1ImVzdAAAoHwqgAJhZGVscwAKGvQZFhrVBCAa8AEPGgAAFBpwAHIAbwD4AFkZcgAAoHgpcQAAAWxxxAQbGmwAZQBzAPMASRlpAO0A5AQAAWVuJxouGnIjdG5lcXEAAOBpIgD+xQAsGgAFQWFiY2Vma29zeUAaQxpmGmoabRqDGocalhrCGtMacgDyAMwCAAJpbG1yShpOGlAaVBpyAHMA8ABxD2YAvWBpAGwA9AASBQABZHJYGlsaYwB5AEpkAKGUIWN3YBpkGmkAcgAAoEgpAKCtIWEAcgAAoA8h6SFyYyVhgAFhbHIAcxp7Gn8a8iF0c3WgZSZpAHQAAKBlJuwhaXAAoCYg4yFvbgCguSJyAADgNdgl3XMAAAFld4wakRphInJvdwAAoCUpYSJyb3cAAKAmKYACYW1vcHIAnxqjGqcauhq+GnIAcgAAoP8h9CFodACgOyJrAAABbHKsGrMaZSRmdGFycm93AACgqSHpJGdodGFycm93AKCqIWYAAOA12Fnd4iFhcgCgFSCAAWNsdADIGswa0BpyAADgNdi93GEAcwDoAGka8iFvaydhAAFicNca2xr1IWxsAKBDIOghZW4AoBAg4Qr2GgAA/RoAAAgbExsaGwAAIRs7GwAAAAA+G2IbmRuVG6sbAACyG80b0htjAHUAdABlADuA7QDtQAChYyBpeQEbBhtyAGMAO4DuAO5AOGQAAWN4CxsNG3kANWRjAGwAO4ChAKFAAAFmcssCFhsA4DXYJt1yAGEAdgBlADuA7ADsQIChSCFpbm8AJxsyGzYbAAFpbisbLxtuAHQAAKAMKnQAAKAtIuYhaW4AoNwpdABhAACgKSHsIWlnM2GAAWFvcABDG1sbXhuAAWNndABJG0sbWRtyACthgAFlbHAAcQVRG1UbaQBuAOUAyAVhAHIA9AByBWgAMWFmAACgtyJlAGQAtWEAoggiY2ZvdGkbbRt1G3kb4SFyZQCgBSFpAG4AdKAeImkAZQAAoN0pZABvAPQAWxsAoisiY2VscIEbhRuPG5QbYQBsAACguiIAAWdyiRuNG2UAcgDzACMQ4wCCG2EicmhrAACgFyryIW9kAKA8KgACY2dwdJ8boRukG6gbeQBRZG8AbgAvYWYAAOA12FrdYQC5Y3UAZQBzAHQAO4C/AL9AAAFjabUbuRtyAADgNdi+3G4AAKIIIkVkc3bCG8QbyBvQAwCg+SJvAHQAAKD1Inag9CIAoPMiaaBiIOwhZGUpYesB1hsAANkbYwB5AFZkbAA7gO8A70AAA2NmbW9zdeYb7hvyG/Ub+hsFHAABaXnqG+0bcgBjADVhOWRyAADgNdgn3eEhdGg3YnAAZgAA4DXYW93jAf8bAAADHHIAAOA12L/c8iFjeVhk6yFjeVRkAARhY2ZnaGpvcxUcGhwiHCYcKhwtHDAcNRzwIXBhdqC6A/BjAAFleR4cIRzkIWls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ZmdobG1vcHJzdHV3CiwNLBEsHSwnLDEsQCxLLFIsYix6LIQsjyzLLOgs7Sz/LAotcgDyAAkDYQByAACgYykAAWNyFSwbLHUAdABlADuA+gD6QPIACQ1yAOMBIywAACUseQBeZHYAZQBtYQABaXkrLDAscgBjADuA+wD7QENkgAFhYmgANyw6LD0scgDyANEO7CFhY3FhYQDyAOAOAAFpckQsSCzzIWh0AKB+KQDgNdgy3XIAYQB2AGUAO4D5APlAYQFWLF8scgAAAWxyWixcLACgvyEAoL4hbABrAACggCUAAWN0Zix2LG8CbCwAAAAAcyxyAG4AZaAcI3IAAKAcI28AcAAAoA8jcgBpAACg+CUAAWFsfiyBLGMAcgBrYTuAqACoQAABZ3CILIssbwBuAHNhZgAA4DXYZt0AA2FkaGxzdZksniynLLgsuyzFLHIAcgBvAPcACQ1vAHcAbgBhAHIAcgBvAPcA2A5hI3Jwb29uAAABbHKvLLMsZQBmAPQAWyxpAGcAaAD0AF0sdQDzAKYOaQAAocUDaGzBLMIs0mNvAG4AxWPwI2Fycm93cwCgyCGAAWNpdADRLOEs5CxvAtcsAAAAAN4scgBuAGWgHSNyAACgHSNvAHAAAKAOI24AZwBvYXIAaQAAoPklYwByAADgNdjK3IABZGlyAPMs9yz6LG8AdAAAoPAi7CFkZWlhaQBmoLUlAKC0JQABYW0DLQYtcgDyAMosbAA7gPwA/EDhIm5nbGUAoKcpgAdBQkRhY2RlZmxub3Byc3oAJy0qLTAtNC2bLZ0toS2/LcMtxy3TLdgt3C3gLfwtcgDyABADYQByAHag6CoAoOkqYQBzAOgA/gIAAW5yOC08LechcnQAoJwpgANla25wcnN0AJkpSC1NLVQtXi1iLYItYQBwAHAA4QAaHG8AdABoAGkAbgDnAKEXgAFoaXIAoSmzJFotbwBwAPQAdCVooJUh7wD4JgABaXVmLWotZwBtAOEAuygAAWJwbi14LXMjZXRuZXEAceCKIgD+AODLKgD+cyNldG5lcQBx4IsiAP4A4MwqAP4AAWhyhi2KLWUAdADhABIraSNhbmdsZQAAAWxyki2WLeUhZnQAoLIiaSJnaHQAAKCzInkAMmThIXNoAKCiIoABZWxyAKcttC24LWKiKCKuLQAAAACyLWEAcgAAoLsicQAAoFoi7CFpcACg7iIAAWJ0vC1eD2EA8gBfD3IAAOA12DPddAByAOkAlS1zAHUAAAFicM0t0C0A4IIi0iAA4IMi0iBwAGYAAOA12GfdcgBvAPAAWQt0AHIA6QCaLQABY3XkLegtcgAA4DXYy9wAAWJw7C30LW4AAAFFZXUt8S0A4IoiAP5uAAABRWV/LfktAOCLIgD+6SJnemFnAKCaKYADY2Vmb3BycwANLhAuJS4pLiMuLi40LukhcmN1YQABZGkULiEuAAFiZxguHC5hAHIAAKBfKmUAcaAnIgCgWSLlIXJwAKAYIXIAAOA12DTdcABmAADgNdho3WWgQCJhAHQA6ABqD2MAcgAA4DXYzNzjCuQRUC4AAFQuAABYLmIuAAAAAGMubS5wLnQuAAAAAIguki4AAJouJxIqEnQAcgDpAB0ScgAA4DXYNd0AAUFhWy5eLnIA8gDnAnIA8gCTB75jAAFBYWYuaS5yAPIA4AJyAPIAjAdhAPAAeh5pAHMAAKD7IoABZHB0APgReS6DLgABZmx9LoAuAOA12GnddQDzAP8RaQBtAOUABBIAAUFhiy6OLnIA8gDuAnIA8gCaBwABY3GVLgoScgAA4DXYzdwAAXB0nS6hLmwAdQDzACUScgDpACASAARhY2VmaW9zdbEuvC7ELsguzC7PLtQu2S5jAAABdXm2LrsudABlADuA/QD9QE9kAAFpecAuwy5yAGMAd2FLZG4AO4ClAKVAcgAA4DXYNt1jAHkAV2RwAGYAAOA12GrdYwByAADgNdjO3AABY23dLt8ueQBOZGwAO4D/AP9AAAVhY2RlZmhpb3N38y73Lv8uAi8MLxAvEy8YLx0vIi9jInV0ZQB6YQABYXn7Lv4u8iFvbn5hN2RvAHQAfGEAAWV0Bi8KL3QAcgDmAB8QYQC2Y3IAAOA12DfdYwB5ADZk5yJyYXJyAKDdIXAAZgAA4DXYa91jAHIAAOA12M/cAAFqbiYvKC8AoA0gagAAoAwg");
 
 // Generated using scripts/write-decode-map.ts
+/** Packed XML decode trie data. */
 const xmlDecodeTree = /* #__PURE__ */ decodeBase64("AAJhZ2xxBwARABMAFQBtAg0AAAAAAA8AcAAmYG8AcwAnYHQAPmB0ADxg9SFvdCJg");
 
 /**
@@ -10109,7 +7662,7 @@ var CharCodes$1;
     CharCodes[CharCodes["UPPER_Z"] = 90] = "UPPER_Z";
 })(CharCodes$1 || (CharCodes$1 = {}));
 /** Bit that needs to be set to convert an upper case ASCII character to lower case */
-const TO_LOWER_BIT = 32;
+const TO_LOWER_BIT = 0b10_0000;
 function isNumber(code) {
     return code >= CharCodes$1.ZERO && code <= CharCodes$1.NINE;
 }
@@ -10127,6 +7680,7 @@ function isAsciiAlphaNumeric(code) {
  *
  * Attribute values that aren't terminated properly aren't parsed, and shouldn't lead to a parser error.
  * See the example in https://html.spec.whatwg.org/multipage/parsing.html#named-character-reference-state
+ * @param code Code point to decode.
  */
 function isEntityInAttributeInvalidEnd(code) {
     return code === CharCodes$1.EQUALS || isAsciiAlphaNumeric(code);
@@ -10139,6 +7693,9 @@ var EntityDecoderState;
     EntityDecoderState[EntityDecoderState["NumericHex"] = 3] = "NumericHex";
     EntityDecoderState[EntityDecoderState["NamedEntity"] = 4] = "NamedEntity";
 })(EntityDecoderState || (EntityDecoderState = {}));
+/**
+ * Decoding mode for named entities.
+ */
 var DecodingMode;
 (function (DecodingMode) {
     /** Entities in text nodes that can end with any character. */
@@ -10152,6 +7709,9 @@ var DecodingMode;
  * Token decoder with support of writing partial entities.
  */
 class EntityDecoder {
+    decodeTree;
+    emitCodePoint;
+    errors;
     constructor(
     /** The tree used to decode entities. */
     // biome-ignore lint/correctness/noUnusedPrivateClassMembers: False positive
@@ -10161,7 +7721,6 @@ class EntityDecoder {
      *
      * For multi-byte named entities, this will be called multiple times,
      * with the second codepoint, and the same `consumed` value.
-     *
      * @param codepoint The decoded codepoint.
      * @param consumed The number of bytes consumed by the decoder.
      */
@@ -10171,27 +7730,30 @@ class EntityDecoder {
         this.decodeTree = decodeTree;
         this.emitCodePoint = emitCodePoint;
         this.errors = errors;
-        /** The current state of the decoder. */
-        this.state = EntityDecoderState.EntityStart;
-        /** Characters that were consumed while parsing an entity. */
-        this.consumed = 1;
-        /**
-         * The result of the entity.
-         *
-         * Either the result index of a numeric entity, or the codepoint of a
-         * numeric entity.
-         */
-        this.result = 0;
-        /** The current index in the decode tree. */
-        this.treeIndex = 0;
-        /** The number of characters that were consumed in excess. */
-        this.excess = 1;
-        /** The mode in which the decoder is operating. */
-        this.decodeMode = DecodingMode.Strict;
-        /** The number of characters that have been consumed in the current run. */
-        this.runConsumed = 0;
     }
-    /** Resets the instance to make it reusable. */
+    /** The current state of the decoder. */
+    state = EntityDecoderState.EntityStart;
+    /** Characters that were consumed while parsing an entity. */
+    consumed = 1;
+    /**
+     * The result of the entity.
+     *
+     * Either the result index of a numeric entity, or the codepoint of a
+     * numeric entity.
+     */
+    result = 0;
+    /** The current index in the decode tree. */
+    treeIndex = 0;
+    /** The number of characters that were consumed in excess. */
+    excess = 1;
+    /** The mode in which the decoder is operating. */
+    decodeMode = DecodingMode.Strict;
+    /** The number of characters that have been consumed in the current run. */
+    runConsumed = 0;
+    /**
+     * Resets the instance to make it reusable.
+     * @param decodeMode Entity decoding mode to use.
+     */
     startEntity(decodeMode) {
         this.decodeMode = decodeMode;
         this.state = EntityDecoderState.EntityStart;
@@ -10207,7 +7769,6 @@ class EntityDecoder {
      *
      * Mirrors the implementation of `getDecoder`, but with the ability to stop decoding if the
      * entity is incomplete, and resume when the next string is written.
-     *
      * @param input The string containing the entity (or a continuation of the entity).
      * @param offset The offset at which the entity begins. Should be 0 if this is not the first call.
      * @returns The number of characters that were consumed, or -1 if the entity is incomplete.
@@ -10241,7 +7802,6 @@ class EntityDecoder {
      * Switches between the numeric decimal and hexadecimal states.
      *
      * Equivalent to the `Numeric character reference state` in the HTML spec.
-     *
      * @param input The string containing the entity (or a continuation of the entity).
      * @param offset The current offset.
      * @returns The number of characters that were consumed, or -1 if the entity is incomplete.
@@ -10262,7 +7822,6 @@ class EntityDecoder {
      * Parses a hexadecimal numeric entity.
      *
      * Equivalent to the `Hexademical character reference state` in the HTML spec.
-     *
      * @param input The string containing the entity (or a continuation of the entity).
      * @param offset The current offset.
      * @returns The number of characters that were consumed, or -1 if the entity is incomplete.
@@ -10289,7 +7848,6 @@ class EntityDecoder {
      * Parses a decimal numeric entity.
      *
      * Equivalent to the `Decimal character reference state` in the HTML spec.
-     *
      * @param input The string containing the entity (or a continuation of the entity).
      * @param offset The current offset.
      * @returns The number of characters that were consumed, or -1 if the entity is incomplete.
@@ -10313,7 +7871,6 @@ class EntityDecoder {
      *
      * Implements the logic from the `Hexademical character reference start
      * state` and `Numeric character reference end state` in the HTML spec.
-     *
      * @param lastCp The last code point of the entity. Used to see if the
      *               entity was terminated with a semicolon.
      * @param expectedLength The minimum number of characters that should be
@@ -10322,10 +7879,9 @@ class EntityDecoder {
      * @returns The number of characters that were consumed.
      */
     emitNumericEntity(lastCp, expectedLength) {
-        var _a;
         // Ensure we consumed at least one digit.
         if (this.consumed <= expectedLength) {
-            (_a = this.errors) === null || _a === void 0 ? void 0 : _a.absenceOfDigitsInNumericCharacterReference(this.consumed);
+            this.errors?.absenceOfDigitsInNumericCharacterReference(this.consumed);
             return 0;
         }
         // Figure out if this is a legit end of the entity
@@ -10348,7 +7904,6 @@ class EntityDecoder {
      * Parses a named entity.
      *
      * Equivalent to the `Named character reference state` in the HTML spec.
-     *
      * @param input The string containing the entity (or a continuation of the entity).
      * @param offset The current offset.
      * @returns The number of characters that were consumed, or -1 if the entity is incomplete.
@@ -10450,24 +8005,20 @@ class EntityDecoder {
     }
     /**
      * Emit a named entity that was not terminated with a semicolon.
-     *
      * @returns The number of characters consumed.
      */
     emitNotTerminatedNamedEntity() {
-        var _a;
         const { result, decodeTree } = this;
         const valueLength = (decodeTree[result] & BinTrieFlags.VALUE_LENGTH) >> 14;
         this.emitNamedEntityData(result, valueLength, this.consumed);
-        (_a = this.errors) === null || _a === void 0 ? void 0 : _a.missingSemicolonAfterCharacterReference();
+        this.errors?.missingSemicolonAfterCharacterReference();
         return this.consumed;
     }
     /**
      * Emit a named entity.
-     *
      * @param result The index of the entity in the decode tree.
      * @param valueLength The number of bytes in the entity.
      * @param consumed The number of characters consumed.
-     *
      * @returns The number of characters consumed.
      */
     emitNamedEntityData(result, valueLength, consumed) {
@@ -10486,11 +8037,9 @@ class EntityDecoder {
      * Signal to the parser that the end of the input was reached.
      *
      * Remaining data will be emitted and relevant errors will be produced.
-     *
      * @returns The number of characters consumed.
      */
     end() {
-        var _a;
         switch (this.state) {
             case EntityDecoderState.NamedEntity: {
                 // Emit a named entity if we have one.
@@ -10508,7 +8057,7 @@ class EntityDecoder {
                 return this.emitNumericEntity(0, 3);
             }
             case EntityDecoderState.NumericStart: {
-                (_a = this.errors) === null || _a === void 0 ? void 0 : _a.absenceOfDigitsInNumericCharacterReference(this.consumed);
+                this.errors?.absenceOfDigitsInNumericCharacterReference(this.consumed);
                 return 0;
             }
             case EntityDecoderState.EntityStart: {
@@ -10521,10 +8070,9 @@ class EntityDecoder {
 /**
  * Determines the branch of the current node that is taken given the current
  * character. This function is used to traverse the trie.
- *
  * @param decodeTree The trie.
  * @param current The current node.
- * @param nodeIdx The index right after the current node and its value.
+ * @param nodeIndex Index immediately after the current node header.
  * @param char The current character.
  * @returns The index of the next node, or -1 if no branch is taken.
  */
@@ -10567,6 +8115,2423 @@ function determineBranch(decodeTree, current, nodeIndex, char) {
     }
     return -1;
 }
+
+const xmlCodeMap = new Map([
+    [34, "&quot;"],
+    [38, "&amp;"],
+    [39, "&apos;"],
+    [60, "&lt;"],
+    [62, "&gt;"],
+]);
+// For compatibility with node < 4, we wrap `codePointAt`
+/**
+ * Read a code point at a given index.
+ * @param input Input string to encode or decode.
+ * @param index Current read position in the input string.
+ */
+const getCodePoint = typeof String.prototype.codePointAt === "function"
+    ? (input, index) => input.codePointAt(index)
+    : // http://mathiasbynens.be/notes/javascript-encoding#surrogate-formulae
+        (c, index) => (c.charCodeAt(index) & 0xfc_00) === 0xd8_00
+            ? (c.charCodeAt(index) - 0xd8_00) * 0x4_00 +
+                c.charCodeAt(index + 1) -
+                0xdc_00 +
+                0x1_00_00
+            : c.charCodeAt(index);
+/**
+ * Bitset for ASCII characters that need to be escaped in XML.
+ */
+const XML_BITSET_VALUE = 0x50_00_00_c4; // 32..63 -> 34 ("),38 (&),39 ('),60 (<),62 (>)
+/**
+ * Encodes all non-ASCII characters, as well as characters not valid in XML
+ * documents using XML entities. Uses a fast bitset scan instead of RegExp.
+ *
+ * If a character has no equivalent entity, a numeric hexadecimal reference
+ * (eg. `&#xfc;`) will be used.
+ * @param input Input string to encode or decode.
+ */
+function encodeXML(input) {
+    let out;
+    let last = 0;
+    const { length } = input;
+    for (let index = 0; index < length; index++) {
+        const char = input.charCodeAt(index);
+        // Check for ASCII chars that don't need escaping
+        if (char < 0x80 &&
+            (((XML_BITSET_VALUE >>> char) & 1) === 0 || char >= 64 || char < 32)) {
+            continue;
+        }
+        if (out === undefined)
+            out = input.substring(0, index);
+        else if (last !== index)
+            out += input.substring(last, index);
+        if (char < 64) {
+            // Known replacement
+            out += xmlCodeMap.get(char);
+            last = index + 1;
+            continue;
+        }
+        // Non-ASCII: encode as numeric entity (handle surrogate pair)
+        const cp = getCodePoint(input, index);
+        out += `&#x${cp.toString(16)};`;
+        if (cp !== char)
+            index++; // Skip trailing surrogate
+        last = index + 1;
+    }
+    if (out === undefined)
+        return input;
+    if (last < length)
+        out += input.substr(last);
+    return out;
+}
+/**
+ * Creates a function that escapes all characters matched by the given regular
+ * expression using the given map of characters to escape to their entities.
+ * @param regex Regular expression to match characters to escape.
+ * @param map Map of characters to escape to their entities.
+ * @returns Function that escapes all characters matched by the given regular
+ * expression using the given map of characters to escape to their entities.
+ */
+function getEscaper(regex, map) {
+    return function escape(data) {
+        let match;
+        let lastIndex = 0;
+        let result = "";
+        while ((match = regex.exec(data))) {
+            if (lastIndex !== match.index) {
+                result += data.substring(lastIndex, match.index);
+            }
+            // We know that this character will be in the map.
+            result += map.get(match[0].charCodeAt(0));
+            // Every match will be of length 1
+            lastIndex = match.index + 1;
+        }
+        return result + data.substring(lastIndex);
+    };
+}
+/**
+ * Encodes all characters that have to be escaped in HTML attributes,
+ * following {@link https://html.spec.whatwg.org/multipage/parsing.html#escapingString}.
+ * @param data String to escape.
+ */
+const escapeAttribute = 
+/* #__PURE__ */ getEscaper(/["&\u00A0]/g, new Map([
+    [34, "&quot;"],
+    [38, "&amp;"],
+    [160, "&nbsp;"],
+]));
+/**
+ * Encodes all characters that have to be escaped in HTML text,
+ * following {@link https://html.spec.whatwg.org/multipage/parsing.html#escapingString}.
+ * @param data String to escape.
+ */
+const escapeText = /* #__PURE__ */ getEscaper(/[&<>\u00A0]/g, new Map([
+    [38, "&amp;"],
+    [60, "&lt;"],
+    [62, "&gt;"],
+    [160, "&nbsp;"],
+]));
+
+/**
+ * Mixed-case SVG and MathML element names recognized in foreign content.
+ * @see https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inforeign
+ */
+const elementNames = new Map("altGlyph altGlyphDef altGlyphItem animateColor animateMotion animateTransform clipPath feBlend feColorMatrix feComponentTransfer feComposite feConvolveMatrix feDiffuseLighting feDisplacementMap feDistantLight feDropShadow feFlood feFuncA feFuncB feFuncG feFuncR feGaussianBlur feImage feMerge feMergeNode feMorphology feOffset fePointLight feSpecularLighting feSpotLight feTile feTurbulence foreignObject glyphRef linearGradient radialGradient textPath"
+    .split(" ")
+    .map((name) => [name.toLowerCase(), name]));
+/**
+ * Mixed-case SVG and MathML attribute names recognized in foreign content.
+ * @see https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inforeign
+ */
+const attributeNames = new Map("definitionURL attributeName attributeType baseFrequency baseProfile calcMode clipPathUnits diffuseConstant edgeMode filterUnits glyphRef gradientTransform gradientUnits kernelMatrix kernelUnitLength keyPoints keySplines keyTimes lengthAdjust limitingConeAngle markerHeight markerUnits markerWidth maskContentUnits maskUnits numOctaves pathLength patternContentUnits patternTransform patternUnits pointsAtX pointsAtY pointsAtZ preserveAlpha preserveAspectRatio primitiveUnits refX refY repeatCount repeatDur requiredExtensions requiredFeatures specularConstant specularExponent spreadMethod startOffset stdDeviation stitchTiles surfaceScale systemLanguage tableValues targetX targetY textLength viewBox viewTarget xChannelSelector yChannelSelector zoomAndPan"
+    .split(" ")
+    .map((name) => [name.toLowerCase(), name]));
+
+// ── Constants ────────────────────────────────────────────────────────
+/** Elements whose text content is never entity-encoded. */
+const unencodedElements = new Set("style script xmp iframe noembed noframes plaintext noscript".split(" "));
+/** HTML void elements — they cannot have children. */
+const voidElements$1 = new Set("area base basefont br col command embed frame hr img input isindex keygen link meta param source track wbr".split(" "));
+/** Elements that switch the parser into foreign (XML-like) mode. */
+const foreignElements = new Set(["svg", "math"]);
+/**
+ * Foreign-mode integration points: children of these elements are parsed
+ * as HTML again, not as foreign content.
+ */
+const foreignModeIntegrationPoints = new Set("mi mo mn ms mtext annotation-xml foreignObject desc title".split(" "));
+// ── Public API ───────────────────────────────────────────────────────
+/**
+ * Renders a DOM node or an array of DOM nodes to a string.
+ *
+ * Can be thought of as the equivalent of the `outerHTML` of the passed
+ * node(s).
+ * @param node Node to be rendered.
+ * @param options Changes serialization behavior
+ */
+function render(node, options = {}) {
+    const nodes = "length" in node ? node : [node];
+    /*
+     * `xmlMode` is threaded as a separate argument through the internal
+     * functions so that foreign-mode transitions (svg/mathml ↔ html) can
+     * adjust it without copying the options object on every element.
+     */
+    const xmlMode = options.xmlMode ?? false;
+    let output = "";
+    // eslint-disable-next-line unicorn/no-for-loop
+    for (let index = 0; index < nodes.length; index++) {
+        output += renderNode(nodes[index], options, xmlMode);
+    }
+    return output;
+}
+// ── Internal rendering ───────────────────────────────────────────────
+/**
+ * Render an array of child nodes (skips the single-node wrapping in `render`).
+ * @param children The child nodes to render.
+ * @param options The serialization options.
+ * @param xmlMode The XML mode to use.
+ */
+function renderChildren(children, options, xmlMode) {
+    let output = "";
+    // eslint-disable-next-line unicorn/no-for-loop
+    for (let index = 0; index < children.length; index++) {
+        output += renderNode(children[index], options, xmlMode);
+    }
+    return output;
+}
+function renderNode(node, options, xmlMode) {
+    switch (node.type) {
+        case Root: {
+            return renderChildren(node.children, options, xmlMode);
+        }
+        case Directive: {
+            return `<${node.data}>`;
+        }
+        case Comment$1: {
+            return `<!--${node.data}-->`;
+        }
+        case CDATA$1: {
+            return `<![CDATA[${node.children[0].data}]]>`;
+        }
+        case Script:
+        case Style:
+        case Tag: {
+            return renderTag(node, options, xmlMode);
+        }
+        case Text$1: {
+            const element = node;
+            const data = element.data || "";
+            /*
+             * Skip encoding when entities weren't decoded on input, or when
+             * inside a raw-text element (script, style, etc.) in HTML mode.
+             */
+            if ((options.encodeEntities ?? options.decodeEntities) !== false &&
+                !(!xmlMode &&
+                    element.parent &&
+                    unencodedElements.has(element.parent.name))) {
+                // `xmlMode: "foreign"` is truthy
+                return xmlMode || options.encodeEntities !== "utf8"
+                    ? encodeXML(data)
+                    : escapeText(data);
+            }
+            return data;
+        }
+    }
+}
+function renderTag(element, options, xmlMode) {
+    if (xmlMode === "foreign") {
+        // Correct lowercase element names back to their canonical mixed-case form
+        element.name = elementNames.get(element.name) ?? element.name;
+        // Integration points exit foreign mode: their children are HTML
+        if (element.parent &&
+            foreignModeIntegrationPoints.has(element.parent.name)) {
+            xmlMode = false;
+        }
+    }
+    if (!xmlMode && foreignElements.has(element.name)) {
+        xmlMode = "foreign";
+    }
+    const { name, children } = element;
+    // Cache the void-element check — used for both self-closing and closing-tag logic
+    const isVoid = !xmlMode && voidElements$1.has(name);
+    let tag = `<${name}${formatAttributes(element.attribs, options, xmlMode)}`;
+    if (children.length === 0 &&
+        (xmlMode
+            ? options.selfClosingTags !== false
+            : options.selfClosingTags && isVoid)) {
+        // XML: `<br/>`, HTML: `<br />`
+        tag += xmlMode ? "/>" : " />";
+    }
+    else {
+        tag += ">";
+        if (children.length > 0) {
+            tag += renderChildren(children, options, xmlMode);
+        }
+        if (!isVoid) {
+            tag += `</${name}>`;
+        }
+    }
+    return tag;
+}
+// ── Attribute formatting ─────────────────────────────────────────────
+function replaceQuotes(value) {
+    return value.replaceAll('"', "&quot;");
+}
+/**
+ * Serialize an element's attribute map to a string.
+ *
+ * Returns a string with a leading space before each attribute, or an
+ * empty string if there are no attributes. This convention lets the
+ * caller unconditionally concatenate the result onto the tag name.
+ * @param attributes
+ * @param options
+ * @param xmlMode
+ */
+function formatAttributes(attributes, options, xmlMode) {
+    if (!attributes)
+        return "";
+    /*
+     * Pick the right encoder:
+     *  - Encoding disabled → only escape double-quotes (for valid attributes)
+     *  - XML / non-utf8    → full numeric entity encoding (encodeXML)
+     *  - HTML + utf8       → minimal escaping (escapeAttribute)
+     */
+    const encode = (options.encodeEntities ?? options.decodeEntities) === false
+        ? replaceQuotes
+        : xmlMode || options.encodeEntities !== "utf8"
+            ? encodeXML
+            : escapeAttribute;
+    const isForeign = xmlMode === "foreign";
+    const showEmpty = !!(options.emptyAttrs ?? xmlMode);
+    let result = "";
+    for (const key in attributes) {
+        if (!Object.hasOwn(attributes, key))
+            continue;
+        const value = attributes[key];
+        const k = isForeign ? (attributeNames.get(key) ?? key) : key;
+        result +=
+            !showEmpty && (value == null || value === "")
+                ? ` ${k}`
+                : ` ${k}="${encode(value == null ? "" : String(value))}"`;
+    }
+    return result;
+}
+
+/**
+ * @category Stringify
+ * @deprecated Use the `dom-serializer` module directly.
+ * @param node Node to get the outer HTML of.
+ * @param options Options for serialization.
+ * @returns `node`'s outer HTML.
+ */
+function getOuterHTML(node, options) {
+    return render(node, options);
+}
+/**
+ * @category Stringify
+ * @deprecated Use the `dom-serializer` module directly.
+ * @param node Node to get the inner HTML of.
+ * @param options Options for serialization.
+ * @returns `node`'s inner HTML.
+ */
+function getInnerHTML(node, options) {
+    return hasChildren(node)
+        ? node.children.map((node) => getOuterHTML(node, options)).join("")
+        : "";
+}
+/**
+ * Get a node's inner text. Same as `textContent`, but inserts newlines for `<br>` tags. Ignores comments.
+ *
+ * @category Stringify
+ * @deprecated Use `textContent` instead.
+ * @param node Node to get the inner text of.
+ * @returns `node`'s inner text.
+ */
+function getText(node) {
+    if (Array.isArray(node))
+        return node.map(getText).join("");
+    if (isTag(node))
+        return node.name === "br" ? "\n" : getText(node.children);
+    if (isCDATA(node))
+        return getText(node.children);
+    if (isText(node))
+        return node.data;
+    return "";
+}
+/**
+ * Get a node's text content. Ignores comments.
+ *
+ * @category Stringify
+ * @param node Node to get the text content of.
+ * @returns `node`'s text content.
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent}
+ */
+function textContent(node) {
+    if (Array.isArray(node))
+        return node.map(textContent).join("");
+    if (hasChildren(node) && !isComment(node)) {
+        return textContent(node.children);
+    }
+    if (isText(node))
+        return node.data;
+    return "";
+}
+/**
+ * Get a node's inner text, ignoring `<script>` and `<style>` tags. Ignores comments.
+ *
+ * @category Stringify
+ * @param node Node to get the inner text of.
+ * @returns `node`'s inner text.
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Node/innerText}
+ */
+function innerText(node) {
+    if (Array.isArray(node))
+        return node.map(innerText).join("");
+    if (hasChildren(node) && (node.type === ElementType.Tag || isCDATA(node))) {
+        return innerText(node.children);
+    }
+    if (isText(node))
+        return node.data;
+    return "";
+}
+
+/**
+ * Get the feed object from the root of a DOM tree.
+ *
+ * @category Feeds
+ * @param document The DOM to extract the feed from.
+ * @returns The feed.
+ */
+function getFeed(document) {
+    const feedRoot = getOneElement(isValidFeed, document);
+    return feedRoot
+        ? feedRoot.name === "feed"
+            ? getAtomFeed(feedRoot)
+            : getRssFeed(feedRoot)
+        : null;
+}
+/**
+ * Parse an Atom feed.
+ *
+ * @param feedRoot The root of the feed.
+ * @returns The parsed feed.
+ */
+function getAtomFeed(feedRoot) {
+    const childs = feedRoot.children;
+    const feed = {
+        type: "atom",
+        items: getElementsByTagName("entry", childs).map((item) => {
+            const { children } = item;
+            const entry = { media: getMediaElements(children) };
+            addConditionally(entry, "id", "id", children);
+            addConditionally(entry, "title", "title", children);
+            const href = getOneElement("link", children)?.attribs["href"];
+            if (href) {
+                entry.link = href;
+            }
+            const description = fetch$1("summary", children) || fetch$1("content", children);
+            if (description) {
+                entry.description = description;
+            }
+            const pubDate = fetch$1("updated", children);
+            if (pubDate) {
+                entry.pubDate = new Date(pubDate);
+            }
+            return entry;
+        }),
+    };
+    addConditionally(feed, "id", "id", childs);
+    addConditionally(feed, "title", "title", childs);
+    const href = getOneElement("link", childs)?.attribs["href"];
+    if (href) {
+        feed.link = href;
+    }
+    addConditionally(feed, "description", "subtitle", childs);
+    const updated = fetch$1("updated", childs);
+    if (updated) {
+        feed.updated = new Date(updated);
+    }
+    addConditionally(feed, "author", "email", childs, true);
+    return feed;
+}
+/**
+ * Parse a RSS feed.
+ *
+ * @param feedRoot The root of the feed.
+ * @returns The parsed feed.
+ */
+function getRssFeed(feedRoot) {
+    const childs = getOneElement("channel", feedRoot.children)?.children ?? [];
+    const feed = {
+        type: feedRoot.name.substr(0, 3),
+        id: "",
+        items: getElementsByTagName("item", feedRoot.children).map((item) => {
+            const { children } = item;
+            const entry = { media: getMediaElements(children) };
+            addConditionally(entry, "id", "guid", children);
+            addConditionally(entry, "title", "title", children);
+            addConditionally(entry, "link", "link", children);
+            addConditionally(entry, "description", "description", children);
+            const pubDate = fetch$1("pubDate", children) || fetch$1("dc:date", children);
+            if (pubDate)
+                entry.pubDate = new Date(pubDate);
+            return entry;
+        }),
+    };
+    addConditionally(feed, "title", "title", childs);
+    addConditionally(feed, "link", "link", childs);
+    addConditionally(feed, "description", "description", childs);
+    const updated = fetch$1("lastBuildDate", childs);
+    if (updated) {
+        feed.updated = new Date(updated);
+    }
+    addConditionally(feed, "author", "managingEditor", childs, true);
+    return feed;
+}
+const MEDIA_KEYS_STRING = ["url", "type", "lang"];
+const MEDIA_KEYS_INT = [
+    "fileSize",
+    "bitrate",
+    "framerate",
+    "samplingrate",
+    "channels",
+    "duration",
+    "height",
+    "width",
+];
+/**
+ * Get all media elements of a feed item.
+ *
+ * @param where Nodes to search in.
+ * @returns Media elements.
+ */
+function getMediaElements(where) {
+    return getElementsByTagName("media:content", where).map((element) => {
+        const { attribs } = element;
+        const media = {
+            medium: attribs["medium"],
+            isDefault: !!attribs["isDefault"],
+        };
+        for (const attrib of MEDIA_KEYS_STRING) {
+            if (attribs[attrib]) {
+                media[attrib] = attribs[attrib];
+            }
+        }
+        for (const attrib of MEDIA_KEYS_INT) {
+            if (attribs[attrib]) {
+                media[attrib] = Number.parseInt(attribs[attrib], 10);
+            }
+        }
+        if (attribs["expression"]) {
+            media.expression = attribs["expression"];
+        }
+        return media;
+    });
+}
+/**
+ * Get one element by tag name.
+ *
+ * @param tagName Tag name to look for
+ * @param node Node to search in
+ * @returns The element or null
+ */
+function getOneElement(tagName, node) {
+    return getElementsByTagName(tagName, node, true, 1)[0];
+}
+/**
+ * Get the text content of an element with a certain tag name.
+ *
+ * @param tagName Tag name to look for.
+ * @param where Node to search in.
+ * @param recurse Whether to recurse into child nodes.
+ * @returns The text content of the element.
+ */
+function fetch$1(tagName, where, recurse = false) {
+    return textContent(getElementsByTagName(tagName, where, recurse, 1)).trim();
+}
+/**
+ * Adds a property to an object if it has a value.
+ *
+ * @param object Object to be extended.
+ * @param property Property name.
+ * @param tagName Tag name that contains the conditionally added property.
+ * @param where Element to search for the property.
+ * @param recurse Whether to recurse into child nodes.
+ */
+function addConditionally(object, property, tagName, where, recurse = false) {
+    const value = fetch$1(tagName, where, recurse);
+    if (value)
+        object[property] = value;
+}
+/**
+ * Checks if an element is a feed root node.
+ *
+ * @param value The name of the element to check.
+ * @returns Whether an element is a feed root node.
+ */
+function isValidFeed(value) {
+    return value === "rss" || value === "feed" || value === "rdf:RDF";
+}
+
+/**
+ * Given an array of nodes, remove any member that is contained by another
+ * member.
+ *
+ * @category Helpers
+ * @param nodes Nodes to filter.
+ * @returns Remaining nodes that aren't contained by other nodes.
+ */
+function removeSubsets(nodes) {
+    let index = nodes.length;
+    /*
+     * Check if each node (or one of its ancestors) is already contained in the
+     * array.
+     */
+    while (--index >= 0) {
+        const node = nodes[index];
+        /*
+         * Remove the node if it is not unique.
+         * We are going through the array from the end, so we only
+         * have to check nodes that preceed the node under consideration in the array.
+         */
+        if (index > 0 && nodes.lastIndexOf(node, index - 1) >= 0) {
+            nodes.splice(index, 1);
+            continue;
+        }
+        for (let ancestor = node.parent; ancestor; ancestor = ancestor.parent) {
+            if (nodes.includes(ancestor)) {
+                nodes.splice(index, 1);
+                break;
+            }
+        }
+    }
+    return nodes;
+}
+/**
+ * @category Helpers
+ * @see {@link http://dom.spec.whatwg.org/#dom-node-comparedocumentposition}
+ */
+var DocumentPosition;
+(function (DocumentPosition) {
+    DocumentPosition[DocumentPosition["DISCONNECTED"] = 1] = "DISCONNECTED";
+    DocumentPosition[DocumentPosition["PRECEDING"] = 2] = "PRECEDING";
+    DocumentPosition[DocumentPosition["FOLLOWING"] = 4] = "FOLLOWING";
+    DocumentPosition[DocumentPosition["CONTAINS"] = 8] = "CONTAINS";
+    DocumentPosition[DocumentPosition["CONTAINED_BY"] = 16] = "CONTAINED_BY";
+})(DocumentPosition || (DocumentPosition = {}));
+/**
+ * Compare the position of one node against another node in any other document,
+ * returning a bitmask with the values from {@link DocumentPosition}.
+ *
+ * Document order:
+ * > There is an ordering, document order, defined on all the nodes in the
+ * > document corresponding to the order in which the first character of the
+ * > XML representation of each node occurs in the XML representation of the
+ * > document after expansion of general entities. Thus, the document element
+ * > node will be the first node. Element nodes occur before their children.
+ * > Thus, document order orders element nodes in order of the occurrence of
+ * > their start-tag in the XML (after expansion of entities). The attribute
+ * > nodes of an element occur after the element and before its children. The
+ * > relative order of attribute nodes is implementation-dependent.
+ *
+ * Source:
+ * http://www.w3.org/TR/DOM-Level-3-Core/glossary.html#dt-document-order
+ *
+ * @category Helpers
+ * @param nodeA The first node to use in the comparison
+ * @param nodeB The second node to use in the comparison
+ * @returns A bitmask describing the input nodes' relative position.
+ *
+ * See http://dom.spec.whatwg.org/#dom-node-comparedocumentposition for
+ * a description of these values.
+ */
+function compareDocumentPosition(nodeA, nodeB) {
+    const aParents = [];
+    const bParents = [];
+    if (nodeA === nodeB) {
+        return 0;
+    }
+    let current = hasChildren(nodeA) ? nodeA : nodeA.parent;
+    while (current) {
+        aParents.unshift(current);
+        current = current.parent;
+    }
+    current = hasChildren(nodeB) ? nodeB : nodeB.parent;
+    while (current) {
+        bParents.unshift(current);
+        current = current.parent;
+    }
+    const maxIndex = Math.min(aParents.length, bParents.length);
+    let index = 0;
+    while (index < maxIndex && aParents[index] === bParents[index]) {
+        index++;
+    }
+    if (index === 0) {
+        return DocumentPosition.DISCONNECTED;
+    }
+    const sharedParent = aParents[index - 1];
+    const siblings = sharedParent.children;
+    const aSibling = aParents[index];
+    const bSibling = bParents[index];
+    if (siblings.indexOf(aSibling) > siblings.indexOf(bSibling)) {
+        if (sharedParent === nodeB) {
+            return DocumentPosition.FOLLOWING | DocumentPosition.CONTAINED_BY;
+        }
+        return DocumentPosition.FOLLOWING;
+    }
+    if (sharedParent === nodeA) {
+        return DocumentPosition.PRECEDING | DocumentPosition.CONTAINS;
+    }
+    return DocumentPosition.PRECEDING;
+}
+/**
+ * Sort an array of nodes based on their relative position in the document,
+ * removing any duplicate nodes. If the array contains nodes that do not belong
+ * to the same document, sort order is unspecified.
+ *
+ * @category Helpers
+ * @param nodes Array of DOM nodes.
+ * @returns Collection of unique nodes, sorted in document order.
+ */
+function uniqueSort(nodes) {
+    nodes = nodes.filter((node, index, array) => !array.includes(node, index + 1));
+    nodes.sort((a, b) => {
+        const relative = compareDocumentPosition(a, b);
+        if (relative & DocumentPosition.PRECEDING) {
+            return -1;
+        }
+        if (relative & DocumentPosition.FOLLOWING) {
+            return 1;
+        }
+        return 0;
+    });
+    return nodes;
+}
+
+/**
+ * Remove an element from the dom
+ *
+ * @category Manipulation
+ * @param element The element to be removed.
+ */
+function removeElement(element) {
+    if (element.prev)
+        element.prev.next = element.next;
+    if (element.next)
+        element.next.prev = element.prev;
+    if (element.parent) {
+        const childs = element.parent.children;
+        const childsIndex = childs.lastIndexOf(element);
+        if (childsIndex !== -1) {
+            childs.splice(childsIndex, 1);
+        }
+    }
+    element.next = null;
+    element.prev = null;
+    element.parent = null;
+}
+/**
+ * Replace an element in the dom
+ *
+ * @category Manipulation
+ * @param element The element to be replaced.
+ * @param replacement The element to be added
+ */
+function replaceElement(element, replacement) {
+    replacement.prev = element.prev;
+    if (replacement.prev) {
+        replacement.prev.next = replacement;
+    }
+    replacement.next = element.next;
+    if (replacement.next) {
+        replacement.next.prev = replacement;
+    }
+    replacement.parent = element.parent;
+    if (replacement.parent) {
+        const { children } = replacement.parent;
+        const elementIndex = children.lastIndexOf(element);
+        if (elementIndex === -1) {
+            return;
+        }
+        children[elementIndex] = replacement;
+        element.parent = null;
+    }
+}
+/**
+ * Append a child to an element.
+ *
+ * @category Manipulation
+ * @param parent The element to append to.
+ * @param child The element to be added as a child.
+ */
+function appendChild(parent, child) {
+    removeElement(child);
+    child.next = null;
+    child.parent = parent;
+    if (parent.children.push(child) > 1) {
+        const sibling = parent.children[parent.children.length - 2];
+        sibling.next = child;
+        child.prev = sibling;
+    }
+    else {
+        child.prev = null;
+    }
+}
+/**
+ * Append an element after another.
+ *
+ * @category Manipulation
+ * @param element The element to append after.
+ * @param next The element be added.
+ */
+function append(element, next) {
+    removeElement(next);
+    const { parent } = element;
+    const currentNext = element.next;
+    next.next = currentNext;
+    next.prev = element;
+    element.next = next;
+    next.parent = parent;
+    if (currentNext) {
+        currentNext.prev = next;
+        if (parent) {
+            const childs = parent.children;
+            childs.splice(childs.lastIndexOf(currentNext), 0, next);
+        }
+    }
+    else if (parent) {
+        parent.children.push(next);
+    }
+}
+/**
+ * Prepend a child to an element.
+ *
+ * @category Manipulation
+ * @param parent The element to prepend before.
+ * @param child The element to be added as a child.
+ */
+function prependChild(parent, child) {
+    removeElement(child);
+    child.parent = parent;
+    child.prev = null;
+    if (parent.children.unshift(child) === 1) {
+        child.next = null;
+    }
+    else {
+        const sibling = parent.children[1];
+        sibling.prev = child;
+        child.next = sibling;
+    }
+}
+/**
+ * Prepend an element before another.
+ *
+ * @category Manipulation
+ * @param element The element to prepend before.
+ * @param previous The element to be added.
+ */
+function prepend(element, previous) {
+    removeElement(previous);
+    const { parent } = element;
+    if (parent) {
+        const childs = parent.children;
+        childs.splice(childs.indexOf(element), 0, previous);
+    }
+    if (element.prev) {
+        element.prev.next = previous;
+    }
+    previous.parent = parent;
+    previous.prev = element.prev;
+    previous.next = element;
+    element.prev = previous;
+}
+
+/**
+ * Get a node's children.
+ *
+ * @category Traversal
+ * @param element Node to get the children of.
+ * @returns `element`'s children, or an empty array.
+ */
+function getChildren(element) {
+    return hasChildren(element) ? element.children : [];
+}
+function getParent(element) {
+    return element.parent || null;
+}
+/**
+ * Gets an elements siblings, including the element itself.
+ *
+ * Attempts to get the children through the element's parent first. If we don't
+ * have a parent (the element is a root node), we walk the element's `prev` &
+ * `next` to get all remaining nodes.
+ *
+ * @category Traversal
+ * @param element Element to get the siblings of.
+ * @returns `element`'s siblings, including `element`.
+ */
+function getSiblings(element) {
+    const parent = getParent(element);
+    if (parent != null)
+        return getChildren(parent);
+    const siblings = [element];
+    let { prev, next } = element;
+    while (prev != null) {
+        siblings.unshift(prev);
+        ({ prev } = prev);
+    }
+    while (next != null) {
+        siblings.push(next);
+        ({ next } = next);
+    }
+    return siblings;
+}
+/**
+ * Gets an attribute from an element.
+ *
+ * @category Traversal
+ * @param element Element to check.
+ * @param name Attribute name to retrieve.
+ * @returns The element's attribute value, or `undefined`.
+ */
+function getAttributeValue(element, name) {
+    const { attribs } = element;
+    return attribs?.[name];
+}
+/**
+ * Checks whether an element has an attribute.
+ *
+ * @category Traversal
+ * @param element Element to check.
+ * @param name Attribute name to look for.
+ * @returns Returns whether `element` has the attribute `name`.
+ */
+function hasAttrib(element, name) {
+    const { attribs } = element;
+    return (attribs != null && Object.hasOwn(attribs, name) && attribs[name] != null);
+}
+/**
+ * Get the tag name of an element.
+ *
+ * @category Traversal
+ * @param element The element to get the name for.
+ * @returns The tag name of `element`.
+ */
+function getName(element) {
+    return element.name;
+}
+/**
+ * Returns the next element sibling of a node.
+ *
+ * @category Traversal
+ * @param element The element to get the next sibling of.
+ * @returns `element`'s next sibling that is a tag, or `null` if there is no next
+ * sibling.
+ */
+function nextElementSibling(element) {
+    let { next } = element;
+    while (next !== null && !isTag(next))
+        ({ next } = next);
+    return next;
+}
+/**
+ * Returns the previous element sibling of a node.
+ *
+ * @category Traversal
+ * @param element The element to get the previous sibling of.
+ * @returns `element`'s previous sibling that is a tag, or `null` if there is no
+ * previous sibling.
+ */
+// eslint-disable-next-line unicorn/prevent-abbreviations -- Keep public API name for backwards compatibility.
+function prevElementSibling(element) {
+    let { prev } = element;
+    while (prev !== null && !isTag(prev))
+        ({ prev } = prev);
+    return prev;
+}
+
+var DomUtils = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  get DocumentPosition () { return DocumentPosition; },
+  append: append,
+  appendChild: appendChild,
+  compareDocumentPosition: compareDocumentPosition,
+  existsOne: existsOne,
+  filter: filter,
+  find: find,
+  findAll: findAll$1,
+  findOne: findOne$1,
+  getAttributeValue: getAttributeValue,
+  getChildren: getChildren,
+  getElementById: getElementById,
+  getElements: getElements,
+  getElementsByClassName: getElementsByClassName,
+  getElementsByTagName: getElementsByTagName,
+  getElementsByTagType: getElementsByTagType,
+  getFeed: getFeed,
+  getInnerHTML: getInnerHTML,
+  getName: getName,
+  getOuterHTML: getOuterHTML,
+  getParent: getParent,
+  getSiblings: getSiblings,
+  getText: getText,
+  hasAttrib: hasAttrib,
+  innerText: innerText,
+  nextElementSibling: nextElementSibling,
+  prepend: prepend,
+  prependChild: prependChild,
+  prevElementSibling: prevElementSibling,
+  removeElement: removeElement,
+  removeSubsets: removeSubsets,
+  replaceElement: replaceElement,
+  testElement: testElement,
+  textContent: textContent,
+  uniqueSort: uniqueSort
+});
+
+/**
+ * All reserved characters in a regex, used for escaping.
+ *
+ * Taken from XRegExp, (c) 2007-2020 Steven Levithan under the MIT license
+ * https://github.com/slevithan/xregexp/blob/95eeebeb8fac8754d54eafe2b4743661ac1cf028/src/xregexp.js#L794
+ */
+const reChars = /[-[\]{}()*+?.,\\^$|#\s]/g;
+const whitespaceRe = /\s/;
+function escapeRegex(value) {
+    return value.replace(reChars, "\\$&");
+}
+/**
+ * Attributes that are case-insensitive in HTML.
+ * @see https://html.spec.whatwg.org/multipage/semantics-other.html#case-sensitivity-of-selectors
+ */
+const caseInsensitiveAttributes = new Set([
+    "accept",
+    "accept-charset",
+    "align",
+    "alink",
+    "axis",
+    "bgcolor",
+    "charset",
+    "checked",
+    "clear",
+    "codetype",
+    "color",
+    "compact",
+    "declare",
+    "defer",
+    "dir",
+    "direction",
+    "disabled",
+    "enctype",
+    "face",
+    "frame",
+    "hreflang",
+    "http-equiv",
+    "lang",
+    "language",
+    "link",
+    "media",
+    "method",
+    "multiple",
+    "nohref",
+    "noresize",
+    "noshade",
+    "nowrap",
+    "readonly",
+    "rel",
+    "rev",
+    "rules",
+    "scope",
+    "scrolling",
+    "selected",
+    "shape",
+    "target",
+    "text",
+    "type",
+    "valign",
+    "valuetype",
+    "vlink",
+]);
+function shouldIgnoreCase(selector, options) {
+    return typeof selector.ignoreCase === "boolean"
+        ? selector.ignoreCase
+        : selector.ignoreCase === "quirks"
+            ? !!options.quirksMode
+            : !options.xmlMode && caseInsensitiveAttributes.has(selector.name);
+}
+/**
+ * Attribute selectors
+ */
+const attributeRules = {
+    equals(next, data, options) {
+        const { adapter } = options;
+        const { name } = data;
+        let { value } = data;
+        if (shouldIgnoreCase(data, options)) {
+            value = value.toLowerCase();
+            return (element) => {
+                const attribute = adapter.getAttributeValue(element, name);
+                return (attribute != null &&
+                    attribute.length === value.length &&
+                    attribute.toLowerCase() === value &&
+                    next(element));
+            };
+        }
+        return (element) => adapter.getAttributeValue(element, name) === value && next(element);
+    },
+    hyphen(next, data, options) {
+        const { adapter } = options;
+        const { name } = data;
+        let { value } = data;
+        const { length } = value;
+        if (shouldIgnoreCase(data, options)) {
+            value = value.toLowerCase();
+            return function hyphenIC(element) {
+                const attribute = adapter.getAttributeValue(element, name);
+                return (attribute != null &&
+                    (attribute.length === length ||
+                        attribute.charAt(length) === "-") &&
+                    attribute.substr(0, length).toLowerCase() === value &&
+                    next(element));
+            };
+        }
+        return function hyphen(element) {
+            const attribute = adapter.getAttributeValue(element, name);
+            return (attribute != null &&
+                (attribute.length === length ||
+                    attribute.charAt(length) === "-") &&
+                attribute.substr(0, length) === value &&
+                next(element));
+        };
+    },
+    element(next, data, options) {
+        const { adapter } = options;
+        const { name, value } = data;
+        if (whitespaceRe.test(value)) {
+            return falseFunc;
+        }
+        const regex = new RegExp(`(?:^|\\s)${escapeRegex(value)}(?:$|\\s)`, shouldIgnoreCase(data, options) ? "i" : "");
+        return function element(node) {
+            const attribute = adapter.getAttributeValue(node, name);
+            return (attribute != null &&
+                attribute.length >= value.length &&
+                regex.test(attribute) &&
+                next(node));
+        };
+    },
+    exists(next, { name }, { adapter }) {
+        return (element) => adapter.hasAttrib(element, name) && next(element);
+    },
+    start(next, data, options) {
+        const { adapter } = options;
+        const { name } = data;
+        let { value } = data;
+        const { length } = value;
+        if (length === 0) {
+            return falseFunc;
+        }
+        if (shouldIgnoreCase(data, options)) {
+            value = value.toLowerCase();
+            return (element) => {
+                const attribute = adapter.getAttributeValue(element, name);
+                return (attribute != null &&
+                    attribute.length >= length &&
+                    attribute.substr(0, length).toLowerCase() === value &&
+                    next(element));
+            };
+        }
+        return (element) => !!adapter.getAttributeValue(element, name)?.startsWith(value) &&
+            next(element);
+    },
+    end(next, data, options) {
+        const { adapter } = options;
+        const { name } = data;
+        let { value } = data;
+        const length = -value.length;
+        if (length === 0) {
+            return falseFunc;
+        }
+        if (shouldIgnoreCase(data, options)) {
+            value = value.toLowerCase();
+            return (element) => adapter
+                .getAttributeValue(element, name)
+                ?.substr(length)
+                .toLowerCase() === value && next(element);
+        }
+        return (element) => !!adapter.getAttributeValue(element, name)?.endsWith(value) &&
+            next(element);
+    },
+    any(next, data, options) {
+        const { adapter } = options;
+        const { name, value } = data;
+        if (value === "") {
+            return falseFunc;
+        }
+        if (shouldIgnoreCase(data, options)) {
+            const regex = new RegExp(escapeRegex(value), "i");
+            return function anyIC(element) {
+                const attribute = adapter.getAttributeValue(element, name);
+                return (attribute != null &&
+                    attribute.length >= value.length &&
+                    regex.test(attribute) &&
+                    next(element));
+            };
+        }
+        return (element) => !!adapter.getAttributeValue(element, name)?.includes(value) &&
+            next(element);
+    },
+    not(next, data, options) {
+        const { adapter } = options;
+        const { name } = data;
+        let { value } = data;
+        if (value === "") {
+            return (element) => !!adapter.getAttributeValue(element, name) && next(element);
+        }
+        if (shouldIgnoreCase(data, options)) {
+            value = value.toLowerCase();
+            return (element) => {
+                const attribute = adapter.getAttributeValue(element, name);
+                return ((attribute == null ||
+                    attribute.length !== value.length ||
+                    attribute.toLowerCase() !== value) &&
+                    next(element));
+            };
+        }
+        return (element) => adapter.getAttributeValue(element, name) !== value && next(element);
+    },
+};
+
+/**
+ * Find all elements matching the query. If not in XML mode, the query will ignore
+ * the contents of `<template>` elements.
+ * @param query - Function that returns true if the element matches the query.
+ * @param nodes - Nodes to query. If a node is an element, its children will be queried.
+ * @param options - Options for querying the document.
+ * @returns All matching elements.
+ */
+function findAll(query, nodes, options) {
+    const { adapter, xmlMode = false } = options;
+    const result = [];
+    /** Stack of the arrays we are looking at. */
+    const nodeStack = [nodes];
+    /** Stack of the indices within the arrays. */
+    const indexStack = [0];
+    for (;;) {
+        // First, check if the current array has any more elements to look at.
+        if (indexStack[0] >= nodeStack[0].length) {
+            // If we have no more arrays to look at, we are done.
+            if (nodeStack.length === 1) {
+                return result;
+            }
+            nodeStack.shift();
+            indexStack.shift();
+            // Loop back to the start to continue with the next array.
+            continue;
+        }
+        const element = nodeStack[0][indexStack[0]++];
+        if (!adapter.isTag(element)) {
+            continue;
+        }
+        if (query(element)) {
+            result.push(element);
+        }
+        if (xmlMode || adapter.getName(element) !== "template") {
+            /*
+             * Add the children to the stack. We are depth-first, so this is
+             * the next array we look at.
+             */
+            const children = adapter.getChildren(element);
+            if (children.length > 0) {
+                nodeStack.unshift(children);
+                indexStack.unshift(0);
+            }
+        }
+    }
+}
+/**
+ * Find the first element matching the query. If not in XML mode, the query will ignore
+ * the contents of `<template>` elements.
+ * @param query - Function that returns true if the element matches the query.
+ * @param nodes - Nodes to query. If a node is an element, its children will be queried.
+ * @param options - Options for querying the document.
+ * @returns The first matching element, or null if there was no match.
+ */
+function findOne(query, nodes, options) {
+    const { adapter, xmlMode = false } = options;
+    /** Stack of the arrays we are looking at. */
+    const nodeStack = [nodes];
+    /** Stack of the indices within the arrays. */
+    const indexStack = [0];
+    for (;;) {
+        // First, check if the current array has any more elements to look at.
+        if (indexStack[0] >= nodeStack[0].length) {
+            // If we have no more arrays to look at, we are done.
+            if (nodeStack.length === 1) {
+                return null;
+            }
+            nodeStack.shift();
+            indexStack.shift();
+            // Loop back to the start to continue with the next array.
+            continue;
+        }
+        const element = nodeStack[0][indexStack[0]++];
+        if (!adapter.isTag(element)) {
+            continue;
+        }
+        if (query(element)) {
+            return element;
+        }
+        if (xmlMode || adapter.getName(element) !== "template") {
+            /*
+             * Add the children to the stack. We are depth-first, so this is
+             * the next array we look at.
+             */
+            const children = adapter.getChildren(element);
+            if (children.length > 0) {
+                nodeStack.unshift(children);
+                indexStack.unshift(0);
+            }
+        }
+    }
+}
+/**
+ * Get all element siblings after the provided node.
+ * @param element Element candidate being tested.
+ * @param adapter Adapter implementation used for DOM operations.
+ */
+function getNextSiblings(element, adapter) {
+    const siblings = adapter.getSiblings(element);
+    if (siblings.length <= 1) {
+        return [];
+    }
+    const elementIndex = siblings.indexOf(element);
+    if (elementIndex === -1 || elementIndex === siblings.length - 1) {
+        return [];
+    }
+    return siblings.slice(elementIndex + 1).filter(adapter.isTag);
+}
+/**
+ * Get the parent element of a node.
+ * @param node Node to inspect.
+ * @param adapter Adapter implementation used for DOM operations.
+ */
+function getElementParent(node, adapter) {
+    const parent = adapter.getParent(node);
+    return parent != null && adapter.isTag(parent) ? parent : null;
+}
+
+/**
+ * Only text controls can be made read-only, since for other controls (such
+ * as checkboxes and buttons) there is no useful distinction between being
+ * read-only and being disabled.
+ * @see {@link https://html.spec.whatwg.org/multipage/input.html#attr-input-readonly}
+ */
+const textControl = "input:is([type=text i],[type=search i],[type=url i],[type=tel i],[type=email i],[type=password i],[type=date i],[type=month i],[type=week i],[type=time i],[type=datetime-local i],[type=number i])";
+/**
+ * Aliases are pseudos that are expressed as selectors.
+ */
+const aliases = {
+    // Links
+    "any-link": ":is(a, area, link)[href]",
+    link: ":any-link:not(:visited)",
+    // Forms
+    // https://html.spec.whatwg.org/multipage/scripting.html#disabled-elements
+    disabled: `:is(
+        :is(button, input, select, textarea, optgroup, option)[disabled],
+        optgroup[disabled] > option,
+        fieldset[disabled]:not(fieldset[disabled] legend:first-of-type *)
+    )`,
+    enabled: ":is(button, input, select, textarea, optgroup, option, fieldset):not(:disabled)",
+    checked: ":is(:is(input[type=radio], input[type=checkbox])[checked], :selected)",
+    required: ":is(input, select, textarea)[required]",
+    optional: ":is(input, select, textarea):not([required])",
+    "read-only": `[readonly]:is(textarea, ${textControl})`,
+    "read-write": `:not([readonly]):is(textarea, ${textControl})`,
+    // JQuery extensions
+    /**
+     * `:selected` matches option elements that have the `selected` attribute,
+     * or are the first option element in a select element that does not have
+     * the `multiple` attribute and does not have any option elements with the
+     * `selected` attribute.
+     * @see https://html.spec.whatwg.org/multipage/form-elements.html#concept-option-selectedness
+     */
+    selected: "option:is([selected], select:not([multiple]):not(:has(> option[selected])) > :first-of-type)",
+    checkbox: "[type=checkbox]",
+    file: "[type=file]",
+    password: "[type=password]",
+    radio: "[type=radio]",
+    reset: "[type=reset]",
+    image: "[type=image]",
+    submit: "[type=submit]",
+    parent: ":not(:empty)",
+    header: ":is(h1, h2, h3, h4, h5, h6)",
+    button: ":is(button, input[type=button])",
+    input: ":is(input, textarea, select, button)",
+    text: "input:is(:not([type!='']), [type=text])",
+};
+
+/**
+ * Returns a function that checks if an elements index matches the given rule
+ * highly optimized to return the fastest solution.
+ * @param parsed A tuple [a, b], as returned by `parse`.
+ * @returns A highly optimized function that returns whether an index matches the nth-check.
+ * @example
+ *
+ * ```js
+ * const check = nthCheck.compile([2, 3]);
+ *
+ * check(0); // `false`
+ * check(1); // `false`
+ * check(2); // `true`
+ * check(3); // `false`
+ * check(4); // `true`
+ * check(5); // `false`
+ * check(6); // `true`
+ * ```
+ */
+function compile(parsed) {
+    const a = parsed[0];
+    // Subtract 1 from `b`, to convert from one- to zero-indexed.
+    const b = parsed[1] - 1;
+    /*
+     * When `b <= 0`, `a * n` won't be lead to any matches for `a < 0`.
+     * Besides, the specification states that no elements are
+     * matched when `a` and `b` are 0.
+     *
+     * `b < 0` here as we subtracted 1 from `b` above.
+     */
+    if (b < 0 && a <= 0)
+        return falseFunc;
+    // When `a` is in the range -1..1, it matches any element (so only `b` is checked).
+    if (a === -1)
+        return (index) => index <= b;
+    if (a === 0)
+        return (index) => index === b;
+    // When `b <= 0` and `a === 1`, they match any element.
+    if (a === 1)
+        return b < 0 ? trueFunc : (index) => index >= b;
+    /*
+     * Otherwise, modulo can be used to check if there is a match.
+     *
+     * Modulo doesn't care about the sign, so let's use `a`s absolute value.
+     */
+    const absA = Math.abs(a);
+    // Get `b mod a`, + a if this is negative.
+    const bModulo = ((b % absA) + absA) % absA;
+    return a > 1
+        ? (index) => index >= b && index % absA === bModulo
+        : (index) => index <= b && index % absA === bModulo;
+}
+
+// Following http://www.w3.org/TR/css3-selectors/#nth-child-pseudo
+// Whitespace as per https://www.w3.org/TR/selectors-3/#lex is " \t\r\n\f"
+const whitespace = new Set([9, 10, 12, 13, 32]);
+const ZERO = "0".charCodeAt(0);
+const NINE = "9".charCodeAt(0);
+/**
+ * Parses an expression.
+ * @param formula CSS nth-formula to parse.
+ * @throws {Error} An `Error` if parsing fails.
+ * @returns An array containing the integer step size and the integer offset of the nth rule.
+ * @example nthCheck.parse("2n+3"); // returns [2, 3]
+ */
+function parse(formula) {
+    formula = formula.trim().toLowerCase();
+    switch (formula) {
+        case "even": {
+            return [2, 0];
+        }
+        case "odd": {
+            return [2, 1];
+        }
+    }
+    // Parse [ ['-'|'+']? INTEGER? {N} [ S* ['-'|'+'] S* INTEGER ]?
+    let index = 0;
+    let a = 0;
+    let sign = readSign();
+    let number = readNumber();
+    if (index < formula.length && formula.charAt(index) === "n") {
+        index++;
+        a = sign * (number ?? 1);
+        skipWhitespace();
+        if (index < formula.length) {
+            sign = readSign();
+            skipWhitespace();
+            number = readNumber();
+        }
+        else {
+            sign = number = 0;
+        }
+    }
+    // Throw if there is anything else
+    if (number === null || index < formula.length) {
+        throw new Error(`n-th rule couldn't be parsed ('${formula}')`);
+    }
+    return [a, sign * number];
+    function readSign() {
+        switch (formula.charAt(index)) {
+            case "-": {
+                index++;
+                return -1;
+            }
+            case "+": {
+                index++;
+                break;
+            }
+        }
+        return 1;
+    }
+    function readNumber() {
+        const start = index;
+        let value = 0;
+        while (index < formula.length &&
+            formula.charCodeAt(index) >= ZERO &&
+            formula.charCodeAt(index) <= NINE) {
+            value = value * 10 + (formula.charCodeAt(index) - ZERO);
+            index++;
+        }
+        // Return `null` if we didn't read anything.
+        return index === start ? null : value;
+    }
+    function skipWhitespace() {
+        while (index < formula.length &&
+            whitespace.has(formula.charCodeAt(index))) {
+            index++;
+        }
+    }
+}
+
+/**
+ * Parses and compiles a formula to a highly optimized function.
+ * Combination of {@link parse} and {@link compile}.
+ *
+ * If the formula doesn't match any elements,
+ * it returns [`boolbase`](https://github.com/fb55/boolbase)'s `falseFunc`.
+ * Otherwise, a function accepting an _index_ is returned, which returns
+ * whether or not the passed _index_ matches the formula.
+ *
+ * Note: The nth-rule starts counting at `1`, the returned function at `0`.
+ * @param formula The formula to compile.
+ * @example
+ * const check = nthCheck("2n+3");
+ *
+ * check(0); // `false`
+ * check(1); // `false`
+ * check(2); // `true`
+ * check(3); // `false`
+ * check(4); // `true`
+ * check(5); // `false`
+ * check(6); // `true`
+ */
+function nthCheck(formula) {
+    return compile(parse(formula));
+}
+
+/**
+ * Some selectors such as `:contains` and (non-relative) `:has` will only be
+ * able to match elements if their parents match the selector (as they contain
+ * a subset of the elements that the parent contains).
+ *
+ * This function wraps the given `matches` function in a function that caches
+ * the results of the parent elements, so that the `matches` function only
+ * needs to be called once for each subtree.
+ * @param next Matcher to run after this matcher succeeds.
+ * @param options Configuration object for cache behavior.
+ * @param options.adapter Adapter implementation used for DOM access.
+ * @param options.cacheResults Whether results should be memoized by input root.
+ * @param matches Compiled matcher function to wrap with caching.
+ */
+function cacheParentResults(next, { adapter, cacheResults }, matches) {
+    if (cacheResults === false || typeof WeakMap === "undefined") {
+        return (element) => next(element) && matches(element);
+    }
+    // Use a cache to avoid re-checking children of an element.
+    // @ts-expect-error `Node` is not extending object
+    const resultCache = new WeakMap();
+    function addResultToCache(element) {
+        const result = matches(element);
+        resultCache.set(element, result);
+        return result;
+    }
+    return function cachedMatcher(element) {
+        if (!next(element)) {
+            return false;
+        }
+        if (resultCache.has(element)) {
+            return resultCache.get(element) ?? false;
+        }
+        // Check all of the element's parents.
+        let node = element;
+        do {
+            const parent = getElementParent(node, adapter);
+            if (parent === null) {
+                return addResultToCache(element);
+            }
+            node = parent;
+        } while (!resultCache.has(node));
+        return resultCache.get(node) ? addResultToCache(element) : false;
+    };
+}
+
+/**
+ * Create a copy of options, omitting `context` and `rootFunc`.
+ *
+ * This is used when compiling nested selectors (e.g. inside `:is`, `:not`,
+ * `:nth-child(… of S)`) so that the parent compilation state doesn't leak.
+ */
+function copyOptions(options) {
+    // Omit context and rootFunc so parent compilation state doesn't leak.
+    const { context: _, rootFunc: __, ...copied } = options;
+    return copied;
+}
+
+/**
+ * RFC 4647 extended filtering with pre-split subtags.
+ * @param tag - Lowercased subtags of the element's language value.
+ * @param range - Lowercased subtags of the language range to match against.
+ */
+function extendedFilter(tag, range) {
+    if (range[0] !== "*" && range[0] !== tag[0])
+        return false;
+    let tagIndex = 1;
+    for (let rangeIndex = 1; rangeIndex < range.length; rangeIndex++) {
+        if (range[rangeIndex] === "*")
+            continue;
+        // Skip non-singleton tag subtags until we find a match.
+        while (tagIndex < tag.length && tag[tagIndex] !== range[rangeIndex]) {
+            if (tag[tagIndex++].length <= 1)
+                return false;
+        }
+        if (tagIndex >= tag.length)
+            return false;
+        tagIndex++;
+    }
+    return true;
+}
+/** @see {@link https://www.w3.org/TR/selectors-4/#the-nth-child-pseudo} */
+const nthOfRegex = /^(.+?)\s+of\s+(.+)$/is;
+function compileNth(reverse, ofType) {
+    return function nth(next, rule, options, context, compileToken) {
+        const { adapter, equals } = options;
+        const ofMatch = ofType ? null : rule.match(nthOfRegex);
+        const nthCheck$1 = nthCheck(ofMatch ? ofMatch[1].trim() : rule);
+        if (nthCheck$1 === falseFunc)
+            return falseFunc;
+        const ofSelector = ofMatch && compileToken
+            ? compileToken(parse$1(ofMatch[2].trim()), copyOptions(options), context)
+            : undefined;
+        if (ofSelector === falseFunc)
+            return falseFunc;
+        if (nthCheck$1 === trueFunc && !ofSelector) {
+            return (element) => getElementParent(element, adapter) !== null && next(element);
+        }
+        const shouldCount = ofSelector
+            ? (_element, sibling) => ofSelector(sibling)
+            : ofType
+                ? (element, sibling) => adapter.getName(sibling) === adapter.getName(element)
+                : trueFunc;
+        if (reverse) {
+            return function nthLast(element) {
+                if (ofSelector && !ofSelector(element))
+                    return false;
+                const siblings = adapter.getSiblings(element);
+                let pos = 0;
+                for (let index = siblings.length - 1; index >= 0; index--) {
+                    const sibling = siblings[index];
+                    if (equals(element, sibling))
+                        break;
+                    if (adapter.isTag(sibling) && shouldCount(element, sibling))
+                        pos++;
+                }
+                return nthCheck$1(pos) && next(element);
+            };
+        }
+        return function nth(element) {
+            if (ofSelector && !ofSelector(element))
+                return false;
+            const siblings = adapter.getSiblings(element);
+            let pos = 0;
+            for (const sibling of siblings) {
+                if (equals(element, sibling))
+                    break;
+                if (adapter.isTag(sibling) && shouldCount(element, sibling))
+                    pos++;
+            }
+            return nthCheck$1(pos) && next(element);
+        };
+    };
+}
+/**
+ * Pre-compiled pseudo filters.
+ */
+const filters = {
+    contains(next, text, options) {
+        const { getText } = options.adapter;
+        return cacheParentResults(next, options, (element) => getText(element).includes(text));
+    },
+    icontains(next, text, options) {
+        const itext = text.toLowerCase();
+        const { getText } = options.adapter;
+        return cacheParentResults(next, options, (element) => getText(element).toLowerCase().includes(itext));
+    },
+    // Location specific methods
+    "nth-child": compileNth(false, false),
+    "nth-last-child": compileNth(true, false),
+    "nth-of-type": compileNth(false, true),
+    "nth-last-of-type": compileNth(true, true),
+    // TODO determine the actual root element
+    root(next, _rule, { adapter }) {
+        return (element) => getElementParent(element, adapter) === null && next(element);
+    },
+    scope(next, rule, options, context) {
+        const { equals } = options;
+        if (!context || context.length === 0) {
+            // Equivalent to :root
+            return filters["root"](next, rule, options);
+        }
+        if (context.length === 1) {
+            // NOTE: can't be unpacked, as :has uses this for side-effects
+            return (element) => equals(context[0], element) && next(element);
+        }
+        return (element) => context.includes(element) && next(element);
+    },
+    lang(next, code, { adapter }) {
+        const ranges = code
+            .split(",")
+            .map((r) => r.trim())
+            .filter((r) => r.length > 0)
+            .map((r) => r
+            .replace(/^['"]|['"]$/g, "")
+            .toLowerCase()
+            .split("-"));
+        return function lang(element) {
+            let node = element;
+            while (node != null) {
+                const value = adapter.getAttributeValue(node, "xml:lang") ??
+                    adapter.getAttributeValue(node, "lang");
+                if (value != null) {
+                    if (!value) {
+                        return ranges.some((r) => r[0] === "") && next(element);
+                    }
+                    const tag = value.toLowerCase().split("-");
+                    return (ranges.some((r) => extendedFilter(tag, r)) &&
+                        next(element));
+                }
+                const parent = adapter.getParent(node);
+                node =
+                    parent != null && adapter.isTag(parent)
+                        ? parent
+                        : null;
+            }
+            return ranges.some((r) => r[0] === "") && next(element);
+        };
+    },
+    hover: dynamicStatePseudo("isHovered"),
+    visited: dynamicStatePseudo("isVisited"),
+    active: dynamicStatePseudo("isActive"),
+};
+/**
+ * Dynamic state pseudos. These depend on optional Adapter methods.
+ * @param name The name of the adapter method to call.
+ * @returns Pseudo for the `filters` object.
+ */
+function dynamicStatePseudo(name) {
+    return function dynamicPseudo(next, _rule, { adapter }) {
+        const filterFunction = adapter[name];
+        if (typeof filterFunction !== "function") {
+            return falseFunc;
+        }
+        return function active(element) {
+            return filterFunction(element) && next(element);
+        };
+    };
+}
+
+/**
+ * CSS limits the characters considered as whitespace to space, tab & line
+ * feed. We add carriage returns as htmlparser2 doesn't normalize them to
+ * line feeds.
+ * @see {@link https://www.w3.org/TR/css-text-3/#white-space}
+ */
+const isDocumentWhiteSpace = /^[ \t\r\n]*$/;
+// While filters are precompiled, pseudos get called when they are needed
+/** Runtime pseudo selector implementations. */
+const pseudos = {
+    empty(element, { adapter }) {
+        const children = adapter.getChildren(element);
+        return (
+        // First, make sure the tag does not have any element children.
+        children.every((element) => !adapter.isTag(element)) &&
+            // Then, check that the text content is only whitespace.
+            children.every((element) => 
+            // FIXME: `getText` call is potentially expensive.
+            isDocumentWhiteSpace.test(adapter.getText(element))));
+    },
+    "first-child"(element, { adapter, equals }) {
+        if (adapter.prevElementSibling) {
+            return adapter.prevElementSibling(element) == null;
+        }
+        const firstChild = adapter
+            .getSiblings(element)
+            .find((sibling) => adapter.isTag(sibling));
+        return firstChild != null && equals(element, firstChild);
+    },
+    "last-child"(element, { adapter, equals }) {
+        const siblings = adapter.getSiblings(element);
+        for (let index = siblings.length - 1; index >= 0; index--) {
+            if (equals(element, siblings[index])) {
+                return true;
+            }
+            if (adapter.isTag(siblings[index])) {
+                break;
+            }
+        }
+        return false;
+    },
+    "first-of-type"(element, { adapter, equals }) {
+        const siblings = adapter.getSiblings(element);
+        const elementName = adapter.getName(element);
+        for (const currentSibling of siblings) {
+            if (equals(element, currentSibling)) {
+                return true;
+            }
+            if (adapter.isTag(currentSibling) &&
+                adapter.getName(currentSibling) === elementName) {
+                break;
+            }
+        }
+        return false;
+    },
+    "last-of-type"(element, { adapter, equals }) {
+        const siblings = adapter.getSiblings(element);
+        const elementName = adapter.getName(element);
+        for (let index = siblings.length - 1; index >= 0; index--) {
+            const currentSibling = siblings[index];
+            if (equals(element, currentSibling)) {
+                return true;
+            }
+            if (adapter.isTag(currentSibling) &&
+                adapter.getName(currentSibling) === elementName) {
+                break;
+            }
+        }
+        return false;
+    },
+    "only-of-type"(element, { adapter, equals }) {
+        const elementName = adapter.getName(element);
+        return adapter
+            .getSiblings(element)
+            .every((sibling) => equals(element, sibling) ||
+            !adapter.isTag(sibling) ||
+            adapter.getName(sibling) !== elementName);
+    },
+    "only-child"(element, { adapter, equals }) {
+        return adapter
+            .getSiblings(element)
+            .every((sibling) => equals(element, sibling) || !adapter.isTag(sibling));
+    },
+};
+/**
+ * Validate pseudo selector argument arity.
+ * @param pseudoClassCondition Pseudo-function implementation to wrap.
+ * @param name Name of the pseudo selector.
+ * @param subselect Subselector passed to the pseudo-function.
+ * @param argumentIndex Index of the argument parser to apply.
+ */
+function verifyPseudoArguments(pseudoClassCondition, name, subselect, argumentIndex) {
+    if (subselect === null) {
+        if (pseudoClassCondition.length > argumentIndex) {
+            throw new Error(`Pseudo-class :${name} requires an argument`);
+        }
+    }
+    else if (pseudoClassCondition.length === argumentIndex) {
+        throw new Error(`Pseudo-class :${name} doesn't have any arguments`);
+    }
+}
+
+/**
+ * Check whether a selector token performs traversal.
+ * @param token Selector token(s) to compile.
+ */
+function isTraversal(token) {
+    return token.type === "_flexibleDescendant" || isTraversal$1(token);
+}
+/**
+ * Sort the parts of the passed selector, as there is potential for
+ * optimization (some types of selectors are faster than others).
+ * @param array Selector to sort
+ */
+function sortRules(array) {
+    const ratings = array.map(getQuality);
+    for (let index = 1; index < array.length; index++) {
+        const procNew = ratings[index];
+        if (procNew < 0) {
+            continue;
+        }
+        // Use insertion sort to move the token to the correct position.
+        for (let currentIndex = index; currentIndex > 0 && procNew < ratings[currentIndex - 1]; currentIndex--) {
+            const token = array[currentIndex];
+            array[currentIndex] = array[currentIndex - 1];
+            array[currentIndex - 1] = token;
+            ratings[currentIndex] = ratings[currentIndex - 1];
+            ratings[currentIndex - 1] = procNew;
+        }
+    }
+}
+function getAttributeQuality(token) {
+    switch (token.action) {
+        case AttributeAction.Exists: {
+            return 10;
+        }
+        case AttributeAction.Equals: {
+            // Prefer ID selectors (eg. #ID)
+            return token.name === "id" ? 9 : 8;
+        }
+        case AttributeAction.Not: {
+            return 7;
+        }
+        case AttributeAction.Start: {
+            return 6;
+        }
+        case AttributeAction.End: {
+            return 6;
+        }
+        case AttributeAction.Any: {
+            return 5;
+        }
+        case AttributeAction.Hyphen: {
+            return 4;
+        }
+        case AttributeAction.Element: {
+            return 3;
+        }
+    }
+}
+/**
+ * Determine the quality of the passed token. The higher the number, the
+ * faster the token is to execute.
+ * @param token Token to get the quality of.
+ * @returns The token's quality.
+ */
+function getQuality(token) {
+    switch (token.type) {
+        case SelectorType.Universal: {
+            return 50;
+        }
+        case SelectorType.Tag: {
+            return 30;
+        }
+        case SelectorType.Attribute: {
+            return Math.floor(getAttributeQuality(token) /
+                // `ignoreCase` adds some overhead, half the result if applicable.
+                (token.ignoreCase ? 2 : 1));
+        }
+        case SelectorType.Pseudo: {
+            return token.data
+                ? token.name === "has" ||
+                    token.name === "contains" ||
+                    token.name === "icontains"
+                    ? // Expensive in any case — run as late as possible.
+                        0
+                    : Array.isArray(token.data)
+                        ? // Eg. `:is`, `:not`
+                            Math.max(
+                            // If we have traversals, try to avoid executing this selector
+                            0, Math.min(...token.data.map((d) => Math.min(...d.map(getQuality)))))
+                        : 2
+                : 3;
+        }
+        default: {
+            return -1;
+        }
+    }
+}
+/**
+ * Check whether a token or nested token includes `:scope`.
+ * @param t Selector token under inspection.
+ */
+function includesScopePseudo(t) {
+    return (t.type === SelectorType.Pseudo &&
+        (t.name === "scope" ||
+            (Array.isArray(t.data) &&
+                t.data.some((data) => data.some(includesScopePseudo)))));
+}
+
+/** Used as a placeholder for :has. Will be replaced with the actual element. */
+const PLACEHOLDER_ELEMENT = {};
+/**
+ * Check if the selector has any properties that rely on the current element.
+ * If not, we can cache the result of the selector.
+ *
+ * We can't cache selectors that start with a traversal (e.g. `>`, `+`, `~`),
+ * or include a `:scope`.
+ * @param selector - The selector to check.
+ * @returns Whether the selector has any properties that rely on the current element.
+ */
+function hasDependsOnCurrentElement(selector) {
+    return selector.some((sel) => sel.length > 0 &&
+        (isTraversal(sel[0]) || sel.some(includesScopePseudo)));
+}
+const is = (next, token, options, context, compileToken) => {
+    const compiledToken = compileToken(token, copyOptions(options), context);
+    return compiledToken === trueFunc
+        ? next
+        : compiledToken === falseFunc
+            ? falseFunc
+            : (element) => compiledToken(element) && next(element);
+};
+/*
+ * :not, :has, :is, :matches and :where have to compile selectors
+ * doing this in src/pseudos.ts would lead to circular dependencies,
+ * so we add them here
+ */
+/** Pseudo selectors that compile nested selectors. */
+const subselects = {
+    is,
+    /**
+     * `:matches` and `:where` are aliases for `:is`.
+     */
+    matches: is,
+    where: is,
+    not(next, token, options, context, compileToken) {
+        const compiledToken = compileToken(token, copyOptions(options), context);
+        return compiledToken === falseFunc
+            ? next
+            : compiledToken === trueFunc
+                ? falseFunc
+                : (element) => !compiledToken(element) && next(element);
+    },
+    has(next, subselect, options, _context, compileToken) {
+        const { adapter } = options;
+        const copiedOptions = copyOptions(options);
+        copiedOptions.relativeSelector = true;
+        const context = subselect.some((s) => s.some(isTraversal))
+            ? // Used as a placeholder. Will be replaced with the actual element.
+                [PLACEHOLDER_ELEMENT]
+            : undefined;
+        const skipCache = hasDependsOnCurrentElement(subselect);
+        const compiled = compileToken(subselect, copiedOptions, context);
+        if (compiled === falseFunc) {
+            return falseFunc;
+        }
+        // If `compiled` is `trueFunc`, we can skip this.
+        if (context && compiled !== trueFunc) {
+            return skipCache
+                ? (element) => {
+                    if (!next(element)) {
+                        return false;
+                    }
+                    context[0] = element;
+                    const childs = adapter.getChildren(element);
+                    return (findOne(compiled, compiled.shouldTestNextSiblings
+                        ? [
+                            ...childs,
+                            ...getNextSiblings(element, adapter),
+                        ]
+                        : childs, options) !== null);
+                }
+                : cacheParentResults(next, options, (element) => {
+                    context[0] = element;
+                    return (findOne(compiled, adapter.getChildren(element), options) !== null);
+                });
+        }
+        const hasOne = (element) => findOne(compiled, adapter.getChildren(element), options) !== null;
+        return skipCache
+            ? (element) => next(element) && hasOne(element)
+            : cacheParentResults(next, options, hasOne);
+    },
+};
+
+/*
+ * Pseudo selectors
+ *
+ * Pseudo selectors are available in three forms:
+ *
+ * 1. Filters are called when the selector is compiled and return a function
+ *  that has to return either false, or the results of `next()`.
+ * 2. Pseudos are called on execution. They have to return a boolean.
+ * 3. Subselects work like filters, but have an embedded selector that will be run separately.
+ *
+ * Filters are great if you want to do some pre-processing, or change the call order
+ * of `next()` and your code.
+ * Pseudos should be used to implement simple checks.
+ */
+/**
+ * Compile a pseudo selector into an executable query function.
+ * @param next Matcher to run after this matcher succeeds.
+ * @param selector Selector used to match elements.
+ * @param options Options that control this operation.
+ * @param context Context nodes used to scope selector matching.
+ * @param compileToken Function used to compile nested selector tokens.
+ */
+function compilePseudoSelector(next, selector, options, context, compileToken) {
+    const { name, data } = selector;
+    if (Array.isArray(data)) {
+        if (!(name in subselects)) {
+            throw new Error(`Unknown pseudo-class :${name}(${data})`);
+        }
+        return subselects[name](next, data, options, context, compileToken);
+    }
+    const userPseudo = options.pseudos?.[name];
+    const stringPseudo = typeof userPseudo === "string" ? userPseudo : aliases[name];
+    if (typeof stringPseudo === "string") {
+        if (data != null) {
+            throw new Error(`Pseudo ${name} doesn't have any arguments`);
+        }
+        // The alias has to be parsed here, to make sure options are respected.
+        const alias = parse$1(stringPseudo);
+        return subselects["is"](next, alias, options, context, compileToken);
+    }
+    if (typeof userPseudo === "function") {
+        verifyPseudoArguments(userPseudo, name, data, 1);
+        return (element) => userPseudo(element, data) && next(element);
+    }
+    if (name in filters) {
+        return filters[name](next, data, options, context, compileToken);
+    }
+    if (name in pseudos) {
+        const pseudo = pseudos[name];
+        verifyPseudoArguments(pseudo, name, data, 2);
+        return (element) => pseudo(element, options, data) && next(element);
+    }
+    throw new Error(`Unknown pseudo-class :${name}`);
+}
+
+/*
+ * All available rules
+ */
+/**
+ * Compile a single selector token.
+ * @param next Matcher to run after this matcher succeeds.
+ * @param selector Selector used to match elements.
+ * @param options Options that control this operation.
+ * @param context Context nodes used to scope selector matching.
+ * @param compileToken Function used to compile nested selector tokens.
+ * @param hasExpensiveSubselector Whether the selector contains expensive subselectors.
+ */
+function compileGeneralSelector(next, selector, options, context, compileToken, hasExpensiveSubselector) {
+    const { adapter, equals, cacheResults } = options;
+    switch (selector.type) {
+        case SelectorType.PseudoElement: {
+            throw new Error("Pseudo-elements are not supported by css-select");
+        }
+        case SelectorType.ColumnCombinator: {
+            throw new Error("Column combinators are not yet supported by css-select");
+        }
+        case SelectorType.Attribute: {
+            if (selector.namespace != null) {
+                throw new Error("Namespaced attributes are not yet supported by css-select");
+            }
+            if (!options.xmlMode || options.lowerCaseAttributeNames) {
+                selector.name = selector.name.toLowerCase();
+            }
+            return attributeRules[selector.action](next, selector, options);
+        }
+        case SelectorType.Pseudo: {
+            return compilePseudoSelector(next, selector, options, context, compileToken);
+        }
+        // Tags
+        case SelectorType.Tag: {
+            if (selector.namespace != null) {
+                throw new Error("Namespaced tag names are not yet supported by css-select");
+            }
+            let { name } = selector;
+            if (!options.xmlMode || options.lowerCaseTags) {
+                name = name.toLowerCase();
+            }
+            return function tag(element) {
+                return adapter.getName(element) === name && next(element);
+            };
+        }
+        // Traversal
+        case SelectorType.Descendant: {
+            if (!hasExpensiveSubselector ||
+                cacheResults === false ||
+                typeof WeakMap === "undefined") {
+                return function descendant(element) {
+                    let current = element;
+                    while ((current = getElementParent(current, adapter))) {
+                        if (next(current)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+            }
+            const resultCache = new WeakMap();
+            return function cachedDescendant(element) {
+                let current = element;
+                let result;
+                while ((current = getElementParent(current, adapter))) {
+                    const cached = resultCache.get(current);
+                    if (cached === undefined) {
+                        result ??= { matches: false };
+                        result.matches = next(current);
+                        resultCache.set(current, result);
+                        if (result.matches) {
+                            return true;
+                        }
+                    }
+                    else {
+                        if (result) {
+                            result.matches = cached.matches;
+                        }
+                        return cached.matches;
+                    }
+                }
+                return false;
+            };
+        }
+        case "_flexibleDescendant": {
+            // Include element itself, only used while querying an array
+            return function flexibleDescendant(element) {
+                let current = element;
+                do {
+                    if (next(current)) {
+                        return true;
+                    }
+                    current = getElementParent(current, adapter);
+                } while (current);
+                return false;
+            };
+        }
+        case SelectorType.Parent: {
+            return function parent(element) {
+                return adapter
+                    .getChildren(element)
+                    .some((element) => adapter.isTag(element) && next(element));
+            };
+        }
+        case SelectorType.Child: {
+            return function child(element) {
+                const parent = getElementParent(element, adapter);
+                return parent !== null && next(parent);
+            };
+        }
+        case SelectorType.Sibling: {
+            return function sibling(element) {
+                const siblings = adapter.getSiblings(element);
+                for (const currentSibling of siblings) {
+                    if (equals(element, currentSibling)) {
+                        break;
+                    }
+                    if (adapter.isTag(currentSibling) && next(currentSibling)) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+        }
+        case SelectorType.Adjacent: {
+            if (adapter.prevElementSibling) {
+                return function adjacent(element) {
+                    // biome-ignore lint/style/noNonNullAssertion: checked by if statement
+                    const previous = adapter.prevElementSibling(element);
+                    return previous != null && next(previous);
+                };
+            }
+            return function adjacent(element) {
+                const siblings = adapter.getSiblings(element);
+                let lastElement;
+                for (const currentSibling of siblings) {
+                    if (equals(element, currentSibling)) {
+                        break;
+                    }
+                    if (adapter.isTag(currentSibling)) {
+                        lastElement = currentSibling;
+                    }
+                }
+                return !!lastElement && next(lastElement);
+            };
+        }
+        case SelectorType.Universal: {
+            if (selector.namespace != null && selector.namespace !== "*") {
+                throw new Error("Namespaced universal selectors are not yet supported by css-select");
+            }
+            return next;
+        }
+    }
+}
+
+const DESCENDANT_TOKEN = { type: SelectorType.Descendant };
+const FLEXIBLE_DESCENDANT_TOKEN = {
+    type: "_flexibleDescendant",
+};
+const SCOPE_TOKEN = {
+    type: SelectorType.Pseudo,
+    name: "scope",
+    data: null,
+};
+/*
+ * CSS 4 Spec (Draft): 3.4.1. Absolutizing a Relative Selector
+ * http://www.w3.org/TR/selectors4/#absolutizing
+ */
+function absolutize(token, { adapter }, context) {
+    // TODO Use better check if the context is a document
+    const hasContext = !!context?.every((element) => element === PLACEHOLDER_ELEMENT ||
+        (adapter.isTag(element) &&
+            getElementParent(element, adapter) !== null));
+    for (const t of token) {
+        if (t.length > 0 &&
+            isTraversal(t[0]) &&
+            t[0].type !== SelectorType.Descendant) ;
+        else if (hasContext && !t.some(includesScopePseudo)) {
+            t.unshift(DESCENDANT_TOKEN);
+        }
+        else {
+            continue;
+        }
+        t.unshift(SCOPE_TOKEN);
+    }
+}
+/**
+ * Compile a parsed selector token into an executable query function.
+ * @param token Selector token(s) to compile.
+ * @param options Options that control this operation.
+ * @param compilationContext Compilation context for relative selector handling.
+ */
+function compileToken(token, options, compilationContext) {
+    for (const rules of token) {
+        sortRules(rules);
+    }
+    const { context = compilationContext, rootFunc: rootFunction = trueFunc, } = options;
+    const isArrayContext = Array.isArray(context);
+    const finalContext = context && (Array.isArray(context) ? context : [context]);
+    // Check if the selector is relative
+    if (options.relativeSelector !== false) {
+        absolutize(token, options, finalContext);
+    }
+    else if (token.some((t) => t.length > 0 && isTraversal(t[0]))) {
+        throw new Error("Relative selectors are not allowed when the `relativeSelector` option is disabled");
+    }
+    let shouldTestNextSiblings = false;
+    let query = falseFunc;
+    combineLoop: for (const rules of token) {
+        if (rules.length >= 2) {
+            const [first, second] = rules;
+            if (first.type !== SelectorType.Pseudo || first.name !== "scope") ;
+            else if (isArrayContext &&
+                second.type === SelectorType.Descendant) {
+                rules[1] = FLEXIBLE_DESCENDANT_TOKEN;
+            }
+            else if (second.type === SelectorType.Adjacent ||
+                second.type === SelectorType.Sibling) {
+                shouldTestNextSiblings = true;
+            }
+        }
+        let next = rootFunction;
+        let hasExpensiveSubselector = false;
+        for (const rule of rules) {
+            next = compileGeneralSelector(next, rule, options, finalContext, compileToken, hasExpensiveSubselector);
+            const quality = getQuality(rule);
+            if (quality === 0) {
+                hasExpensiveSubselector = true;
+            }
+            // If the sub-selector won't match any elements, skip it.
+            if (next === falseFunc) {
+                continue combineLoop;
+            }
+        }
+        // If we have a function that always returns true, we can stop here.
+        if (next === rootFunction) {
+            return rootFunction;
+        }
+        query = query === falseFunc ? next : or(query, next);
+    }
+    query.shouldTestNextSiblings = shouldTestNextSiblings;
+    return query;
+}
+function or(a, b) {
+    return (element) => a(element) || b(element);
+}
+
+const defaultEquals = (a, b) => a === b;
+const defaultOptions = {
+    adapter: { ...DomUtils, isTag },
+    equals: defaultEquals,
+};
+function convertOptionFormats(options) {
+    /*
+     * We force one format of options to the other one.
+     */
+    // @ts-expect-error Default options may have incompatible `Node` / `ElementNode`.
+    const finalOptions = options ?? defaultOptions;
+    // @ts-expect-error Same as above.
+    finalOptions.adapter ??= defaultOptions.adapter;
+    // @ts-expect-error `equals` does not exist on `Options`
+    finalOptions.equals ??= finalOptions.adapter?.equals ?? defaultEquals;
+    return finalOptions;
+}
+/**
+ * Like `compile`, but does not add a check if elements are tags.
+ * @param selector Selector used to match elements.
+ * @param options Options that control this operation.
+ * @param context Context nodes used to scope selector matching.
+ */
+function _compileUnsafe(selector, options, context) {
+    return compileToken(typeof selector === "string" ? parse$1(selector) : selector, convertOptionFormats(options), context);
+}
+function getSelectorFunction(searchFunction) {
+    return function select(query, elements, options) {
+        const convertedOptions = convertOptionFormats(options);
+        if (typeof query !== "function") {
+            query = _compileUnsafe(query, convertedOptions, elements);
+        }
+        const filteredElements = prepareContext(elements, convertedOptions.adapter, query.shouldTestNextSiblings);
+        return searchFunction(query, filteredElements, convertedOptions);
+    };
+}
+/**
+ * Normalize a query context and optionally include next siblings.
+ * @param elements Elements to test against sibling-dependent selectors.
+ * @param adapter Adapter implementation used for DOM operations.
+ * @param shouldTestNextSiblings Whether sibling combinators should include following siblings.
+ */
+function prepareContext(elements, adapter, shouldTestNextSiblings = false) {
+    /*
+     * Add siblings if the query requires them.
+     * See https://github.com/fb55/css-select/pull/43#issuecomment-225414692
+     */
+    if (shouldTestNextSiblings) {
+        elements = appendNextSiblings(elements, adapter);
+    }
+    return Array.isArray(elements)
+        ? adapter.removeSubsets(elements)
+        : adapter.getChildren(elements);
+}
+function appendNextSiblings(element, adapter) {
+    // Order matters because jQuery seems to check the children before the siblings
+    const elements = Array.isArray(element) ? [...element] : [element];
+    const elementsLength = elements.length;
+    for (let index = 0; index < elementsLength; index++) {
+        const nextSiblings = getNextSiblings(elements[index], adapter);
+        elements.push(...nextSiblings);
+    }
+    return elements;
+}
+/**
+ * @template Node The generic Node type for the DOM adapter being used.
+ * @template ElementNode The Node type for elements for the DOM adapter being used.
+ * @param elems Elements to query. If it is an element, its children will be queried.
+ * @param query can be either a CSS selector string or a compiled query function.
+ * @param [options] options for querying the document.
+ * @see compile for supported selector queries.
+ * @returns All matching elements.
+ */
+const selectAll = getSelectorFunction((query, elements, options) => query === falseFunc || !elements || elements.length === 0
+    ? []
+    : findAll(query, elements, options));
+/**
+ * @template Node The generic Node type for the DOM adapter being used.
+ * @template ElementNode The Node type for elements for the DOM adapter being used.
+ * @param elems Elements to query. If it is an element, its children will be queried.
+ * @param query can be either a CSS selector string or a compiled query function.
+ * @param [options] options for querying the document.
+ * @see compile for supported selector queries.
+ * @returns the first match, or null if there was no match.
+ */
+const selectOne = getSelectorFunction((query, elements, options) => query === falseFunc || !elements || elements.length === 0
+    ? null
+    : findOne(query, elements, options));
 
 var CharCodes;
 (function (CharCodes) {
@@ -10624,13 +10589,13 @@ var State;
     // Comments & CDATA
     State[State["BeforeComment"] = 18] = "BeforeComment";
     State[State["CDATASequence"] = 19] = "CDATASequence";
-    State[State["InSpecialComment"] = 20] = "InSpecialComment";
-    State[State["InCommentLike"] = 21] = "InCommentLike";
+    State[State["DeclarationSequence"] = 20] = "DeclarationSequence";
+    State[State["InSpecialComment"] = 21] = "InSpecialComment";
+    State[State["InCommentLike"] = 22] = "InCommentLike";
     // Special tags
-    State[State["BeforeSpecialS"] = 22] = "BeforeSpecialS";
-    State[State["BeforeSpecialT"] = 23] = "BeforeSpecialT";
-    State[State["SpecialStartSequence"] = 24] = "SpecialStartSequence";
-    State[State["InSpecialTag"] = 25] = "InSpecialTag";
+    State[State["SpecialStartSequence"] = 23] = "SpecialStartSequence";
+    State[State["InSpecialTag"] = 24] = "InSpecialTag";
+    State[State["InPlainText"] = 25] = "InPlainText";
     State[State["InEntity"] = 26] = "InEntity";
 })(State || (State = {}));
 function isWhitespace(c) {
@@ -10647,6 +10612,9 @@ function isASCIIAlpha(c) {
     return ((c >= CharCodes.LowerA && c <= CharCodes.LowerZ) ||
         (c >= CharCodes.UpperA && c <= CharCodes.UpperZ));
 }
+/**
+ * Quote style used for parsed attributes.
+ */
 var QuoteType;
 (function (QuoteType) {
     QuoteType[QuoteType["NoValue"] = 0] = "NoValue";
@@ -10661,9 +10629,21 @@ var QuoteType;
  * sequences with an increased offset.
  */
 const Sequences = {
+    Empty: new Uint8Array(0),
     Cdata: new Uint8Array([0x43, 0x44, 0x41, 0x54, 0x41, 0x5b]), // CDATA[
     CdataEnd: new Uint8Array([0x5d, 0x5d, 0x3e]), // ]]>
-    CommentEnd: new Uint8Array([0x2d, 0x2d, 0x3e]), // `-->`
+    CommentEnd: new Uint8Array([0x2d, 0x2d, 0x21, 0x3e]), // `--!>`
+    Doctype: new Uint8Array([0x64, 0x6f, 0x63, 0x74, 0x79, 0x70, 0x65]), // `doctype`
+    IframeEnd: new Uint8Array([0x3c, 0x2f, 0x69, 0x66, 0x72, 0x61, 0x6d, 0x65]), // `</iframe`
+    NoembedEnd: new Uint8Array([
+        0x3c, 0x2f, 0x6e, 0x6f, 0x65, 0x6d, 0x62, 0x65, 0x64,
+    ]), // `</noembed`
+    NoframesEnd: new Uint8Array([
+        0x3c, 0x2f, 0x6e, 0x6f, 0x66, 0x72, 0x61, 0x6d, 0x65, 0x73,
+    ]), // `</noframes`
+    Plaintext: new Uint8Array([
+        0x3c, 0x2f, 0x70, 0x6c, 0x61, 0x69, 0x6e, 0x74, 0x65, 0x78, 0x74,
+    ]), // `</plaintext`
     ScriptEnd: new Uint8Array([0x3c, 0x2f, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74]), // `</script`
     StyleEnd: new Uint8Array([0x3c, 0x2f, 0x73, 0x74, 0x79, 0x6c, 0x65]), // `</style`
     TitleEnd: new Uint8Array([0x3c, 0x2f, 0x74, 0x69, 0x74, 0x6c, 0x65]), // `</title`
@@ -10672,31 +10652,52 @@ const Sequences = {
     ]), // `</textarea`
     XmpEnd: new Uint8Array([0x3c, 0x2f, 0x78, 0x6d, 0x70]), // `</xmp`
 };
+/**
+ * Maps the first lowercase character of an HTML tag name to the sequence
+ * used for special-tag detection.  All sequences share a common layout
+ * where index 2 is the first tag-name character, so matching always
+ * continues from offset 3.
+ */
+const specialStartSequences = new Map([
+    [Sequences.IframeEnd[2], Sequences.IframeEnd],
+    [Sequences.NoembedEnd[2], Sequences.NoembedEnd],
+    [Sequences.Plaintext[2], Sequences.Plaintext],
+    [Sequences.ScriptEnd[2], Sequences.ScriptEnd],
+    [Sequences.TitleEnd[2], Sequences.TitleEnd],
+    [Sequences.XmpEnd[2], Sequences.XmpEnd],
+]);
+/**
+ * Tokenizer implementation used by `Parser`.
+ */
 class Tokenizer {
-    constructor({ xmlMode = false, decodeEntities = true, }, cbs) {
+    cbs;
+    /** The current state the tokenizer is in. */
+    state = State.Text;
+    /** The read buffer. */
+    buffer = "";
+    /** The beginning of the section that is currently being read. */
+    sectionStart = 0;
+    /** The index within the buffer that we are currently looking at. */
+    index = 0;
+    /** The start of the last entity. */
+    entityStart = 0;
+    /** Some behavior, eg. when decoding entities, is done while we are in another state. This keeps track of the other state type. */
+    baseState = State.Text;
+    /** For special parsing behavior inside of script and style tags. */
+    isSpecial = false;
+    /** Indicates whether the tokenizer has been paused. */
+    running = true;
+    /** The offset of the current buffer. */
+    offset = 0;
+    xmlMode;
+    decodeEntities;
+    recognizeSelfClosing;
+    entityDecoder;
+    constructor({ xmlMode = false, decodeEntities = true, recognizeSelfClosing = xmlMode, }, cbs) {
         this.cbs = cbs;
-        /** The current state the tokenizer is in. */
-        this.state = State.Text;
-        /** The read buffer. */
-        this.buffer = "";
-        /** The beginning of the section that is currently being read. */
-        this.sectionStart = 0;
-        /** The index within the buffer that we are currently looking at. */
-        this.index = 0;
-        /** The start of the last entity. */
-        this.entityStart = 0;
-        /** Some behavior, eg. when decoding entities, is done while we are in another state. This keeps track of the other state type. */
-        this.baseState = State.Text;
-        /** For special parsing behavior inside of script and style tags. */
-        this.isSpecial = false;
-        /** Indicates whether the tokenizer has been paused. */
-        this.running = true;
-        /** The offset of the current buffer. */
-        this.offset = 0;
-        this.currentSequence = undefined;
-        this.sequenceIndex = 0;
         this.xmlMode = xmlMode;
         this.decodeEntities = decodeEntities;
+        this.recognizeSelfClosing = recognizeSelfClosing;
         this.entityDecoder = new EntityDecoder(xmlMode ? xmlDecodeTree : htmlDecodeTree, (cp, consumed) => this.emitCodePoint(cp, consumed));
     }
     reset() {
@@ -10705,7 +10706,9 @@ class Tokenizer {
         this.sectionStart = 0;
         this.index = 0;
         this.baseState = State.Text;
-        this.currentSequence = undefined;
+        this.isSpecial = false;
+        this.currentSequence = Sequences.Empty;
+        this.sequenceIndex = 0;
         this.running = true;
         this.offset = 0;
     }
@@ -10740,62 +10743,74 @@ class Tokenizer {
             this.startEntity();
         }
     }
-    stateSpecialStartSequence(c) {
-        const isEnd = this.sequenceIndex === this.currentSequence.length;
-        const isMatch = isEnd
-            ? // If we are at the end of the sequence, make sure the tag name has ended
-                isEndOfTagSection(c)
-            : // Otherwise, do a case-insensitive comparison
-                (c | 0x20) === this.currentSequence[this.sequenceIndex];
-        if (!isMatch) {
-            this.isSpecial = false;
+    currentSequence = Sequences.Empty;
+    sequenceIndex = 0;
+    enterTagBody() {
+        if (this.currentSequence === Sequences.Plaintext) {
+            this.currentSequence = Sequences.Empty;
+            this.state = State.InPlainText;
         }
-        else if (!isEnd) {
-            this.sequenceIndex++;
+        else if (this.isSpecial) {
+            this.state = State.InSpecialTag;
+            this.sequenceIndex = 0;
+        }
+        else {
+            this.state = State.Text;
+        }
+    }
+    /**
+     * Match the opening tag name against an HTML text-only tag sequence.
+     *
+     * Some tags share an initial prefix (`script`/`style`, `title`/`textarea`,
+     * `noembed`/`noframes`), so we may switch to an alternate sequence at the
+     * first distinguishing byte.  On a successful full match we fall back to
+     * the normal tag-name state; a later `>` will enter raw-text, RCDATA, or
+     * plaintext mode based on `currentSequence` / `isSpecial`.
+     * @param c Current character code point.
+     */
+    stateSpecialStartSequence(c) {
+        const lower = c | 0x20;
+        // Still matching — check for an alternate sequence at branch points.
+        if (this.sequenceIndex < this.currentSequence.length) {
+            if (lower === this.currentSequence[this.sequenceIndex]) {
+                this.sequenceIndex++;
+                return;
+            }
+            if (this.sequenceIndex === 3) {
+                if (this.currentSequence === Sequences.ScriptEnd &&
+                    lower === Sequences.StyleEnd[3]) {
+                    this.currentSequence = Sequences.StyleEnd;
+                    this.sequenceIndex = 4;
+                    return;
+                }
+                if (this.currentSequence === Sequences.TitleEnd &&
+                    lower === Sequences.TextareaEnd[3]) {
+                    this.currentSequence = Sequences.TextareaEnd;
+                    this.sequenceIndex = 4;
+                    return;
+                }
+            }
+            else if (this.sequenceIndex === 4 &&
+                this.currentSequence === Sequences.NoembedEnd &&
+                lower === Sequences.NoframesEnd[4]) {
+                this.currentSequence = Sequences.NoframesEnd;
+                this.sequenceIndex = 5;
+                return;
+            }
+        }
+        else if (isEndOfTagSection(c)) {
+            // Full match on a valid tag boundary — keep the sequence.
+            this.sequenceIndex = 0;
+            this.state = State.InTagName;
+            this.stateInTagName(c);
             return;
         }
+        // No match — abandon special-tag detection.
+        this.isSpecial = false;
+        this.currentSequence = Sequences.Empty;
         this.sequenceIndex = 0;
         this.state = State.InTagName;
         this.stateInTagName(c);
-    }
-    /** Look for an end tag. For <title> tags, also decode entities. */
-    stateInSpecialTag(c) {
-        if (this.sequenceIndex === this.currentSequence.length) {
-            if (c === CharCodes.Gt || isWhitespace(c)) {
-                const endOfText = this.index - this.currentSequence.length;
-                if (this.sectionStart < endOfText) {
-                    // Spoof the index so that reported locations match up.
-                    const actualIndex = this.index;
-                    this.index = endOfText;
-                    this.cbs.ontext(this.sectionStart, endOfText);
-                    this.index = actualIndex;
-                }
-                this.isSpecial = false;
-                this.sectionStart = endOfText + 2; // Skip over the `</`
-                this.stateInClosingTagName(c);
-                return; // We are done; skip the rest of the function.
-            }
-            this.sequenceIndex = 0;
-        }
-        if ((c | 0x20) === this.currentSequence[this.sequenceIndex]) {
-            this.sequenceIndex += 1;
-        }
-        else if (this.sequenceIndex === 0) {
-            if (this.currentSequence === Sequences.TitleEnd) {
-                // We have to parse entities in <title> tags.
-                if (this.decodeEntities && c === CharCodes.Amp) {
-                    this.startEntity();
-                }
-            }
-            else if (this.fastForwardTo(CharCodes.Lt)) {
-                // Outside of <title> tags, we can fast-forward.
-                this.sequenceIndex = 1;
-            }
-        }
-        else {
-            // If we see a `<`, set the sequence index to 1; useful for eg. `<</script>`.
-            this.sequenceIndex = Number(c === CharCodes.Lt);
-        }
     }
     stateCDATASequence(c) {
         if (c === Sequences.Cdata[this.sequenceIndex]) {
@@ -10808,14 +10823,20 @@ class Tokenizer {
         }
         else {
             this.sequenceIndex = 0;
-            this.state = State.InDeclaration;
-            this.stateInDeclaration(c); // Reconsume the character
+            if (this.xmlMode) {
+                this.state = State.InDeclaration;
+                this.stateInDeclaration(c); // Reconsume the character
+            }
+            else {
+                this.state = State.InSpecialComment;
+                this.stateInSpecialComment(c); // Reconsume the character
+            }
         }
     }
     /**
      * When we wait for one specific character, we can speed things up
      * by skipping through the buffer until we find it.
-     *
+     * @param c Current character code point.
      * @returns Whether the character was found.
      */
     fastForwardTo(c) {
@@ -10834,21 +10855,56 @@ class Tokenizer {
         return false;
     }
     /**
+     * Emit a comment token and return to the text state.
+     * @param offset Number of characters in the end sequence that have already been matched.
+     */
+    emitComment(offset) {
+        this.cbs.oncomment(this.sectionStart, this.index, offset);
+        this.sequenceIndex = 0;
+        this.sectionStart = this.index + 1;
+        this.state = State.Text;
+    }
+    /**
      * Comments and CDATA end with `-->` and `]]>`.
      *
      * Their common qualities are:
      * - Their end sequences have a distinct character they start with.
      * - That character is then repeated, so we have to check multiple repeats.
      * - All characters but the start character of the sequence can be skipped.
+     * @param c Current character code point.
      */
     stateInCommentLike(c) {
-        if (c === this.currentSequence[this.sequenceIndex]) {
+        if (!this.xmlMode &&
+            this.currentSequence === Sequences.CommentEnd &&
+            this.sequenceIndex <= 1 &&
+            /*
+             * We're still at the very start of the comment: the only
+             * characters consumed since `<!--` are the dashes that
+             * advanced sequenceIndex (0 for `<!-->`, 1 for `<!--->`).
+             */
+            this.index === this.sectionStart + this.sequenceIndex &&
+            c === CharCodes.Gt) {
+            // Abruptly closed empty HTML comment.
+            this.emitComment(this.sequenceIndex);
+        }
+        else if (this.currentSequence === Sequences.CommentEnd &&
+            this.sequenceIndex === 2 &&
+            c === CharCodes.Gt) {
+            // `!` is optional here, so the same sequence also accepts `-->`.
+            this.emitComment(2);
+        }
+        else if (this.currentSequence === Sequences.CommentEnd &&
+            this.sequenceIndex === this.currentSequence.length - 1 &&
+            c !== CharCodes.Gt) {
+            this.sequenceIndex = Number(c === CharCodes.Dash);
+        }
+        else if (c === this.currentSequence[this.sequenceIndex]) {
             if (++this.sequenceIndex === this.currentSequence.length) {
                 if (this.currentSequence === Sequences.CdataEnd) {
                     this.cbs.oncdata(this.sectionStart, this.index, 2);
                 }
                 else {
-                    this.cbs.oncomment(this.sectionStart, this.index, 2);
+                    this.cbs.oncomment(this.sectionStart, this.index, 3);
                 }
                 this.sequenceIndex = 0;
                 this.sectionStart = this.index + 1;
@@ -10871,15 +10927,56 @@ class Tokenizer {
      *
      * XML allows a lot more characters here (@see https://www.w3.org/TR/REC-xml/#NT-NameStartChar).
      * We allow anything that wouldn't end the tag.
+     * @param c Current character code point.
      */
     isTagStartChar(c) {
         return this.xmlMode ? !isEndOfTagSection(c) : isASCIIAlpha(c);
     }
-    startSpecial(sequence, offset) {
-        this.isSpecial = true;
-        this.currentSequence = sequence;
-        this.sequenceIndex = offset;
-        this.state = State.SpecialStartSequence;
+    /**
+     * Scan raw-text / RCDATA content for the matching end tag.
+     *
+     * For RCDATA tags (`<title>`, `<textarea>`) entities are decoded inline.
+     * For raw-text tags (`<script>`, `<style>`, etc.) we fast-forward to `<`.
+     * @param c Current character code point.
+     */
+    stateInSpecialTag(c) {
+        if (this.sequenceIndex === this.currentSequence.length) {
+            if (isEndOfTagSection(c)) {
+                const endOfText = this.index - this.currentSequence.length;
+                if (this.sectionStart < endOfText) {
+                    // Spoof the index so that reported locations match up.
+                    const actualIndex = this.index;
+                    this.index = endOfText;
+                    this.cbs.ontext(this.sectionStart, endOfText);
+                    this.index = actualIndex;
+                }
+                this.isSpecial = false;
+                this.sectionStart = endOfText + 2; // Skip over the `</`
+                this.stateInClosingTagName(c);
+                return; // We are done; skip the rest of the function.
+            }
+            this.sequenceIndex = 0;
+        }
+        if ((c | 0x20) === this.currentSequence[this.sequenceIndex]) {
+            this.sequenceIndex += 1;
+        }
+        else if (this.sequenceIndex === 0) {
+            if (this.currentSequence === Sequences.TitleEnd ||
+                this.currentSequence === Sequences.TextareaEnd) {
+                // RCDATA tags have to parse entities while still looking for their end tag.
+                if (this.decodeEntities && c === CharCodes.Amp) {
+                    this.startEntity();
+                }
+            }
+            else if (this.fastForwardTo(CharCodes.Lt)) {
+                // Outside of RCDATA tags, we can fast-forward.
+                this.sequenceIndex = 1;
+            }
+        }
+        else {
+            // If we see a `<`, set the sequence index to 1; useful for eg. `<</script>`.
+            this.sequenceIndex = Number(c === CharCodes.Lt);
+        }
     }
     stateBeforeTagName(c) {
         if (c === CharCodes.ExclamationMark) {
@@ -10887,24 +10984,29 @@ class Tokenizer {
             this.sectionStart = this.index + 1;
         }
         else if (c === CharCodes.Questionmark) {
-            this.state = State.InProcessingInstruction;
-            this.sectionStart = this.index + 1;
-        }
-        else if (this.isTagStartChar(c)) {
-            const lower = c | 0x20;
-            this.sectionStart = this.index;
             if (this.xmlMode) {
-                this.state = State.InTagName;
-            }
-            else if (lower === Sequences.ScriptEnd[2]) {
-                this.state = State.BeforeSpecialS;
-            }
-            else if (lower === Sequences.TitleEnd[2] ||
-                lower === Sequences.XmpEnd[2]) {
-                this.state = State.BeforeSpecialT;
+                this.state = State.InProcessingInstruction;
+                this.sequenceIndex = 0;
+                this.sectionStart = this.index + 1;
             }
             else {
+                this.state = State.InSpecialComment;
+                this.sectionStart = this.index;
+            }
+        }
+        else if (this.isTagStartChar(c)) {
+            this.sectionStart = this.index;
+            const special = this.xmlMode || this.cbs.isInForeignContext?.()
+                ? undefined
+                : specialStartSequences.get(c | 0x20);
+            if (special === undefined) {
                 this.state = State.InTagName;
+            }
+            else {
+                this.isSpecial = true;
+                this.currentSequence = special;
+                this.sequenceIndex = 3;
+                this.state = State.SpecialStartSequence;
             }
         }
         else if (c === CharCodes.Slash) {
@@ -10924,9 +11026,18 @@ class Tokenizer {
         }
     }
     stateBeforeClosingTagName(c) {
-        if (isWhitespace(c)) ;
+        if (isWhitespace(c)) {
+            if (this.xmlMode) ;
+            else {
+                this.state = State.InSpecialComment;
+                this.sectionStart = this.index;
+            }
+        }
         else if (c === CharCodes.Gt) {
             this.state = State.Text;
+            if (!this.xmlMode) {
+                this.sectionStart = this.index + 1;
+            }
         }
         else {
             this.state = this.isTagStartChar(c)
@@ -10936,7 +11047,7 @@ class Tokenizer {
         }
     }
     stateInClosingTagName(c) {
-        if (c === CharCodes.Gt || isWhitespace(c)) {
+        if (isEndOfTagSection(c)) {
             this.cbs.onclosetag(this.sectionStart, this.index);
             this.sectionStart = -1;
             this.state = State.AfterClosingTagName;
@@ -10953,13 +11064,7 @@ class Tokenizer {
     stateBeforeAttributeName(c) {
         if (c === CharCodes.Gt) {
             this.cbs.onopentagend(this.index);
-            if (this.isSpecial) {
-                this.state = State.InSpecialTag;
-                this.sequenceIndex = 0;
-            }
-            else {
-                this.state = State.Text;
-            }
+            this.enterTagBody();
             this.sectionStart = this.index + 1;
         }
         else if (c === CharCodes.Slash) {
@@ -10970,12 +11075,26 @@ class Tokenizer {
             this.sectionStart = this.index;
         }
     }
+    /**
+     * Handle `/` before `>` in an opening tag.
+     *
+     * In HTML mode, text-only tags ignore the self-closing flag and still enter
+     * their raw-text/RCDATA/plaintext state unless self-closing tags are being
+     * recognized. In XML mode, or for ordinary tags, the tokenizer returns to
+     * regular text parsing after emitting the self-closing callback.
+     * @param c Current character code point.
+     */
     stateInSelfClosingTag(c) {
         if (c === CharCodes.Gt) {
             this.cbs.onselfclosingtag(this.index);
-            this.state = State.Text;
             this.sectionStart = this.index + 1;
+            if (!this.recognizeSelfClosing) {
+                this.enterTagBody();
+                return;
+            }
+            this.state = State.Text;
             this.isSpecial = false; // Reset special state, in case of self-closing special tags
+            this.currentSequence = Sequences.Empty;
         }
         else if (!isWhitespace(c)) {
             this.state = State.BeforeAttributeName;
@@ -11053,16 +11172,65 @@ class Tokenizer {
             this.startEntity();
         }
     }
+    /**
+     * Distinguish between CDATA, declarations, HTML comments, and HTML bogus
+     * comments after `<!`.
+     *
+     * In HTML mode, only real comments and doctypes stay on declaration paths;
+     * everything else becomes a bogus comment terminated by the next `>`.
+     * @param c Current character code point.
+     */
     stateBeforeDeclaration(c) {
         if (c === CharCodes.OpeningSquareBracket) {
             this.state = State.CDATASequence;
             this.sequenceIndex = 0;
         }
-        else {
+        else if (this.xmlMode) {
             this.state =
                 c === CharCodes.Dash
                     ? State.BeforeComment
                     : State.InDeclaration;
+        }
+        else if ((c | 0x20) === Sequences.Doctype[0]) {
+            this.state = State.DeclarationSequence;
+            this.currentSequence = Sequences.Doctype;
+            this.sequenceIndex = 1;
+        }
+        else if (c === CharCodes.Gt) {
+            this.cbs.oncomment(this.sectionStart, this.index, 0);
+            this.state = State.Text;
+            this.sectionStart = this.index + 1;
+        }
+        else if (c === CharCodes.Dash) {
+            this.state = State.BeforeComment;
+        }
+        else {
+            this.state = State.InSpecialComment;
+        }
+    }
+    /**
+     * Continue matching `doctype` after `<!d`.
+     *
+     * A full `doctype` match stays on the declaration path; any other name falls
+     * back to an HTML bogus comment, which matches browser behavior for
+     * non-doctype `<!...>` constructs.
+     * @param c Current character code point.
+     */
+    stateDeclarationSequence(c) {
+        if (this.sequenceIndex === this.currentSequence.length) {
+            this.state = State.InDeclaration;
+            this.stateInDeclaration(c);
+        }
+        else if ((c | 0x20) === this.currentSequence[this.sequenceIndex]) {
+            this.sequenceIndex += 1;
+        }
+        else if (c === CharCodes.Gt) {
+            this.cbs.oncomment(this.sectionStart, this.index, 0);
+            this.state = State.Text;
+            this.sectionStart = this.index + 1;
+        }
+        else {
+            this.state = State.InSpecialComment;
         }
     }
     stateInDeclaration(c) {
@@ -11072,23 +11240,46 @@ class Tokenizer {
             this.sectionStart = this.index + 1;
         }
     }
+    /**
+     * XML processing instructions (`<?...?>`).
+     *
+     * In HTML mode `<?` is routed to `InSpecialComment` instead, so this
+     * state is only reachable in XML mode.
+     * @param c Current character code point.
+     */
     stateInProcessingInstruction(c) {
-        if (c === CharCodes.Gt || this.fastForwardTo(CharCodes.Gt)) {
-            this.cbs.onprocessinginstruction(this.sectionStart, this.index);
+        if (c === CharCodes.Questionmark) {
+            // Remember that we just consumed `?`, so the next `>` closes the PI.
+            this.sequenceIndex = 1;
+        }
+        else if (c === CharCodes.Gt && this.sequenceIndex === 1) {
+            this.cbs.onprocessinginstruction(this.sectionStart, this.index - 1);
+            this.sequenceIndex = 0;
             this.state = State.Text;
             this.sectionStart = this.index + 1;
+        }
+        else {
+            // Keep scanning for the next `?`, which can start a closing `?>`.
+            this.sequenceIndex = Number(this.fastForwardTo(CharCodes.Questionmark));
         }
     }
     stateBeforeComment(c) {
         if (c === CharCodes.Dash) {
             this.state = State.InCommentLike;
             this.currentSequence = Sequences.CommentEnd;
-            // Allow short comments (eg. <!-->)
-            this.sequenceIndex = 2;
+            this.sequenceIndex = 0;
+            this.sectionStart = this.index + 1;
+        }
+        else if (this.xmlMode) {
+            this.state = State.InDeclaration;
+        }
+        else if (c === CharCodes.Gt) {
+            this.cbs.oncomment(this.sectionStart, this.index, 0);
+            this.state = State.Text;
             this.sectionStart = this.index + 1;
         }
         else {
-            this.state = State.InDeclaration;
+            this.state = State.InSpecialComment;
         }
     }
     stateInSpecialComment(c) {
@@ -11096,40 +11287,6 @@ class Tokenizer {
             this.cbs.oncomment(this.sectionStart, this.index, 0);
             this.state = State.Text;
             this.sectionStart = this.index + 1;
-        }
-    }
-    stateBeforeSpecialS(c) {
-        const lower = c | 0x20;
-        if (lower === Sequences.ScriptEnd[3]) {
-            this.startSpecial(Sequences.ScriptEnd, 4);
-        }
-        else if (lower === Sequences.StyleEnd[3]) {
-            this.startSpecial(Sequences.StyleEnd, 4);
-        }
-        else {
-            this.state = State.InTagName;
-            this.stateInTagName(c); // Consume the token again
-        }
-    }
-    stateBeforeSpecialT(c) {
-        const lower = c | 0x20;
-        switch (lower) {
-            case Sequences.TitleEnd[3]: {
-                this.startSpecial(Sequences.TitleEnd, 4);
-                break;
-            }
-            case Sequences.TextareaEnd[3]: {
-                this.startSpecial(Sequences.TextareaEnd, 4);
-                break;
-            }
-            case Sequences.XmpEnd[3]: {
-                this.startSpecial(Sequences.XmpEnd, 4);
-                break;
-            }
-            default: {
-                this.state = State.InTagName;
-                this.stateInTagName(c); // Consume the token again
-            }
         }
     }
     startEntity() {
@@ -11171,6 +11328,7 @@ class Tokenizer {
         // If we are inside of text or attributes, emit what we already have.
         if (this.running && this.sectionStart !== this.index) {
             if (this.state === State.Text ||
+                this.state === State.InPlainText ||
                 (this.state === State.InSpecialTag && this.sequenceIndex === 0)) {
                 this.cbs.ontext(this.sectionStart, this.index);
                 this.sectionStart = this.index;
@@ -11199,6 +11357,11 @@ class Tokenizer {
                     this.stateText(c);
                     break;
                 }
+                case State.InPlainText: {
+                    // Skip to end of buffer; cleanup() emits the text.
+                    this.index = this.buffer.length + this.offset - 1;
+                    break;
+                }
                 case State.SpecialStartSequence: {
                     this.stateSpecialStartSequence(c);
                     break;
@@ -11209,6 +11372,10 @@ class Tokenizer {
                 }
                 case State.CDATASequence: {
                     this.stateCDATASequence(c);
+                    break;
+                }
+                case State.DeclarationSequence: {
+                    this.stateDeclarationSequence(c);
                     break;
                 }
                 case State.InAttributeValueDq: {
@@ -11263,14 +11430,6 @@ class Tokenizer {
                     this.stateAfterClosingTagName(c);
                     break;
                 }
-                case State.BeforeSpecialS: {
-                    this.stateBeforeSpecialS(c);
-                    break;
-                }
-                case State.BeforeSpecialT: {
-                    this.stateBeforeSpecialT(c);
-                    break;
-                }
                 case State.InAttributeValueNq: {
                     this.stateInAttributeValueNoQuotes(c);
                     break;
@@ -11312,32 +11471,98 @@ class Tokenizer {
         this.handleTrailingData();
         this.cbs.onend();
     }
+    handleTrailingCommentLikeData(endIndex) {
+        if (this.state !== State.InCommentLike) {
+            return false;
+        }
+        if (this.currentSequence === Sequences.CdataEnd) {
+            if (this.xmlMode) {
+                if (this.sectionStart < endIndex) {
+                    this.cbs.oncdata(this.sectionStart, endIndex, 0);
+                }
+            }
+            else {
+                /* In HTML mode, unclosed CDATA is a bogus comment. */
+                const cdataStart = this.sectionStart - Sequences.Cdata.length - 1;
+                this.cbs.oncomment(cdataStart, endIndex, 0);
+            }
+        }
+        else {
+            const offset = this.xmlMode
+                ? 0
+                : Math.min(this.sequenceIndex, Sequences.CommentEnd.length - 1);
+            this.cbs.oncomment(this.sectionStart, endIndex, offset);
+        }
+        return true;
+    }
+    handleTrailingMarkupDeclaration(endIndex) {
+        if (this.xmlMode) {
+            switch (this.state) {
+                case State.InSpecialComment:
+                case State.BeforeComment:
+                case State.CDATASequence:
+                case State.DeclarationSequence:
+                case State.InDeclaration: {
+                    this.cbs.ontext(this.sectionStart, endIndex);
+                    return true;
+                }
+                default: {
+                    return false;
+                }
+            }
+        }
+        switch (this.state) {
+            case State.BeforeDeclaration:
+            case State.InSpecialComment:
+            case State.BeforeComment:
+            case State.CDATASequence: {
+                this.cbs.oncomment(this.sectionStart, endIndex, 0);
+                return true;
+            }
+            case State.DeclarationSequence: {
+                if (this.sequenceIndex !== Sequences.Doctype.length) {
+                    this.cbs.oncomment(this.sectionStart, endIndex, 0);
+                }
+                return true;
+            }
+            case State.InDeclaration: {
+                return true;
+            }
+            default: {
+                return false;
+            }
+        }
+    }
     /** Handle any trailing data. */
     handleTrailingData() {
         const endIndex = this.buffer.length + this.offset;
+        if (this.handleTrailingCommentLikeData(endIndex) ||
+            this.handleTrailingMarkupDeclaration(endIndex)) {
+            return;
+        }
         // If there is no remaining data, we are done.
         if (this.sectionStart >= endIndex) {
             return;
         }
-        if (this.state === State.InCommentLike) {
-            if (this.currentSequence === Sequences.CdataEnd) {
-                this.cbs.oncdata(this.sectionStart, endIndex, 0);
+        switch (this.state) {
+            case State.InTagName:
+            case State.BeforeAttributeName:
+            case State.BeforeAttributeValue:
+            case State.AfterAttributeName:
+            case State.InAttributeName:
+            case State.InAttributeValueSq:
+            case State.InAttributeValueDq:
+            case State.InAttributeValueNq:
+            case State.InClosingTagName: {
+                /*
+                 * If we are currently in an opening or closing tag, us not calling the
+                 * respective callback signals that the tag should be ignored.
+                 */
+                break;
             }
-            else {
-                this.cbs.oncomment(this.sectionStart, endIndex, 0);
+            default: {
+                this.cbs.ontext(this.sectionStart, endIndex);
             }
-        }
-        else if (this.state === State.InTagName ||
-            this.state === State.BeforeAttributeName ||
-            this.state === State.BeforeAttributeValue ||
-            this.state === State.AfterAttributeName ||
-            this.state === State.InAttributeName ||
-            this.state === State.InAttributeValueSq ||
-            this.state === State.InAttributeValueDq ||
-            this.state === State.InAttributeValueNq ||
-            this.state === State.InClosingTagName) ;
-        else {
-            this.cbs.ontext(this.sectionStart, endIndex);
         }
     }
     emitCodePoint(cp, consumed) {
@@ -11361,6 +11586,7 @@ class Tokenizer {
     }
 }
 
+const { fromCodePoint } = String;
 const formTags = new Set([
     "input",
     "option",
@@ -11371,6 +11597,7 @@ const formTags = new Set([
     "textarea",
 ]);
 const pTag = new Set(["p"]);
+const headingTags = new Set(["h1", "h2", "h3", "h4", "h5", "h6", "p"]);
 const tableSectionTags = new Set(["thead", "tbody"]);
 const ddtTags = new Set(["dd", "dt"]);
 const rtpTags = new Set(["rt", "rp"]);
@@ -11379,14 +11606,15 @@ const openImpliesClose = new Map([
     ["th", new Set(["th"])],
     ["td", new Set(["thead", "th", "td"])],
     ["body", new Set(["head", "link", "script"])],
+    ["a", new Set(["a"])],
     ["li", new Set(["li"])],
     ["p", pTag],
-    ["h1", pTag],
-    ["h2", pTag],
-    ["h3", pTag],
-    ["h4", pTag],
-    ["h5", pTag],
-    ["h6", pTag],
+    ["h1", headingTags],
+    ["h2", headingTags],
+    ["h3", headingTags],
+    ["h4", headingTags],
+    ["h5", headingTags],
+    ["h6", headingTags],
     ["select", formTags],
     ["input", formTags],
     ["output", formTags],
@@ -11423,6 +11651,7 @@ const openImpliesClose = new Map([
     ["tbody", tableSectionTags],
     ["tfoot", tableSectionTags],
 ]);
+const DOCUMENT_TYPE = "doctype";
 const voidElements = new Set([
     "area",
     "base",
@@ -11445,6 +11674,12 @@ const voidElements = new Set([
     "wbr",
 ]);
 const foreignContextElements = new Set(["math", "svg"]);
+/**
+ * Elements that can be used to integrate HTML content within foreign namespaces (e.g., SVG or MathML).
+ *
+ * Entries must use the SVG-adjusted casing (e.g. "foreignObject" not
+ * "foreignobject") since they are compared against adjusted tag names.
+ */
 const htmlIntegrationElements = new Set([
     "mi",
     "mo",
@@ -11452,109 +11687,223 @@ const htmlIntegrationElements = new Set([
     "ms",
     "mtext",
     "annotation-xml",
-    "foreignobject",
+    "foreignObject",
     "desc",
     "title",
 ]);
+const svgTagNameAdjustments = new Map([
+    ["altglyph", "altGlyph"],
+    ["altglyphdef", "altGlyphDef"],
+    ["altglyphitem", "altGlyphItem"],
+    ["animatecolor", "animateColor"],
+    ["animatemotion", "animateMotion"],
+    ["animatetransform", "animateTransform"],
+    ["clippath", "clipPath"],
+    ["feblend", "feBlend"],
+    ["fecolormatrix", "feColorMatrix"],
+    ["fecomponenttransfer", "feComponentTransfer"],
+    ["fecomposite", "feComposite"],
+    ["feconvolvematrix", "feConvolveMatrix"],
+    ["fediffuselighting", "feDiffuseLighting"],
+    ["fedisplacementmap", "feDisplacementMap"],
+    ["fedistantlight", "feDistantLight"],
+    ["fedropshadow", "feDropShadow"],
+    ["feflood", "feFlood"],
+    ["fefunca", "feFuncA"],
+    ["fefuncb", "feFuncB"],
+    ["fefuncg", "feFuncG"],
+    ["fefuncr", "feFuncR"],
+    ["fegaussianblur", "feGaussianBlur"],
+    ["feimage", "feImage"],
+    ["femerge", "feMerge"],
+    ["femergenode", "feMergeNode"],
+    ["femorphology", "feMorphology"],
+    ["feoffset", "feOffset"],
+    ["fepointlight", "fePointLight"],
+    ["fespecularlighting", "feSpecularLighting"],
+    ["fespotlight", "feSpotLight"],
+    ["fetile", "feTile"],
+    ["feturbulence", "feTurbulence"],
+    ["foreignobject", "foreignObject"],
+    ["glyphref", "glyphRef"],
+    ["lineargradient", "linearGradient"],
+    ["radialgradient", "radialGradient"],
+    ["textpath", "textPath"],
+]);
+var ForeignContext;
+(function (ForeignContext) {
+    ForeignContext[ForeignContext["None"] = 0] = "None";
+    ForeignContext[ForeignContext["Svg"] = 1] = "Svg";
+    ForeignContext[ForeignContext["MathML"] = 2] = "MathML";
+})(ForeignContext || (ForeignContext = {}));
 const reNameEnd = /\s|\//;
+/**
+ * Incremental parser implementation.
+ */
 class Parser {
+    options;
+    /** The start index of the last event. */
+    startIndex = 0;
+    /** The end index of the last event. */
+    endIndex = 0;
+    /**
+     * Store the start index of the current open tag,
+     * so we can update the start index for attributes.
+     */
+    openTagStart = 0;
+    tagname = "";
+    attribname = "";
+    attribvalue = "";
+    attribs = null;
+    stack = [];
+    foreignContext;
+    cbs;
+    lowerCaseTagNames;
+    lowerCaseAttributeNames;
+    recognizeSelfClosing;
+    /** We are parsing HTML. Inverse of the `xmlMode` option. */
+    htmlMode;
+    tokenizer;
+    buffers = [];
+    bufferOffset = 0;
+    /** The index of the last written buffer. Used when resuming after a `pause()`. */
+    writeIndex = 0;
+    /** Indicates whether the parser has finished running / `.end` has been called. */
+    ended = false;
     constructor(cbs, options = {}) {
-        var _a, _b, _c, _d, _e, _f;
         this.options = options;
-        /** The start index of the last event. */
-        this.startIndex = 0;
-        /** The end index of the last event. */
-        this.endIndex = 0;
-        /**
-         * Store the start index of the current open tag,
-         * so we can update the start index for attributes.
-         */
-        this.openTagStart = 0;
-        this.tagname = "";
-        this.attribname = "";
-        this.attribvalue = "";
-        this.attribs = null;
-        this.stack = [];
-        this.buffers = [];
-        this.bufferOffset = 0;
-        /** The index of the last written buffer. Used when resuming after a `pause()`. */
-        this.writeIndex = 0;
-        /** Indicates whether the parser has finished running / `.end` has been called. */
-        this.ended = false;
-        this.cbs = cbs !== null && cbs !== void 0 ? cbs : {};
+        this.cbs = cbs ?? {};
         this.htmlMode = !this.options.xmlMode;
-        this.lowerCaseTagNames = (_a = options.lowerCaseTags) !== null && _a !== void 0 ? _a : this.htmlMode;
+        this.lowerCaseTagNames = options.lowerCaseTags ?? this.htmlMode;
         this.lowerCaseAttributeNames =
-            (_b = options.lowerCaseAttributeNames) !== null && _b !== void 0 ? _b : this.htmlMode;
+            options.lowerCaseAttributeNames ?? this.htmlMode;
         this.recognizeSelfClosing =
-            (_c = options.recognizeSelfClosing) !== null && _c !== void 0 ? _c : !this.htmlMode;
-        this.tokenizer = new ((_d = options.Tokenizer) !== null && _d !== void 0 ? _d : Tokenizer)(this.options, this);
-        this.foreignContext = [!this.htmlMode];
-        (_f = (_e = this.cbs).onparserinit) === null || _f === void 0 ? void 0 : _f.call(_e, this);
+            options.recognizeSelfClosing ?? !this.htmlMode;
+        this.tokenizer = new (options.Tokenizer ?? Tokenizer)(this.options, this);
+        this.foreignContext = [ForeignContext.None];
+        this.cbs.onparserinit?.(this);
     }
     // Tokenizer event handlers
-    /** @internal */
+    /**
+     * @param start Start index for the current parser event.
+     * @param endIndex End index for the current parser event.
+     * @internal
+     */
     ontext(start, endIndex) {
-        var _a, _b;
         const data = this.getSlice(start, endIndex);
         this.endIndex = endIndex - 1;
-        (_b = (_a = this.cbs).ontext) === null || _b === void 0 ? void 0 : _b.call(_a, data);
+        this.cbs.ontext?.(data);
+        this.startIndex = endIndex;
+    }
+    /**
+     * @param cp Current Unicode code point.
+     * @param endIndex End index for the current parser event.
+     * @internal
+     */
+    ontextentity(cp, endIndex) {
+        this.endIndex = endIndex - 1;
+        this.cbs.ontext?.(fromCodePoint(cp));
         this.startIndex = endIndex;
     }
     /** @internal */
-    ontextentity(cp, endIndex) {
-        var _a, _b;
-        this.endIndex = endIndex - 1;
-        (_b = (_a = this.cbs).ontext) === null || _b === void 0 ? void 0 : _b.call(_a, fromCodePoint(cp));
-        this.startIndex = endIndex;
+    isInForeignContext() {
+        return this.foreignContext[0] !== ForeignContext.None;
     }
     /**
      * Checks if the current tag is a void element. Override this if you want
      * to specify your own additional void elements.
+     * @param name Name of the pseudo selector.
      */
     isVoidElement(name) {
         return this.htmlMode && voidElements.has(name);
     }
-    /** @internal */
+    /**
+     * Read a tag name from the buffer.
+     *
+     * When `lowerCaseTagNames` is enabled (the default in HTML mode), the name
+     * is lowercased and may be adjusted for SVG casing or the `image` → `img`
+     * alias.
+     * @param start Start index of the tag name in the buffer.
+     * @param endIndex End index of the tag name in the buffer.
+     */
+    readTagName(start, endIndex) {
+        const name = this.lowerCaseTagNames
+            ? this.getSlice(start, endIndex).toLowerCase()
+            : this.getSlice(start, endIndex);
+        if (!(this.lowerCaseTagNames && this.htmlMode)) {
+            return name;
+        }
+        if (this.foreignContext[0] === ForeignContext.Svg) {
+            return svgTagNameAdjustments.get(name) ?? name;
+        }
+        /*
+         * Closing tags for SVG elements inside HTML integration points
+         * (e.g. </foreignObject> while inside its own content) need case
+         * adjustment so the name matches what was pushed to the stack.
+         * `foreignContext.length > 1` means a foreign ancestor exists —
+         * the base [None] entry plus at least one pushed context.
+         */
+        if (this.foreignContext.length > 1) {
+            const adjusted = svgTagNameAdjustments.get(name);
+            if (adjusted !== undefined && this.stack.includes(adjusted)) {
+                return adjusted;
+            }
+        }
+        if (!this.isInForeignContext()) {
+            return name === "image" ? "img" : name;
+        }
+        return name;
+    }
+    /**
+     * @param start Start index for the current parser event.
+     * @param endIndex End index for the current parser event.
+     * @internal
+     */
     onopentagname(start, endIndex) {
         this.endIndex = endIndex;
-        let name = this.getSlice(start, endIndex);
-        if (this.lowerCaseTagNames) {
-            name = name.toLowerCase();
-        }
-        this.emitOpenTag(name);
+        this.emitOpenTag(this.readTagName(start, endIndex));
     }
     emitOpenTag(name) {
-        var _a, _b, _c, _d;
         this.openTagStart = this.startIndex;
         this.tagname = name;
+        /*
+         * The spec ignores a second <form> when one is already open.
+         * Setting tagname to "" suppresses all downstream effects: attribs
+         * stays null so endOpenTag is a no-op, and closeCurrentTag can't
+         * match "" on the stack.
+         */
+        if (this.htmlMode && name === "form" && this.stack.includes("form")) {
+            this.tagname = "";
+            return;
+        }
         const impliesClose = this.htmlMode && openImpliesClose.get(name);
         if (impliesClose) {
             while (this.stack.length > 0 && impliesClose.has(this.stack[0])) {
-                const element = this.stack.shift();
-                (_b = (_a = this.cbs).onclosetag) === null || _b === void 0 ? void 0 : _b.call(_a, element, true);
+                this.popElement(true);
             }
         }
         if (!this.isVoidElement(name)) {
             this.stack.unshift(name);
             if (this.htmlMode) {
-                if (foreignContextElements.has(name)) {
-                    this.foreignContext.unshift(true);
+                if (name === "svg") {
+                    this.foreignContext.unshift(ForeignContext.Svg);
+                }
+                else if (name === "math") {
+                    this.foreignContext.unshift(ForeignContext.MathML);
                 }
                 else if (htmlIntegrationElements.has(name)) {
-                    this.foreignContext.unshift(false);
+                    this.foreignContext.unshift(ForeignContext.None);
                 }
             }
         }
-        (_d = (_c = this.cbs).onopentagname) === null || _d === void 0 ? void 0 : _d.call(_c, name);
+        this.cbs.onopentagname?.(name);
         if (this.cbs.onopentag)
             this.attribs = {};
     }
     endOpenTag(isImplied) {
-        var _a, _b;
         this.startIndex = this.openTagStart;
         if (this.attribs) {
-            (_b = (_a = this.cbs).onopentag) === null || _b === void 0 ? void 0 : _b.call(_a, this.tagname, this.attribs, isImplied);
+            this.cbs.onopentag?.(this.tagname, this.attribs, isImplied);
             this.attribs = null;
         }
         if (this.cbs.onclosetag && this.isVoidElement(this.tagname)) {
@@ -11562,34 +11911,31 @@ class Parser {
         }
         this.tagname = "";
     }
-    /** @internal */
+    /**
+     * @param endIndex End index for the current parser event.
+     * @internal
+     */
     onopentagend(endIndex) {
         this.endIndex = endIndex;
         this.endOpenTag(false);
         // Set `startIndex` for next node
         this.startIndex = endIndex + 1;
     }
-    /** @internal */
+    /**
+     * @param start Start index for the current parser event.
+     * @param endIndex End index for the current parser event.
+     * @internal
+     */
     onclosetag(start, endIndex) {
-        var _a, _b, _c, _d, _e, _f, _g, _h;
         this.endIndex = endIndex;
-        let name = this.getSlice(start, endIndex);
-        if (this.lowerCaseTagNames) {
-            name = name.toLowerCase();
-        }
-        if (this.htmlMode &&
-            (foreignContextElements.has(name) ||
-                htmlIntegrationElements.has(name))) {
-            this.foreignContext.shift();
-        }
+        const name = this.readTagName(start, endIndex);
         if (!this.isVoidElement(name)) {
             const pos = this.stack.indexOf(name);
             if (pos !== -1) {
-                for (let index = 0; index <= pos; index++) {
-                    const element = this.stack.shift();
-                    // We know the stack has sufficient elements.
-                    (_b = (_a = this.cbs).onclosetag) === null || _b === void 0 ? void 0 : _b.call(_a, element, index !== pos);
+                for (let index = 0; index < pos; index++) {
+                    this.popElement(true);
                 }
+                this.popElement(false);
             }
             else if (this.htmlMode && name === "p") {
                 // Implicit open before close
@@ -11599,17 +11945,20 @@ class Parser {
         }
         else if (this.htmlMode && name === "br") {
             // We can't use `emitOpenTag` for implicit open, as `br` would be implicitly closed.
-            (_d = (_c = this.cbs).onopentagname) === null || _d === void 0 ? void 0 : _d.call(_c, "br");
-            (_f = (_e = this.cbs).onopentag) === null || _f === void 0 ? void 0 : _f.call(_e, "br", {}, true);
-            (_h = (_g = this.cbs).onclosetag) === null || _h === void 0 ? void 0 : _h.call(_g, "br", false);
+            this.cbs.onopentagname?.("br");
+            this.cbs.onopentag?.("br", {}, true);
+            this.cbs.onclosetag?.("br", false);
         }
         // Set `startIndex` for next node
         this.startIndex = endIndex + 1;
     }
-    /** @internal */
+    /**
+     * @param endIndex End index for the current parser event.
+     * @internal
+     */
     onselfclosingtag(endIndex) {
         this.endIndex = endIndex;
-        if (this.recognizeSelfClosing || this.foreignContext[0]) {
+        if (this.recognizeSelfClosing || this.isInForeignContext()) {
             this.closeCurrentTag(false);
             // Set `startIndex` for next node
             this.startIndex = endIndex + 1;
@@ -11619,18 +11968,34 @@ class Parser {
             this.onopentagend(endIndex);
         }
     }
+    /**
+     * Pop the top element off the stack, emit a close event, and maintain
+     * the foreign context stack.
+     * @param implied Whether this close is implied (not from an explicit end tag).
+     */
+    popElement(implied) {
+        // biome-ignore lint/style/noNonNullAssertion: The element is guaranteed to exist.
+        const element = this.stack.shift();
+        if (this.htmlMode &&
+            (foreignContextElements.has(element) ||
+                htmlIntegrationElements.has(element))) {
+            this.foreignContext.shift();
+        }
+        this.cbs.onclosetag?.(element, implied);
+    }
     closeCurrentTag(isOpenImplied) {
-        var _a, _b;
         const name = this.tagname;
         this.endOpenTag(isOpenImplied);
         // Self-closing tags will be on the top of the stack
         if (this.stack[0] === name) {
-            // If the opening tag isn't implied, the closing tag has to be implied.
-            (_b = (_a = this.cbs).onclosetag) === null || _b === void 0 ? void 0 : _b.call(_a, name, !isOpenImplied);
-            this.stack.shift();
+            this.popElement(!isOpenImplied);
         }
     }
-    /** @internal */
+    /**
+     * @param start Start index for the current parser event.
+     * @param endIndex End index for the current parser event.
+     * @internal
+     */
     onattribname(start, endIndex) {
         this.startIndex = start;
         const name = this.getSlice(start, endIndex);
@@ -11638,27 +12003,36 @@ class Parser {
             ? name.toLowerCase()
             : name;
     }
-    /** @internal */
+    /**
+     * @param start Start index for the current parser event.
+     * @param endIndex End index for the current parser event.
+     * @internal
+     */
     onattribdata(start, endIndex) {
         this.attribvalue += this.getSlice(start, endIndex);
     }
-    /** @internal */
+    /**
+     * @param cp Current Unicode code point.
+     * @internal
+     */
     onattribentity(cp) {
         this.attribvalue += fromCodePoint(cp);
     }
-    /** @internal */
+    /**
+     * @param quote Quote type used for the current attribute.
+     * @param endIndex End index for the current parser event.
+     * @internal
+     */
     onattribend(quote, endIndex) {
-        var _a, _b;
         this.endIndex = endIndex;
-        (_b = (_a = this.cbs).onattribute) === null || _b === void 0 ? void 0 : _b.call(_a, this.attribname, this.attribvalue, quote === QuoteType.Double
+        this.cbs.onattribute?.(this.attribname, this.attribvalue, quote === QuoteType.Double
             ? '"'
             : quote === QuoteType.Single
                 ? "'"
                 : quote === QuoteType.NoValue
                     ? undefined
                     : null);
-        if (this.attribs &&
-            !Object.prototype.hasOwnProperty.call(this.attribs, this.attribname)) {
+        if (this.attribs && !Object.hasOwn(this.attribs, this.attribname)) {
             this.attribs[this.attribname] = this.attribvalue;
         }
         this.attribvalue = "";
@@ -11671,18 +12045,34 @@ class Parser {
         }
         return name;
     }
-    /** @internal */
+    /**
+     * @param start Start index for the current parser event.
+     * @param endIndex End index for the current parser event.
+     * @internal
+     */
     ondeclaration(start, endIndex) {
         this.endIndex = endIndex;
         const value = this.getSlice(start, endIndex);
         if (this.cbs.onprocessinginstruction) {
-            const name = this.getInstructionName(value);
+            /*
+             * In HTML mode, ondeclaration is only reached for DOCTYPE
+             * (the tokenizer routes everything else to bogus comments).
+             */
+            const name = this.htmlMode
+                ? this.lowerCaseTagNames
+                    ? DOCUMENT_TYPE
+                    : value.slice(0, DOCUMENT_TYPE.length)
+                : this.getInstructionName(value);
             this.cbs.onprocessinginstruction(`!${name}`, `!${value}`);
         }
         // Set `startIndex` for next node
         this.startIndex = endIndex + 1;
     }
-    /** @internal */
+    /**
+     * @param start Start index for the current parser event.
+     * @param endIndex End index for the current parser event.
+     * @internal
+     */
     onprocessinginstruction(start, endIndex) {
         this.endIndex = endIndex;
         const value = this.getSlice(start, endIndex);
@@ -11693,35 +12083,45 @@ class Parser {
         // Set `startIndex` for next node
         this.startIndex = endIndex + 1;
     }
-    /** @internal */
+    /**
+     * @param start Start index for the current parser event.
+     * @param endIndex End index for the current parser event.
+     * @param offset Offset applied when computing parser indices.
+     * @internal
+     */
     oncomment(start, endIndex, offset) {
-        var _a, _b, _c, _d;
         this.endIndex = endIndex;
-        (_b = (_a = this.cbs).oncomment) === null || _b === void 0 ? void 0 : _b.call(_a, this.getSlice(start, endIndex - offset));
-        (_d = (_c = this.cbs).oncommentend) === null || _d === void 0 ? void 0 : _d.call(_c);
+        this.cbs.oncomment?.(this.getSlice(start, endIndex - offset));
+        this.cbs.oncommentend?.();
         // Set `startIndex` for next node
         this.startIndex = endIndex + 1;
     }
-    /** @internal */
+    /**
+     * @param start Start index for the current parser event.
+     * @param endIndex End index for the current parser event.
+     * @param offset Offset applied when computing parser indices.
+     * @internal
+     */
     oncdata(start, endIndex, offset) {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
         this.endIndex = endIndex;
         const value = this.getSlice(start, endIndex - offset);
         if (!this.htmlMode || this.options.recognizeCDATA) {
-            (_b = (_a = this.cbs).oncdatastart) === null || _b === void 0 ? void 0 : _b.call(_a);
-            (_d = (_c = this.cbs).ontext) === null || _d === void 0 ? void 0 : _d.call(_c, value);
-            (_f = (_e = this.cbs).oncdataend) === null || _f === void 0 ? void 0 : _f.call(_e);
+            this.cbs.oncdatastart?.();
+            this.cbs.ontext?.(value);
+            this.cbs.oncdataend?.();
+        }
+        else if (this.isInForeignContext()) {
+            this.cbs.ontext?.(value);
         }
         else {
-            (_h = (_g = this.cbs).oncomment) === null || _h === void 0 ? void 0 : _h.call(_g, `[CDATA[${value}]]`);
-            (_k = (_j = this.cbs).oncommentend) === null || _k === void 0 ? void 0 : _k.call(_j);
+            this.cbs.oncomment?.(`[CDATA[${value}]]`);
+            this.cbs.oncommentend?.();
         }
         // Set `startIndex` for next node
         this.startIndex = endIndex + 1;
     }
     /** @internal */
     onend() {
-        var _a, _b;
         if (this.cbs.onclosetag) {
             // Set the end index for all remaining tags
             this.endIndex = this.startIndex;
@@ -11729,25 +12129,25 @@ class Parser {
                 this.cbs.onclosetag(this.stack[index], true);
             }
         }
-        (_b = (_a = this.cbs).onend) === null || _b === void 0 ? void 0 : _b.call(_a);
+        this.cbs.onend?.();
     }
     /**
      * Resets the parser to a blank state, ready to parse a new HTML document
      */
     reset() {
-        var _a, _b, _c, _d;
-        (_b = (_a = this.cbs).onreset) === null || _b === void 0 ? void 0 : _b.call(_a);
+        this.cbs.onreset?.();
         this.tokenizer.reset();
         this.tagname = "";
         this.attribname = "";
+        this.attribvalue = "";
         this.attribs = null;
         this.stack.length = 0;
         this.startIndex = 0;
         this.endIndex = 0;
-        (_d = (_c = this.cbs).onparserinit) === null || _d === void 0 ? void 0 : _d.call(_c, this);
+        this.cbs.onparserinit?.(this);
         this.buffers.length = 0;
         this.foreignContext.length = 0;
-        this.foreignContext.unshift(!this.htmlMode);
+        this.foreignContext.unshift(ForeignContext.None);
         this.bufferOffset = 0;
         this.writeIndex = 0;
         this.ended = false;
@@ -11755,7 +12155,6 @@ class Parser {
     /**
      * Resets the parser, then parses a complete document and
      * pushes it to the handler.
-     *
      * @param data Document to parse.
      */
     parseComplete(data) {
@@ -11763,6 +12162,9 @@ class Parser {
         this.end(data);
     }
     getSlice(start, end) {
+        if (start === end) {
+            return "";
+        }
         while (start - this.bufferOffset >= this.buffers[0].length) {
             this.shiftBuffer();
         }
@@ -11780,13 +12182,11 @@ class Parser {
     }
     /**
      * Parses a chunk of data and calls the corresponding callbacks.
-     *
      * @param chunk Chunk to parse.
      */
     write(chunk) {
-        var _a, _b;
         if (this.ended) {
-            (_b = (_a = this.cbs).onerror) === null || _b === void 0 ? void 0 : _b.call(_a, new Error(".write() after done!"));
+            this.cbs.onerror?.(new Error(".write() after done!"));
             return;
         }
         this.buffers.push(chunk);
@@ -11797,13 +12197,11 @@ class Parser {
     }
     /**
      * Parses the end of the buffer and clears the stack, calls onend.
-     *
      * @param chunk Optional final chunk to parse.
      */
     end(chunk) {
-        var _a, _b;
         if (this.ended) {
-            (_b = (_a = this.cbs).onerror) === null || _b === void 0 ? void 0 : _b.call(_a, new Error(".end() after done!"));
+            this.cbs.onerror?.(new Error(".end() after done!"));
             return;
         }
         if (chunk)
@@ -11829,30 +12227,11 @@ class Parser {
         if (this.ended)
             this.tokenizer.end();
     }
-    /**
-     * Alias of `write`, for backwards compatibility.
-     *
-     * @param chunk Chunk to parse.
-     * @deprecated
-     */
-    parseChunk(chunk) {
-        this.write(chunk);
-    }
-    /**
-     * Alias of `end`, for backwards compatibility.
-     *
-     * @param chunk Optional final chunk to parse.
-     * @deprecated
-     */
-    done(chunk) {
-        this.end(chunk);
-    }
 }
 
 // Helper methods
 /**
  * Parses the data, returns the resulting document.
- *
  * @param data The data that should be parsed.
  * @param options Optional options for the parser and DOM handler.
  */
@@ -11865,1048 +12244,1072 @@ function parseDocument(data, options) {
 var picocolors_browserExports = /*@__PURE__*/ requirePicocolors_browser();
 var pc = /*@__PURE__*/getDefaultExportFromCjs(picocolors_browserExports);
 
+//#region src/css.ts
+/**
+* Parse a textual CSS Stylesheet into a Stylesheet instance.
+* Stylesheet is a mutable postcss AST with format similar to CSSOM.
+* @see https://github.com/postcss/postcss/
+* @private
+*/
 function parseStylesheet(stylesheet, options) {
-  if (options?.safeParser) {
-    return safeParser(stylesheet);
-  }
-  return parse$2(stylesheet);
+	if (options?.safeParser) return safeParser(stylesheet);
+	return parse$2(stylesheet);
 }
+/**
+* Serialize a postcss Stylesheet to a String of CSS.
+* @private
+* @param ast A Stylesheet to serialize, such as one returned from `parseStylesheet()`
+*/
 function serializeStylesheet(ast, options) {
-  const cssParts = [];
-  stringify(ast, (result, node, type) => {
-    if (node?.type === "decl" && node.value.includes("</style>")) {
-      return;
-    }
-    if (!options.compress) {
-      cssParts.push(result);
-      return;
-    }
-    if (node?.type === "comment")
-      return;
-    if (node?.type === "decl") {
-      const prefix = node.prop + node.raws.between;
-      cssParts.push(result.replace(prefix, prefix.trim()));
-      return;
-    }
-    if (type === "start") {
-      if (node?.type === "rule" && node.selectors) {
-        if (node.selectors.length === 1) {
-          cssParts.push(node.selectors[0] ?? "", "{");
-        } else {
-          cssParts.push(node.selectors.join(","), "{");
-        }
-      } else {
-        cssParts.push(result.trim());
-      }
-      return;
-    }
-    if (type === "end" && result === "}" && node?.raws?.semicolon && (node.type === "rule" || node.type === "atrule")) {
-      const lastChild = node.nodes?.[node.nodes.length - 1];
-      const lastItemIdx = cssParts.length - 2;
-      if (lastChild?.type === "decl" && lastItemIdx >= 0 && cssParts[lastItemIdx]) {
-        cssParts[lastItemIdx] = cssParts[lastItemIdx].slice(0, -1);
-      }
-    }
-    cssParts.push(result.trim());
-  });
-  return cssParts.join("");
+	const cssParts = [];
+	stringify(ast, (result, node, type) => {
+		if (node?.type === "decl" && node.value.includes("</style>")) return;
+		if (!options.compress) {
+			cssParts.push(result);
+			return;
+		}
+		if (node?.type === "comment") return;
+		if (node?.type === "decl") {
+			const prefix = node.prop + node.raws.between;
+			cssParts.push(result.replace(prefix, prefix.trim()));
+			return;
+		}
+		if (type === "start") {
+			if (node?.type === "rule" && node.selectors) {
+				if (node.selectors.length === 1) cssParts.push(node.selectors[0] ?? "", "{");
+				else cssParts.push(node.selectors.join(","), "{");
+			} else cssParts.push(result.trim());
+			return;
+		}
+		if (type === "end" && result === "}" && node?.raws?.semicolon && (node.type === "rule" || node.type === "atrule")) {
+			const lastChild = node.nodes?.[node.nodes.length - 1];
+			const lastItemIdx = cssParts.length - 2;
+			if (lastChild?.type === "decl" && lastItemIdx >= 0 && cssParts[lastItemIdx]) cssParts[lastItemIdx] = cssParts[lastItemIdx].slice(0, -1);
+		}
+		cssParts.push(result.trim());
+	});
+	return cssParts.join("");
 }
+/**
+* Converts a walkStyleRules() iterator to mark nodes with `.$$remove=true` instead of actually removing them.
+* This means they can be removed in a second pass, allowing the first pass to be nondestructive (eg: to preserve mirrored sheets).
+* @private
+* @param predicate   Invoked on each node in the tree. Return `false` to remove that node.
+*/
 function markOnly(predicate) {
-  return (rule) => {
-    const sel = "selectors" in rule ? rule.selectors : void 0;
-    if (predicate(rule) === false) {
-      rule.$$remove = true;
-    }
-    if ("selectors" in rule) {
-      rule.$$markedSelectors = rule.selectors;
-      rule.selectors = sel;
-    }
-    if (rule._other) {
-      rule._other.$$markedSelectors = rule._other.selectors;
-    }
-  };
+	return (rule) => {
+		const sel = "selectors" in rule ? rule.selectors : void 0;
+		if (predicate(rule) === false) rule.$$remove = true;
+		if ("selectors" in rule) {
+			rule.$$markedSelectors = rule.selectors;
+			rule.selectors = sel;
+		}
+		if (rule._other) rule._other.$$markedSelectors = rule._other.selectors;
+	};
 }
+/**
+* Apply filtered selectors to a rule from a previous markOnly run.
+* @private
+* @param rule The Rule to apply marked selectors to (if they exist).
+*/
 function applyMarkedSelectors(rule) {
-  if (rule.$$markedSelectors) {
-    rule.selectors = rule.$$markedSelectors;
-  }
-  if (rule._other) {
-    applyMarkedSelectors(rule._other);
-  }
+	if (rule.$$markedSelectors) rule.selectors = rule.$$markedSelectors;
+	if (rule._other) applyMarkedSelectors(rule._other);
 }
+/**
+* Recursively walk all rules in a stylesheet.
+* @private
+* @param node       A Stylesheet or Rule to descend into.
+* @param iterator   Invoked on each node in the tree. Return `false` to remove that node.
+*/
 function walkStyleRules(node, iterator) {
-  if (!("nodes" in node)) {
-    return;
-  }
-  node.nodes = node.nodes?.filter((rule) => {
-    if (hasNestedRules(rule)) {
-      walkStyleRules(rule, iterator);
-    }
-    rule._other = void 0;
-    rule.filterSelectors = filterSelectors;
-    return iterator(rule) !== false;
-  });
+	if (!("nodes" in node)) return;
+	node.nodes = node.nodes?.filter((rule) => {
+		if (hasNestedRules(rule)) walkStyleRules(rule, iterator);
+		rule._other = void 0;
+		rule.filterSelectors = filterSelectors;
+		return iterator(rule) !== false;
+	});
 }
+/**
+* Recursively walk all rules in two identical stylesheets, filtering nodes into one or the other based on a predicate.
+* @private
+* @param node       A Stylesheet or Rule to descend into.
+* @param node2      A second tree identical to `node`
+* @param iterator   Invoked on each node in the tree. Return `false` to remove that node from the first tree, true to remove it from the second.
+*/
 function walkStyleRulesWithReverseMirror(node, node2, iterator) {
-  if (!node2)
-    return walkStyleRules(node, iterator);
-  [node.nodes, node2.nodes] = splitFilter(
-    node.nodes,
-    node2.nodes,
-    (rule, index, _rules, rules2) => {
-      const rule2 = rules2?.[index];
-      if (hasNestedRules(rule)) {
-        walkStyleRulesWithReverseMirror(rule, rule2, iterator);
-        if ("nodes" in rule && rule.nodes?.length === 0 && isRemovableIfEmpty(rule)) {
-          return false;
-        }
-      }
-      rule._other = rule2;
-      rule.filterSelectors = filterSelectors;
-      return iterator(rule) !== false;
-    }
-  );
-  if (node2.nodes) {
-    node2.nodes = node2.nodes.filter((rule) => {
-      if ("nodes" in rule && rule.nodes?.length === 0 && isRemovableIfEmpty(rule)) {
-        return false;
-      }
-      return true;
-    });
-  }
+	if (!node2) return walkStyleRules(node, iterator);
+	[node.nodes, node2.nodes] = splitFilter(node.nodes, node2.nodes, (rule, index, _rules, rules2) => {
+		const rule2 = rules2?.[index];
+		if (hasNestedRules(rule)) {
+			walkStyleRulesWithReverseMirror(rule, rule2, iterator);
+			if ("nodes" in rule && rule.nodes?.length === 0 && isRemovableIfEmpty(rule)) return false;
+		}
+		rule._other = rule2;
+		rule.filterSelectors = filterSelectors;
+		return iterator(rule) !== false;
+	});
+	if (node2.nodes) node2.nodes = node2.nodes.filter((rule) => {
+		if ("nodes" in rule && rule.nodes?.length === 0 && isRemovableIfEmpty(rule)) return false;
+		return true;
+	});
 }
 function hasNestedRules(rule) {
-  return "nodes" in rule && !!rule.nodes?.length && (!("name" in rule) || rule.name !== "keyframes" && rule.name !== "-webkit-keyframes") && rule.nodes.some((n) => n.type === "rule" || n.type === "atrule");
+	return "nodes" in rule && !!rule.nodes?.length && (!("name" in rule) || rule.name !== "keyframes" && rule.name !== "-webkit-keyframes") && rule.nodes.some((n) => n.type === "rule" || n.type === "atrule");
 }
 function isRemovableIfEmpty(rule) {
-  if (!("name" in rule) || rule.type !== "atrule") {
-    return false;
-  }
-  return rule.name === "media" || rule.name === "supports";
+	if (!("name" in rule) || rule.type !== "atrule") return false;
+	return rule.name === "media" || rule.name === "supports";
 }
 function splitFilter(a, b, predicate) {
-  const aOut = [];
-  const bOut = [];
-  for (let index = 0; index < a.length; index++) {
-    const item = a[index];
-    if (predicate(item, index, a, b)) {
-      aOut.push(item);
-    } else {
-      bOut.push(b?.[index] ?? item);
-    }
-  }
-  return [aOut, bOut];
+	const aOut = [];
+	const bOut = [];
+	for (let index = 0; index < a.length; index++) {
+		const item = a[index];
+		if (predicate(item, index, a, b)) aOut.push(item);
+		else bOut.push(b?.[index] ?? item);
+	}
+	return [aOut, bOut];
 }
 function filterSelectors(predicate) {
-  if (this._other) {
-    const [a, b] = splitFilter(
-      this.selectors,
-      this._other.selectors,
-      predicate
-    );
-    this.selectors = a;
-    this._other.selectors = b;
-  } else {
-    this.selectors = this.selectors.filter(predicate);
-  }
+	if (this._other) {
+		const [a, b] = splitFilter(this.selectors, this._other.selectors, predicate);
+		this.selectors = a;
+		this._other.selectors = b;
+	} else this.selectors = this.selectors.filter(predicate);
 }
-const MEDIA_TYPES = /* @__PURE__ */ new Set(["all", "print", "screen", "speech"]);
-const MEDIA_KEYWORDS = /* @__PURE__ */ new Set(["and", "not", ","]);
-const MEDIA_FEATURES = new Set(
-  [
-    "width",
-    "aspect-ratio",
-    "color",
-    "color-index",
-    "grid",
-    "height",
-    "monochrome",
-    "orientation",
-    "resolution",
-    "scan"
-  ].flatMap((feature) => [feature, `min-${feature}`, `max-${feature}`])
-);
+const MEDIA_TYPES = /* @__PURE__ */ new Set([
+	"all",
+	"print",
+	"screen",
+	"speech"
+]);
+const MEDIA_KEYWORDS = /* @__PURE__ */ new Set([
+	"and",
+	"not",
+	","
+]);
+const MEDIA_FEATURES = new Set([
+	"width",
+	"aspect-ratio",
+	"color",
+	"color-index",
+	"grid",
+	"height",
+	"monochrome",
+	"orientation",
+	"resolution",
+	"scan"
+].flatMap((feature) => [
+	feature,
+	`min-${feature}`,
+	`max-${feature}`
+]));
 function validateMediaType(node) {
-  const { type: nodeType, value: nodeValue } = node;
-  if (nodeType === "media-type") {
-    return MEDIA_TYPES.has(nodeValue);
-  } else if (nodeType === "keyword") {
-    return MEDIA_KEYWORDS.has(nodeValue);
-  } else if (nodeType === "media-feature") {
-    return MEDIA_FEATURES.has(nodeValue);
-  }
+	const { type: nodeType, value: nodeValue } = node;
+	if (nodeType === "media-type") return MEDIA_TYPES.has(nodeValue);
+	else if (nodeType === "keyword") return MEDIA_KEYWORDS.has(nodeValue);
+	else if (nodeType === "media-feature") return MEDIA_FEATURES.has(nodeValue);
 }
+/**
+*
+* This function performs a basic media query validation
+* to ensure the values passed as part of the 'media' config
+* is HTML safe and does not cause any injection issue
+*
+* @param query Media query to validate
+*/
 function validateMediaQuery(query) {
-  const mediaParserFn = "default" in mediaParser ? mediaParser.default : mediaParser;
-  const mediaTree = mediaParserFn(query);
-  const nodeTypes = /* @__PURE__ */ new Set(["media-type", "keyword", "media-feature"]);
-  const stack = [mediaTree];
-  while (stack.length > 0) {
-    const node = stack.pop();
-    if (nodeTypes.has(node.type) && !validateMediaType(node)) {
-      return false;
-    }
-    if (node.nodes) {
-      stack.push(...node.nodes);
-    }
-  }
-  return true;
+	const mediaTree = ("default" in mediaParser ? mediaParser.default : mediaParser)(query);
+	const nodeTypes = /* @__PURE__ */ new Set([
+		"media-type",
+		"keyword",
+		"media-feature"
+	]);
+	const stack = [mediaTree];
+	while (stack.length > 0) {
+		const node = stack.pop();
+		if (nodeTypes.has(node.type) && !validateMediaType(node)) return false;
+		if (node.nodes) stack.push(...node.nodes);
+	}
+	return true;
 }
-
+//#endregion
+//#region src/directives.ts
+const DIRECTIVE_RE = /^(beasties|critters):(.*)$/;
+/**
+* A comment which looks like a directive but uses an unknown namespace, e.g.
+* `/* critter:include *\/`. Deliberately narrow: a single bare word followed by
+* `include`/`exclude` and an optional `start`/`end`, and nothing else, so that
+* license banners, sourcemap comments and ordinary prose never match.
+*/
+const DIRECTIVE_LOOKALIKE_RE = /^([\w-]+):(include|exclude)(?: (start|end))?$/;
+const COMMANDS = /* @__PURE__ */ new Set([
+	"include",
+	"exclude",
+	"include start",
+	"include end",
+	"exclude start",
+	"exclude end"
+]);
+const SUPPORTED_DIRECTIVES = [...COMMANDS].map((command) => `beasties:${command}`).join(", ");
+/**
+* Interpret a CSS comment's text as a beasties directive.
+*
+* `text` is the comment body with the delimiters removed and whitespace
+* trimmed, i.e. postcss' `Comment#text`. Comments beginning with `!` (legal
+* comments preserved by minifiers) are not treated as directives.
+*/
+function parseDirective(text) {
+	const match = text.match(DIRECTIVE_RE);
+	if (match) {
+		const command = match[2].trim();
+		if (COMMANDS.has(command)) return {
+			command,
+			deprecated: match[1] === "critters"
+		};
+		return { warning: `Unknown comment directive "${text}". Supported directives are: ${SUPPORTED_DIRECTIVES}.` };
+	}
+	const lookalike = text.match(DIRECTIVE_LOOKALIKE_RE);
+	if (lookalike) return { warning: `Ignoring unrecognised comment directive "${text}". Did you mean "beasties:${lookalike[3] ? `${lookalike[2]} ${lookalike[3]}` : lookalike[2]}"?` };
+	return {};
+}
+const CRITTERS_DEPRECATION_WARNING = "Found deprecated \"critters:\" comment directives. Use the \"beasties:\" prefix instead, for example \"/* beasties:include start */\".";
+//#endregion
+//#region package.json
+var version = "0.5.1";
+//#endregion
+//#region src/dom.ts
 function buildCache(container) {
-  container._classCache = /* @__PURE__ */ new Set();
-  container._idCache = /* @__PURE__ */ new Set();
-  const queue = [container];
-  while (queue.length) {
-    const node = queue.shift();
-    if (node.hasAttribute?.("class")) {
-      const classList = node.getAttribute("class").trim().split(" ");
-      classList.forEach((cls) => {
-        container._classCache.add(cls);
-      });
-    }
-    if (node.hasAttribute?.("id")) {
-      const id = node.getAttribute("id").trim();
-      container._idCache.add(id);
-    }
-    if ("children" in node) {
-      queue.push(...node.children.filter((child) => child.type === "tag"));
-    }
-  }
+	container._classCache = /* @__PURE__ */ new Set();
+	container._idCache = /* @__PURE__ */ new Set();
+	const queue = [container];
+	while (queue.length) {
+		const node = queue.shift();
+		if (node.hasAttribute?.("class")) node.getAttribute("class").trim().split(" ").forEach((cls) => {
+			container._classCache.add(cls);
+		});
+		if (node.hasAttribute?.("id")) {
+			const id = node.getAttribute("id").trim();
+			container._idCache.add(id);
+		}
+		if ("children" in node) queue.push(...node.children.filter((child) => child.type === "tag"));
+	}
 }
-function createDocument(html) {
-  const document = parseDocument(html, { decodeEntities: false });
-  extendDocument(document);
-  extendElement(Element.prototype);
-  let beastiesContainers = document.querySelectorAll("[data-beasties-container]");
-  if (!beastiesContainers.length) {
-    document.documentElement?.setAttribute("data-beasties-container", "");
-    beastiesContainers = [document.documentElement || document];
-  }
-  document.beastiesContainers = beastiesContainers;
-  for (const container of beastiesContainers) {
-    buildCache(container);
-  }
-  return document;
+/**
+* Parse HTML into a mutable, serializable DOM Document.
+* The DOM implementation is an htmlparser2 DOM enhanced with basic DOM mutation methods.
+* @param html   HTML to parse into a Document instance
+*/
+function createDocument(html, logger) {
+	const document = parseDocument(html, { decodeEntities: false });
+	extendDocument(document);
+	const parsedPrototype = Object.getPrototypeOf(document.children.find((child) => child.type === "tag") ?? Element.prototype);
+	extendElement(parsedPrototype, logger);
+	if (parsedPrototype !== Element.prototype) extendElement(Element.prototype, logger);
+	let beastiesContainers = document.querySelectorAll("[data-beasties-container]");
+	if (!beastiesContainers.length) {
+		document.documentElement?.setAttribute("data-beasties-container", "");
+		beastiesContainers = [document.documentElement || document];
+	}
+	document.beastiesContainers = beastiesContainers;
+	for (const container of beastiesContainers) buildCache(container);
+	return document;
 }
+/**
+* Serialize a Document to an HTML String
+*/
 function serializeDocument(document) {
-  return render(document, { decodeEntities: false });
+	return render(document, { decodeEntities: false });
 }
-let extended = false;
-function extendElement(element) {
-  if (extended) {
-    return;
-  }
-  extended = true;
-  Object.defineProperties(element, {
-    nodeName: {
-      get() {
-        return this.tagName.toUpperCase();
-      }
-    },
-    id: {
-      get() {
-        return this.getAttribute("id");
-      },
-      set(value) {
-        this.setAttribute("id", value);
-      }
-    },
-    className: {
-      get() {
-        return this.getAttribute("class");
-      },
-      set(value) {
-        this.setAttribute("class", value);
-      }
-    },
-    insertBefore: {
-      value(child, referenceNode) {
-        if (!referenceNode)
-          return this.appendChild(child);
-        prepend(referenceNode, child);
-        return child;
-      }
-    },
-    appendChild: {
-      value(child) {
-        appendChild(this, child);
-        return child;
-      }
-    },
-    removeChild: {
-      value(child) {
-        removeElement(child);
-      }
-    },
-    remove: {
-      value() {
-        removeElement(this);
-      }
-    },
-    textContent: {
-      get() {
-        return getText(this);
-      },
-      set(text) {
-        this.children = [];
-        appendChild(this, new Text(text));
-      }
-    },
-    setAttribute: {
-      value(name, value) {
-        this.attribs ??= {};
-        value ??= "";
-        this.attribs[name] = value;
-      }
-    },
-    removeAttribute: {
-      value(name) {
-        if (this.attribs != null) {
-          delete this.attribs[name];
-        }
-      }
-    },
-    getAttribute: {
-      value(name) {
-        return this.attribs != null && this.attribs[name];
-      }
-    },
-    hasAttribute: {
-      value(name) {
-        return this.attribs != null && this.attribs[name] != null;
-      }
-    },
-    getAttributeNode: {
-      value(name) {
-        const value = this.getAttribute(name);
-        if (value != null)
-          return { specified: true, value };
-      }
-    },
-    exists: {
-      value(sel) {
-        return cachedQuerySelector(sel, this);
-      }
-    },
-    querySelector: {
-      value(sel) {
-        return selectOne(sel, this);
-      }
-    },
-    querySelectorAll: {
-      value(sel) {
-        return selectAll(sel, this);
-      }
-    }
-  });
+/**
+* Methods and descriptors to mix into Element.prototype
+* @private
+*/
+const extendedMarker = Symbol.for("beasties.element-extended");
+function extendElement(element, logger) {
+	const appliedVersion = element[extendedMarker] ?? (Object.hasOwn(element, "nodeName") ? "an older version" : void 0);
+	if (typeof appliedVersion === "string") {
+		if (appliedVersion !== version) logger?.warn?.(`Multiple versions of beasties are patching the same \`domhandler\` instance (${appliedVersion} applied it, ${version} loaded after). Deduplicate beasties to a single version if you see unexpected DOM errors.`);
+		return;
+	}
+	Object.defineProperties(element, {
+		nodeName: { get() {
+			return this.tagName.toUpperCase();
+		} },
+		id: {
+			get() {
+				return this.getAttribute("id");
+			},
+			set(value) {
+				this.setAttribute("id", value);
+			}
+		},
+		className: {
+			get() {
+				return this.getAttribute("class");
+			},
+			set(value) {
+				this.setAttribute("class", value);
+			}
+		},
+		insertBefore: { value(child, referenceNode) {
+			if (!referenceNode) return this.appendChild(child);
+			prepend(referenceNode, child);
+			return child;
+		} },
+		appendChild: { value(child) {
+			appendChild(this, child);
+			return child;
+		} },
+		removeChild: { value(child) {
+			removeElement(child);
+		} },
+		remove: { value() {
+			removeElement(this);
+		} },
+		textContent: {
+			get() {
+				return getText(this);
+			},
+			set(text) {
+				this.children = [];
+				appendChild(this, new Text(text));
+			}
+		},
+		setAttribute: { value(name, value) {
+			this.attribs ??= {};
+			value ??= "";
+			this.attribs[name] = value;
+		} },
+		removeAttribute: { value(name) {
+			if (this.attribs != null) delete this.attribs[name];
+		} },
+		getAttribute: { value(name) {
+			return this.attribs != null && this.attribs[name];
+		} },
+		hasAttribute: { value(name) {
+			return this.attribs != null && this.attribs[name] != null;
+		} },
+		getAttributeNode: { value(name) {
+			const value = this.getAttribute(name);
+			if (value != null) return {
+				specified: true,
+				value
+			};
+		} },
+		exists: { value(sel) {
+			return cachedQuerySelector(sel, this);
+		} },
+		querySelector: { value(sel) {
+			return selectOne(sel, this);
+		} },
+		querySelectorAll: { value(sel) {
+			return selectAll(sel, this);
+		} }
+	});
+	Object.defineProperty(element, extendedMarker, {
+		value: version,
+		configurable: true
+	});
 }
 function extendDocument(document) {
-  Object.defineProperties(document, {
-    // document is just an Element in htmlparser2, giving it a nodeType of ELEMENT_NODE.
-    // TODO: verify if these are needed for css-select
-    nodeType: {
-      get() {
-        return 9;
-      }
-    },
-    contentType: {
-      get() {
-        return "text/html";
-      }
-    },
-    nodeName: {
-      get() {
-        return "#document";
-      }
-    },
-    documentElement: {
-      get() {
-        return this.children.find(
-          (child) => "tagName" in child && String(child.tagName).toLowerCase() === "html"
-        );
-      }
-    },
-    head: {
-      get() {
-        return this.querySelector("head");
-      }
-    },
-    body: {
-      get() {
-        return this.querySelector("body");
-      }
-    },
-    createElement: {
-      value(name) {
-        return new Element(name, {});
-      }
-    },
-    createTextNode: {
-      value(text) {
-        return new Text(text);
-      }
-    },
-    exists: {
-      value(sel) {
-        return cachedQuerySelector(sel, this);
-      }
-    },
-    querySelector: {
-      value(sel) {
-        return selectOne(sel, this);
-      }
-    },
-    querySelectorAll: {
-      value(sel) {
-        if (sel === ":root") {
-          return this;
-        }
-        return selectAll(sel, this);
-      }
-    },
-    beastiesContainer: {
-      get() {
-        return this.beastiesContainers?.[0];
-      }
-    }
-  });
+	Object.defineProperties(document, {
+		nodeType: { get() {
+			return 9;
+		} },
+		contentType: { get() {
+			return "text/html";
+		} },
+		nodeName: { get() {
+			return "#document";
+		} },
+		documentElement: { get() {
+			return this.children.find((child) => "tagName" in child && String(child.tagName).toLowerCase() === "html");
+		} },
+		head: { get() {
+			return this.querySelector("head");
+		} },
+		body: { get() {
+			return this.querySelector("body");
+		} },
+		createElement: { value(name) {
+			return new Element(name, {});
+		} },
+		createTextNode: { value(text) {
+			return new Text(text);
+		} },
+		exists: { value(sel) {
+			return cachedQuerySelector(sel, this);
+		} },
+		querySelector: { value(sel) {
+			return selectOne(sel, this);
+		} },
+		querySelectorAll: { value(sel) {
+			if (sel === ":root") return this;
+			return selectAll(sel, this);
+		} },
+		beastiesContainer: { get() {
+			return this.beastiesContainers?.[0];
+		} }
+	});
 }
 const selectorTokensCache = /* @__PURE__ */ new Map();
 function cachedQuerySelector(sel, node) {
-  let selectorTokens = selectorTokensCache.get(sel);
-  if (selectorTokens === void 0) {
-    selectorTokens = parseRelevantSelectors(sel);
-    selectorTokensCache.set(sel, selectorTokens);
-  }
-  if (selectorTokens && node._classCache && node._idCache) {
-    for (const token of selectorTokens) {
-      if (token.name === "class" && !node._classCache.has(token.value)) {
-        return false;
-      }
-      if (token.name === "id" && !node._idCache.has(token.value)) {
-        return false;
-      }
-    }
-    return true;
-  }
-  return !!selectOne(sel, node);
+	let selectorTokens = selectorTokensCache.get(sel);
+	if (selectorTokens === void 0) {
+		selectorTokens = parseRelevantSelectors(sel);
+		selectorTokensCache.set(sel, selectorTokens);
+	}
+	if (selectorTokens && node._classCache && node._idCache) {
+		for (const token of selectorTokens) {
+			if (token.name === "class" && !node._classCache.has(token.value)) return false;
+			if (token.name === "id" && !node._idCache.has(token.value)) return false;
+		}
+		return true;
+	}
+	return !!selectOne(sel, node);
 }
 function parseRelevantSelectors(sel) {
-  const tokens = parse$1(sel);
-  const relevantTokens = [];
-  for (let i = 0; i < tokens.length; i++) {
-    const tokenGroup = tokens[i];
-    if (tokenGroup?.length !== 1) {
-      return null;
-    }
-    const token = tokenGroup[0];
-    if (token?.type === "attribute" && (token.name === "class" || token.name === "id")) {
-      relevantTokens.push(token);
-    }
-  }
-  return relevantTokens.length > 0 ? relevantTokens : null;
+	const tokens = parse$1(sel);
+	const relevantTokens = [];
+	for (let i = 0; i < tokens.length; i++) {
+		const tokenGroup = tokens[i];
+		if (tokenGroup?.length !== 1) return null;
+		const token = tokenGroup[0];
+		if (token?.type === "attribute" && (token.name === "class" || token.name === "id")) relevantTokens.push(token);
+	}
+	return relevantTokens.length > 0 ? relevantTokens : null;
 }
-
-const LOG_LEVELS = ["trace", "debug", "info", "warn", "error", "silent"];
-const defaultLogger = {
-  trace(msg) {
-    console.trace(msg);
-  },
-  debug(msg) {
-    console.debug(msg);
-  },
-  warn(msg) {
-    console.warn(pc.yellow(msg));
-  },
-  error(msg) {
-    console.error(pc.bold(pc.red(msg)));
-  },
-  info(msg) {
-    console.info(pc.bold(pc.blue(msg)));
-  },
-  silent() {
-  }
-};
-function createLogger(logLevel) {
-  const logLevelIdx = LOG_LEVELS.indexOf(logLevel);
-  return LOG_LEVELS.reduce((logger, type, index) => {
-    if (index >= logLevelIdx) {
-      logger[type] = defaultLogger[type];
-    } else {
-      logger[type] = defaultLogger.silent;
-    }
-    return logger;
-  }, {});
+//#endregion
+//#region src/media.ts
+/**
+* Conservative allowlist for re-emitting a `media` attribute value into
+* generated JavaScript. `validateMediaQuery()` parses the query but tolerates
+* quotes and semicolons, which would break out of the `onload` handler that the
+* `media` and `js*` strategies build.
+*
+* @see https://github.com/angular/angular-cli/issues/33342
+*/
+const SAFE_MEDIA_RE = /^[\w\s\-(),:.]+$/;
+function isSafeMediaValue(media) {
+	return SAFE_MEDIA_RE.test(media);
 }
-function isSubpath(basePath, currentPath) {
-  return !_pathModule.relative(basePath, currentPath).startsWith("..");
-}
-
+//#endregion
+//#region src/selectors.ts
 const removePseudoClassesAndElementsPattern = /(?<!\\)::?[a-z-]+(?:\(.+\))?/gi;
 const implicitUniversalPattern = /([>+~])\s*(?!\1)([>+~])/g;
 const emptyCombinatorPattern = /([>+~])\s*(?=\1|$)/g;
 const removeTrailingCommasPattern = /\(\s*,|,\s*\)/g;
+const BEFORE_AFTER_PSEUDO_RE = /^::?(?:before|after)$/;
+const UNEVALUABLE_SELECTOR_ERROR_RE = /^(?:unknown pseudo-class|pseudo-elements are not supported)/i;
+/**
+* Whether a selector matching error means the selector is valid CSS that cannot
+* be evaluated statically (rather than a selector we failed to parse).
+*/
+function isUnevaluableSelectorError(message) {
+	return UNEVALUABLE_SELECTOR_ERROR_RE.test(message);
+}
+/**
+* Selectors that are considered critical regardless of whether they match an element in the document.
+*/
+function isAlwaysCriticalSelector(sel) {
+	return sel === ":root" || sel === "html" || sel === "body" || sel[0] === ":" && BEFORE_AFTER_PSEUDO_RE.test(sel);
+}
+/**
+* Strip pseudo-classes and pseudo-elements from a selector so it can be
+* matched against the document, since we only care that the associated
+* elements exist.
+*/
+function normalizeCssSelector(sel) {
+	return sel.replace(removePseudoClassesAndElementsPattern, "").replace(removeTrailingCommasPattern, (match) => match.includes("(") ? "(" : ")").replace(implicitUniversalPattern, "$1 * $2").replace(emptyCombinatorPattern, "$1 *").trim();
+}
+//#endregion
+//#region src/urls.ts
+const REMOTE_URL_RE = /^https?:\/\//;
+const URL_RE_G = /url\((?:'([^']*)'|"([^"]*)"|([^()]*))\)/gi;
+const ABSOLUTE_URL_RE = /^(?:[a-z][\w+.-]*:|\/\/|\/|#)/i;
+/**
+* Resolve a `url()` value that is relative to `baseHref` (the location of the
+* stylesheet it was declared in) so that it can be used from the document instead.
+*/
+function resolveCssUrl(url, baseHref) {
+	if (!url || ABSOLUTE_URL_RE.test(url)) return url;
+	const base = baseHref.split("?")[0].split("#")[0];
+	if (REMOTE_URL_RE.test(base) || base.startsWith("//")) try {
+		const resolved = new URL(url, base.startsWith("//") ? `https:${base}` : base);
+		return base.startsWith("//") ? resolved.href.replace(REMOTE_URL_RE, "//") : resolved.href;
+	} catch {
+		return url;
+	}
+	const dir = _pathModule.posix.dirname(base);
+	if (dir === "." || dir === "") return url;
+	return _pathModule.posix.join(dir, url);
+}
+function rewriteCssUrls(css, baseHref) {
+	return css.replace(URL_RE_G, (match, singleQuoted, doubleQuoted, bare) => {
+		const quote = singleQuoted !== void 0 ? "'" : doubleQuoted !== void 0 ? "\"" : "";
+		const url = singleQuoted ?? doubleQuoted ?? bare?.trim() ?? "";
+		const resolved = resolveCssUrl(url, baseHref);
+		return resolved === url ? match : `url(${quote}${resolved}${quote})`;
+	});
+}
+//#endregion
+//#region src/util.ts
+const LOG_LEVELS = [
+	"trace",
+	"debug",
+	"info",
+	"warn",
+	"error",
+	"silent"
+];
+const defaultLogger = {
+	trace(msg) {
+		console.trace(msg);
+	},
+	debug(msg) {
+		console.debug(msg);
+	},
+	warn(msg) {
+		console.warn(pc.yellow(msg));
+	},
+	error(msg) {
+		console.error(pc.bold(pc.red(msg)));
+	},
+	info(msg) {
+		console.info(pc.bold(pc.blue(msg)));
+	},
+	silent() {}
+};
+function createLogger(logLevel) {
+	const logLevelIdx = LOG_LEVELS.indexOf(logLevel);
+	return LOG_LEVELS.reduce((logger, type, index) => {
+		if (index >= logLevelIdx) logger[type] = defaultLogger[type];
+		else logger[type] = defaultLogger.silent;
+		return logger;
+	}, {});
+}
+const DEDUPE_WINDOW_MS = 6e4;
+const DEDUPE_MAX_ENTRIES = 500;
+const processSeen = /* @__PURE__ */ new Map();
+/**
+* Wrap a logger so that identical `warn`/`error` messages are only emitted once
+* per scope. Server-side rendering constructs a Beasties instance per request,
+* so the default scope is the process.
+*/
+function createDeduplicatingLogger(logger, scope) {
+	if (scope === false) return logger;
+	const seen = scope === "process" ? processSeen : /* @__PURE__ */ new Map();
+	const shouldEmit = (level, message) => {
+		const key = `${level}:${message}`;
+		const now = Date.now();
+		const last = seen.get(key);
+		if (last !== void 0 && now - last < DEDUPE_WINDOW_MS) return false;
+		if (seen.size >= DEDUPE_MAX_ENTRIES) seen.clear();
+		seen.set(key, now);
+		return true;
+	};
+	const deduped = { ...logger };
+	for (const level of ["warn", "error"]) {
+		const original = logger[level];
+		if (!original) continue;
+		deduped[level] = (message) => {
+			if (shouldEmit(level, message)) original.call(logger, message);
+		};
+	}
+	return deduped;
+}
+function isSubpath(basePath, currentPath) {
+	return !_pathModule.relative(basePath, currentPath).startsWith("..");
+}
+//#endregion
+//#region src/index.ts
 const LEADING_SLASH_OR_QUERY_RE = /^\/(?!\/)|[?#].*$/g;
 const PUBLIC_PATH_RE = /(^\/(?!\/)|\/$)/g;
-const REMOTE_URL_RE = /^https?:\/\//;
-const BEFORE_AFTER_PSEUDO_RE = /^::?(?:before|after)$/;
 const FONT_FAMILY_RE = /\bfont(?:-family)?\b/i;
-const BEASTIES_COMMENT_RE = /^(?<!! )beasties:(.*)/;
 const LEADING_SLASH_RE = /^\//;
 const WHITESPACE_RE = /\s+/;
 const URL_RE = /url\s*\(\s*(['"]?)(.+?)\1\s*\)/;
-class Beasties {
-  #selectorCache = /* @__PURE__ */ new Map();
-  options;
-  logger;
-  fs;
-  constructor(options = {}) {
-    this.options = Object.assign({
-      logLevel: "info",
-      path: "",
-      publicPath: "",
-      reduceInlineStyles: true,
-      pruneSource: false,
-      additionalStylesheets: [],
-      allowRules: []
-    }, options);
-    this.logger = this.options.logger || createLogger(this.options.logLevel);
-  }
-  /**
-   * Read the contents of a file from the specified filesystem or disk
-   */
-  readFile(filename) {
-    const fs = this.fs;
-    return new Promise((resolve, reject) => {
-      const callback = (err, data) => {
-        if (err)
-          reject(err);
-        else resolve(data.toString());
-      };
-      if (fs && fs.readFile) {
-        fs.readFile(filename, callback);
-      } else {
-        readFile(filename, "utf-8", callback);
-      }
-    });
-  }
-  /**
-   * Write content to a file
-   */
-  writeFile(filename, data) {
-    const fs = this.fs;
-    return new Promise((resolve, reject) => {
-      const callback = (err) => {
-        if (err)
-          reject(err);
-        else resolve();
-      };
-      if (fs && fs.writeFile) {
-        fs.writeFile(filename, data, callback);
-      } else {
-        writeFile(filename, data, callback);
-      }
-    });
-  }
-  /**
-   * Apply critical CSS processing to the html
-   */
-  async process(html) {
-    const start = Date.now();
-    const document = createDocument(html);
-    if (this.options.additionalStylesheets.length > 0) {
-      await this.embedAdditionalStylesheet(document);
-    }
-    if (this.options.external !== false) {
-      const externalSheets = [...document.querySelectorAll('link[rel="stylesheet"]')];
-      const hasCustomEmbed = this.embedLinkedStylesheet !== Beasties.prototype.embedLinkedStylesheet;
-      if (hasCustomEmbed) {
-        for (const link of externalSheets) {
-          await this.embedLinkedStylesheet(link, document);
-        }
-      } else {
-        const sheets = await Promise.all(
-          externalSheets.map((link) => this.fetchStylesheet(link, document))
-        );
-        for (const sheet of sheets) {
-          if (sheet) {
-            this.embedFetchedStylesheet(sheet, document);
-          }
-        }
-      }
-    }
-    const styles = this.getAffectedStyleTags(document);
-    for (const style of styles) {
-      this.processStyle(style, document);
-    }
-    if (this.options.mergeStylesheets !== false && styles.length !== 0) {
-      this.mergeStylesheets(document);
-    }
-    const output = serializeDocument(document);
-    const end = Date.now();
-    this.logger.info?.(`Time ${end - start}ms`);
-    return output;
-  }
-  /**
-   * Get the style tags that need processing
-   */
-  getAffectedStyleTags(document) {
-    const styles = [...document.querySelectorAll("style")];
-    if (this.options.reduceInlineStyles === false) {
-      return styles.filter((style) => style.$$external);
-    }
-    return styles;
-  }
-  mergeStylesheets(document) {
-    const styles = this.getAffectedStyleTags(document);
-    if (styles.length === 0) {
-      this.logger.warn?.(
-        "Merging inline stylesheets into a single <style> tag skipped, no inline stylesheets to merge"
-      );
-      return;
-    }
-    const first = styles[0];
-    let sheet = first.textContent;
-    for (let i = 1; i < styles.length; i++) {
-      const node = styles[i];
-      sheet += node.textContent;
-      node.remove();
-    }
-    first.textContent = sheet;
-  }
-  /**
-   * Given href, find the corresponding CSS asset
-   */
-  async getCssAsset(href, _style) {
-    const outputPath = this.options.path;
-    const publicPath = this.options.publicPath;
-    let normalizedPath = href.replace(LEADING_SLASH_OR_QUERY_RE, "");
-    const pathPrefix = `${(publicPath || "").replace(PUBLIC_PATH_RE, "")}/`;
-    if (normalizedPath.startsWith(pathPrefix) && !(pathPrefix === "/" && normalizedPath.startsWith("//"))) {
-      normalizedPath = normalizedPath.substring(pathPrefix.length).replace(LEADING_SLASH_RE, "");
-    }
-    const isRemote = REMOTE_URL_RE.test(normalizedPath) || normalizedPath.startsWith("//");
-    if (isRemote) {
-      if (this.options.remote === true) {
-        try {
-          const absoluteUrl = href.startsWith("//") ? `https:${href}` : href;
-          const response = await fetch(absoluteUrl);
-          if (!response.ok) {
-            this.logger.warn?.(`Failed to fetch ${absoluteUrl} (${response.status})`);
-            return void 0;
-          }
-          return await response.text();
-        } catch (error) {
-          this.logger.warn?.(`Error fetching ${href}: ${error.message}`);
-          return void 0;
-        }
-      }
-      return void 0;
-    }
-    const filename = _pathModule.resolve(outputPath, normalizedPath);
-    if (!isSubpath(outputPath, filename)) {
-      return void 0;
-    }
-    let sheet;
-    try {
-      sheet = await this.readFile(filename);
-    } catch {
-      this.logger.warn?.(`Unable to locate stylesheet: ${filename}`);
-    }
-    return sheet;
-  }
-  checkInlineThreshold(link, style, sheet) {
-    if (this.options.inlineThreshold && sheet.length < this.options.inlineThreshold) {
-      const href = style.$$name;
-      style.$$reduce = false;
-      this.logger.info?.(
-        `\x1B[32mInlined all of ${href} (${sheet.length} was below the threshold of ${this.options.inlineThreshold})\x1B[39m`
-      );
-      link.remove();
-      return true;
-    }
-    return false;
-  }
-  /**
-   * Inline the stylesheets from options.additionalStylesheets (assuming it passes `options.filter`)
-   */
-  async embedAdditionalStylesheet(document) {
-    const styleSheetsIncluded = [];
-    const sources = await Promise.all(
-      this.options.additionalStylesheets.map((cssFile) => {
-        if (styleSheetsIncluded.includes(cssFile)) {
-          return [];
-        }
-        styleSheetsIncluded.push(cssFile);
-        const style = document.createElement("style");
-        style.$$external = true;
-        style.$$name = cssFile;
-        return this.getCssAsset(cssFile, style).then((sheet) => [sheet, style]);
-      })
-    );
-    for (const [sheet, style] of sources) {
-      if (sheet) {
-        style.textContent = sheet;
-        document.head.appendChild(style);
-      }
-    }
-  }
-  /**
-   * Fetch CSS content for a linked stylesheet
-   */
-  async fetchStylesheet(link, document) {
-    if (link.hasAttribute("data-beasties-skip")) {
-      return void 0;
-    }
-    const href = link.getAttribute("href");
-    const pathname = href?.split("?")[0]?.split("#")[0];
-    if (!pathname?.endsWith(".css")) {
-      return void 0;
-    }
-    const style = document.createElement("style");
-    style.$$external = true;
-    const sheet = await this.getCssAsset(href, style);
-    if (!sheet) {
-      return void 0;
-    }
-    return { link, href, sheet, style };
-  }
-  /**
-   * Embed a fetched stylesheet into the document
-   */
-  embedFetchedStylesheet(data, document) {
-    const { link, href, sheet, style } = data;
-    style.textContent = sheet;
-    style.$$name = href;
-    style.$$links = [link];
-    link.parentNode?.insertBefore(style, link);
-    if (this.checkInlineThreshold(link, style, sheet)) {
-      return;
-    }
-    let media = link.getAttribute("media");
-    if (media && !validateMediaQuery(media)) {
-      media = void 0;
-    }
-    const preloadMode = this.options.preload;
-    let cssLoaderPreamble = "function $loadcss(u,m,l){(l=document.createElement('link')).rel='stylesheet';l.href=u;document.head.appendChild(l)}";
-    const lazy = preloadMode === "js-lazy";
-    if (lazy) {
-      cssLoaderPreamble = cssLoaderPreamble.replace(
-        "l.href",
-        "l.media='print';l.onload=function(){l.media=m};l.href"
-      );
-    }
-    if (preloadMode === false)
-      return;
-    let noscriptFallback = false;
-    let updateLinkToPreload = false;
-    const noscriptLink = link.cloneNode(false);
-    if (preloadMode === "body") {
-      document.body.appendChild(link);
-    } else {
-      if (preloadMode === "js" || preloadMode === "js-lazy") {
-        const script = document.createElement("script");
-        script.setAttribute("data-href", href);
-        script.setAttribute("data-media", media || "all");
-        const js = `${cssLoaderPreamble}$loadcss(document.currentScript.dataset.href,document.currentScript.dataset.media)`;
-        script.textContent = js;
-        link.parentNode.insertBefore(script, link.nextSibling);
-        style.$$links.push(script);
-        cssLoaderPreamble = "";
-        noscriptFallback = true;
-        updateLinkToPreload = true;
-      } else if (preloadMode === "media") {
-        link.setAttribute("media", "print");
-        link.setAttribute("onload", `this.media='${media || "all"}'`);
-        noscriptFallback = true;
-      } else if (preloadMode === "swap-high") {
-        link.setAttribute("rel", "alternate stylesheet preload");
-        link.setAttribute("title", "styles");
-        link.setAttribute("as", "style");
-        link.setAttribute("onload", `this.title='';this.rel='stylesheet'`);
-        noscriptFallback = true;
-      } else if (preloadMode === "swap-low") {
-        link.setAttribute("rel", "alternate stylesheet");
-        link.setAttribute("title", "styles");
-        link.setAttribute("onload", `this.title='';this.rel='stylesheet'`);
-        noscriptFallback = true;
-      } else if (preloadMode === "swap") {
-        link.setAttribute("onload", "this.rel='stylesheet'");
-        updateLinkToPreload = true;
-        noscriptFallback = true;
-      } else {
-        const bodyLink = link.cloneNode(false);
-        bodyLink.removeAttribute("id");
-        document.body.appendChild(bodyLink);
-        style.$$links.push(bodyLink);
-        updateLinkToPreload = true;
-      }
-    }
-    if (this.options.noscriptFallback !== false && noscriptFallback && !href.includes("</noscript>")) {
-      const noscript = document.createElement("noscript");
-      noscriptLink.removeAttribute("id");
-      noscript.appendChild(noscriptLink);
-      link.parentNode.insertBefore(noscript, link.nextSibling);
-      style.$$links.push(noscript);
-    }
-    if (updateLinkToPreload) {
-      link.setAttribute("rel", "preload");
-      link.setAttribute("as", "style");
-    }
-  }
-  /**
-   * Inline the target stylesheet referred to by a <link rel="stylesheet"> (assuming it passes `options.filter`)
-   */
-  async embedLinkedStylesheet(link, document) {
-    const sheet = await this.fetchStylesheet(link, document);
-    if (sheet) {
-      this.embedFetchedStylesheet(sheet, document);
-    }
-  }
-  /**
-   * Prune the source CSS files
-   */
-  pruneSource(style, before, sheetInverse) {
-    const minSize = this.options.minimumExternalSize;
-    const name = style.$$name;
-    const shouldInline = minSize && sheetInverse.length < minSize;
-    if (shouldInline) {
-      this.logger.info?.(
-        `\x1B[32mInlined all of ${name} (non-critical external stylesheet would have been ${sheetInverse.length}b, which was below the threshold of ${minSize})\x1B[39m`
-      );
-    }
-    if (shouldInline || !sheetInverse) {
-      style.textContent = before;
-      if (style.$$links) {
-        for (const link of style.$$links) {
-          const parent = link.parentNode;
-          parent?.removeChild(link);
-        }
-      }
-    }
-    return !!shouldInline;
-  }
-  /**
-   * Parse the stylesheet within a <style> element, then reduce it to contain only rules used by the document.
-   */
-  processStyle(style, document) {
-    if (style.$$reduce === false)
-      return;
-    const name = style.$$name ? style.$$name.replace(LEADING_SLASH_RE, "") : "inline CSS";
-    const options = this.options;
-    const beastiesContainers = document.beastiesContainers;
-    let keyframesMode = options.keyframes ?? "critical";
-    if (keyframesMode === true)
-      keyframesMode = "all";
-    if (keyframesMode === false)
-      keyframesMode = "none";
-    let sheet = style.textContent;
-    const before = sheet;
-    if (!sheet)
-      return;
-    const ast = parseStylesheet(sheet, { safeParser: this.options.safeParser !== false });
-    const astInverse = options.pruneSource ? parseStylesheet(sheet, { safeParser: this.options.safeParser !== false }) : null;
-    let criticalFonts = "";
-    const failedSelectors = [];
-    const criticalKeyframeNames = /* @__PURE__ */ new Set();
-    let includeNext = false;
-    let includeAll = false;
-    let excludeNext = false;
-    let excludeAll = false;
-    const shouldPreloadFonts = options.fonts === true || options.preloadFonts === true;
-    const shouldInlineFonts = options.fonts !== false && options.inlineFonts === true;
-    walkStyleRules(
-      ast,
-      markOnly((rule) => {
-        if (rule.type === "comment") {
-          const beastiesComment = rule.text.match(BEASTIES_COMMENT_RE);
-          const command = beastiesComment && beastiesComment[1];
-          if (command) {
-            switch (command) {
-              case "include":
-                includeNext = true;
-                break;
-              case "exclude":
-                excludeNext = true;
-                break;
-              case "include start":
-                includeAll = true;
-                break;
-              case "include end":
-                includeAll = false;
-                break;
-              case "exclude start":
-                excludeAll = true;
-                break;
-              case "exclude end":
-                excludeAll = false;
-                break;
-            }
-          }
-        }
-        if (rule.type === "rule") {
-          if (includeNext) {
-            includeNext = false;
-            return true;
-          }
-          if (excludeNext) {
-            excludeNext = false;
-            return false;
-          }
-          if (includeAll) {
-            return true;
-          }
-          if (excludeAll) {
-            return false;
-          }
-          rule.filterSelectors?.((sel) => {
-            const isAllowedRule = options.allowRules.some((exp) => {
-              if (exp instanceof RegExp) {
-                return exp.test(sel);
-              }
-              return exp === sel;
-            });
-            if (isAllowedRule)
-              return true;
-            if (sel === ":root" || sel === "html" || sel === "body" || sel[0] === ":" && BEFORE_AFTER_PSEUDO_RE.test(sel)) {
-              return true;
-            }
-            sel = this.normalizeCssSelector(sel);
-            if (!sel)
-              return false;
-            try {
-              return beastiesContainers.some((container) => container.exists(sel));
-            } catch (e) {
-              failedSelectors.push(`${sel} -> ${e.message || e.toString()}`);
-              return false;
-            }
-          });
-          if (!rule.selector) {
-            return false;
-          }
-          if (rule.nodes) {
-            for (const decl of rule.nodes) {
-              if (!("prop" in decl)) {
-                continue;
-              }
-              if (shouldInlineFonts && FONT_FAMILY_RE.test(decl.prop)) {
-                criticalFonts += ` ${decl.value}`;
-              }
-              if (decl.prop === "animation" || decl.prop === "animation-name") {
-                for (const name2 of decl.value.split(WHITESPACE_RE)) {
-                  const nameTrimmed = name2.trim();
-                  if (nameTrimmed)
-                    criticalKeyframeNames.add(nameTrimmed);
-                }
-              }
-            }
-          }
-        }
-        if (rule.type === "atrule" && (rule.name === "font-face" || rule.name === "layer"))
-          return;
-        const hasRemainingRules = ("nodes" in rule && rule.nodes?.some((rule2) => !rule2.$$remove)) ?? true;
-        return hasRemainingRules;
-      })
-    );
-    if (failedSelectors.length !== 0) {
-      this.logger.warn?.(
-        `${failedSelectors.length} rules skipped due to selector errors:
-  ${failedSelectors.join("\n  ")}`
-      );
-    }
-    const preloadedFonts = /* @__PURE__ */ new Set();
-    walkStyleRulesWithReverseMirror(ast, astInverse, (rule) => {
-      if (rule.$$remove === true)
-        return false;
-      if ("selectors" in rule) {
-        applyMarkedSelectors(rule);
-      }
-      if (rule.type === "atrule" && rule.name === "keyframes") {
-        if (keyframesMode === "none")
-          return false;
-        if (keyframesMode === "all")
-          return true;
-        return criticalKeyframeNames.has(rule.params);
-      }
-      if (rule.type === "atrule" && rule.name === "font-face") {
-        let family, src;
-        if (rule.nodes) {
-          for (const decl of rule.nodes) {
-            if (!("prop" in decl)) {
-              continue;
-            }
-            if (decl.prop === "src") {
-              src = (decl.value.match(URL_RE) || [])[2];
-            } else if (decl.prop === "font-family") {
-              family = decl.value;
-            }
-          }
-          if (src && shouldPreloadFonts && !preloadedFonts.has(src)) {
-            preloadedFonts.add(src);
-            const preload = document.createElement("link");
-            preload.setAttribute("rel", "preload");
-            preload.setAttribute("as", "font");
-            preload.setAttribute("crossorigin", "anonymous");
-            preload.setAttribute("href", src.trim());
-            document.head.appendChild(preload);
-          }
-        }
-        if (!shouldInlineFonts || !family || !src || !criticalFonts.includes(family)) {
-          return false;
-        }
-      }
-    });
-    sheet = serializeStylesheet(ast, {
-      compress: this.options.compress !== false
-    });
-    if (sheet.trim().length === 0) {
-      if (style.parentNode) {
-        style.remove();
-      }
-      return;
-    }
-    let afterText = "";
-    let styleInlinedCompletely = false;
-    if (options.pruneSource) {
-      const sheetInverse = serializeStylesheet(astInverse, {
-        compress: this.options.compress !== false
-      });
-      styleInlinedCompletely = this.pruneSource(style, before, sheetInverse);
-      if (styleInlinedCompletely) {
-        const percent2 = sheetInverse.length / before.length * 100;
-        afterText = `, reducing non-inlined size ${percent2 | 0}% to ${formatSize(sheetInverse.length)}`;
-      }
-      const cssFilePath = _pathModule.resolve(this.options.path, name);
-      this.writeFile(cssFilePath, sheetInverse).then(() => this.logger.info?.(`${name} was successfully updated`)).catch((err) => this.logger.error?.(err));
-    }
-    if (!styleInlinedCompletely) {
-      style.textContent = sheet;
-    }
-    const percent = sheet.length / before.length * 100 | 0;
-    this.logger.info?.(
-      `\x1B[32mInlined ${formatSize(sheet.length)} (${percent}% of original ${formatSize(before.length)}) of ${name}${afterText}.\x1B[39m`
-    );
-  }
-  normalizeCssSelector(sel) {
-    let normalizedSelector = this.#selectorCache.get(sel);
-    if (normalizedSelector !== void 0) {
-      return normalizedSelector;
-    }
-    normalizedSelector = sel.replace(removePseudoClassesAndElementsPattern, "").replace(removeTrailingCommasPattern, (match) => match.includes("(") ? "(" : ")").replace(implicitUniversalPattern, "$1 * $2").replace(emptyCombinatorPattern, "$1 *").trim();
-    this.#selectorCache.set(sel, normalizedSelector);
-    return normalizedSelector;
-  }
-}
+const DEFERRED_MEDIA_ATTR = "data-beasties-media";
+const DEFERRED_MEDIA_SCRIPT = `document.querySelectorAll('link[${DEFERRED_MEDIA_ATTR}]').forEach(function(l){l.media=l.getAttribute('${DEFERRED_MEDIA_ATTR}');l.removeAttribute('${DEFERRED_MEDIA_ATTR}')})`;
+var Beasties = class Beasties {
+	#selectorCache = /* @__PURE__ */ new Map();
+	#preloadedFonts = /* @__PURE__ */ new WeakMap();
+	options;
+	logger;
+	fs;
+	constructor(options = {}) {
+		this.options = Object.assign({
+			logLevel: "info",
+			path: "",
+			publicPath: "",
+			reduceInlineStyles: true,
+			pruneSource: false,
+			additionalStylesheets: [],
+			allowRules: [],
+			dedupeWarnings: "process"
+		}, options);
+		this.logger = createDeduplicatingLogger(this.options.logger || createLogger(this.options.logLevel), this.options.dedupeWarnings === true ? "process" : this.options.dedupeWarnings);
+	}
+	/**
+	* Read the contents of a file from the specified filesystem or disk
+	*/
+	readFile(filename) {
+		const fs = this.fs;
+		return new Promise((resolve, reject) => {
+			const callback = (err, data) => {
+				if (err) reject(err);
+				else resolve(data.toString());
+			};
+			if (fs && fs.readFile) fs.readFile(filename, callback);
+			else readFile(filename, "utf-8", callback);
+		});
+	}
+	/**
+	* Write content to a file
+	*/
+	writeFile(filename, data) {
+		const fs = this.fs;
+		return new Promise((resolve, reject) => {
+			const callback = (err) => {
+				if (err) reject(err);
+				else resolve();
+			};
+			if (fs && fs.writeFile) fs.writeFile(filename, data, callback);
+			else writeFile(filename, data, callback);
+		});
+	}
+	/**
+	* Apply critical CSS processing to the html
+	*/
+	async process(html) {
+		const start = Date.now();
+		const document = createDocument(html, this.logger);
+		if (this.options.additionalStylesheets.length > 0) await this.embedAdditionalStylesheet(document);
+		if (this.options.external !== false) {
+			const externalSheets = [...document.querySelectorAll("link[rel=\"stylesheet\"]")];
+			if (this.embedLinkedStylesheet !== Beasties.prototype.embedLinkedStylesheet) for (const link of externalSheets) await this.embedLinkedStylesheet(link, document);
+			else {
+				const sheets = await Promise.all(externalSheets.map((link) => this.fetchStylesheet(link, document)));
+				for (const sheet of sheets) if (sheet) this.embedFetchedStylesheet(sheet, document);
+			}
+		}
+		if (this.options.preload === "media-script") this.injectDeferredMediaScript(document);
+		const styles = this.getAffectedStyleTags(document);
+		for (const style of styles) this.processStyle(style, document);
+		if (this.options.mergeStylesheets !== false && styles.length !== 0) this.mergeStylesheets(document);
+		const output = serializeDocument(document);
+		const end = Date.now();
+		this.logger.info?.(`Time ${end - start}ms`);
+		return output;
+	}
+	/**
+	* Get the style tags that need processing
+	*/
+	getAffectedStyleTags(document) {
+		const styles = [...document.querySelectorAll("style")];
+		if (this.options.reduceInlineStyles === false) return styles.filter((style) => style.$$external);
+		return styles;
+	}
+	/**
+	* Append the single deferred-CSS activation script used by the `"media-script"`
+	* strategy, if any link was actually deferred. The script body is invariant, so
+	* it can be covered by a CSP hash as well as by `options.nonce`.
+	*/
+	injectDeferredMediaScript(document) {
+		if (document.querySelectorAll(`link[${DEFERRED_MEDIA_ATTR}]`).length === 0) return;
+		const script = document.createElement("script");
+		this.applyNonce(document, script);
+		script.textContent = DEFERRED_MEDIA_SCRIPT;
+		document.body.appendChild(script);
+	}
+	nonceValue;
+	applyNonce(document, element) {
+		this.nonceValue ??= typeof this.options.nonce === "function" ? this.options.nonce(document) : this.options.nonce;
+		if (this.nonceValue) element.setAttribute("nonce", this.nonceValue);
+	}
+	mergeStylesheets(document) {
+		const styles = this.getAffectedStyleTags(document);
+		if (styles.length === 0) {
+			this.logger.warn?.("Merging inline stylesheets into a single <style> tag skipped, no inline stylesheets to merge");
+			return;
+		}
+		const first = styles[0];
+		let sheet = first.textContent;
+		for (let i = 1; i < styles.length; i++) {
+			const node = styles[i];
+			sheet += node.textContent;
+			node.remove();
+		}
+		first.textContent = sheet;
+	}
+	/**
+	* Given href, find the corresponding CSS asset
+	*/
+	async getCssAsset(href, _style) {
+		const outputPath = this.options.path;
+		const publicPath = this.options.publicPath;
+		let normalizedPath = href.replace(LEADING_SLASH_OR_QUERY_RE, "");
+		const pathPrefix = `${(publicPath || "").replace(PUBLIC_PATH_RE, "")}/`;
+		if (normalizedPath.startsWith(pathPrefix) && !(pathPrefix === "/" && normalizedPath.startsWith("//"))) normalizedPath = normalizedPath.substring(pathPrefix.length).replace(LEADING_SLASH_RE, "");
+		if (REMOTE_URL_RE.test(normalizedPath) || normalizedPath.startsWith("//")) {
+			if (this.options.remote === true) try {
+				const absoluteUrl = href.startsWith("//") ? `https:${href}` : href;
+				const response = await fetch(absoluteUrl);
+				if (!response.ok) {
+					this.logger.warn?.(`Failed to fetch ${absoluteUrl} (${response.status})`);
+					return;
+				}
+				return await response.text();
+			} catch (error) {
+				this.logger.warn?.(`Error fetching ${href}: ${error.message}`);
+				return;
+			}
+			return;
+		}
+		const filename = _pathModule.resolve(outputPath, normalizedPath);
+		if (!isSubpath(outputPath, filename)) return;
+		let sheet;
+		try {
+			sheet = await this.readFile(filename);
+		} catch {
+			this.logger.warn?.(`Unable to locate stylesheet ${href} (resolved to ${filename}, using path: ${JSON.stringify(outputPath)}, publicPath: ${JSON.stringify(publicPath)}). If this file is not part of your build output, add data-beasties-skip to its <link> to skip it.`);
+		}
+		return sheet;
+	}
+	checkInlineThreshold(link, style, sheet) {
+		if (this.options.inlineThreshold && sheet.length < this.options.inlineThreshold) {
+			const href = style.$$name;
+			style.$$reduce = false;
+			this.logger.info?.(`\u001B[32mInlined all of ${href} (${sheet.length} was below the threshold of ${this.options.inlineThreshold})\u001B[39m`);
+			link.remove();
+			return true;
+		}
+		return false;
+	}
+	/**
+	* Inline the stylesheets from options.additionalStylesheets (assuming it passes `options.filter`)
+	*/
+	async embedAdditionalStylesheet(document) {
+		const styleSheetsIncluded = [];
+		const sources = await Promise.all(this.options.additionalStylesheets.map((cssFile) => {
+			if (styleSheetsIncluded.includes(cssFile)) return [];
+			styleSheetsIncluded.push(cssFile);
+			const style = document.createElement("style");
+			this.applyNonce(document, style);
+			style.$$external = true;
+			style.$$name = cssFile;
+			return this.getCssAsset(cssFile, style).then((sheet) => [sheet, style]);
+		}));
+		for (const [sheet, style] of sources) if (sheet) {
+			style.textContent = sheet;
+			document.head.appendChild(style);
+		}
+	}
+	/**
+	* Fetch CSS content for a linked stylesheet
+	*/
+	async fetchStylesheet(link, document) {
+		if (link.hasAttribute("data-beasties-skip")) return;
+		const href = link.getAttribute("href");
+		if (!(href?.split("?")[0]?.split("#")[0])?.endsWith(".css")) return;
+		const style = document.createElement("style");
+		this.applyNonce(document, style);
+		style.$$external = true;
+		const sheet = await this.getCssAsset(href, style);
+		if (!sheet) return;
+		return {
+			link,
+			href,
+			sheet,
+			style
+		};
+	}
+	/**
+	* Embed a fetched stylesheet into the document
+	*/
+	embedFetchedStylesheet(data, document) {
+		const { link, href, sheet, style } = data;
+		style.textContent = sheet;
+		style.$$name = href;
+		style.$$links = [link];
+		link.parentNode?.insertBefore(style, link);
+		if (this.checkInlineThreshold(link, style, sheet)) return;
+		let media = link.getAttribute("media");
+		if (media && (!validateMediaQuery(media) || !isSafeMediaValue(media))) media = void 0;
+		const preloadMode = this.options.preload;
+		let cssLoaderPreamble = "function $loadcss(u,m,l){(l=document.createElement('link')).rel='stylesheet';l.href=u;document.head.appendChild(l)}";
+		if (preloadMode === "js-lazy") cssLoaderPreamble = cssLoaderPreamble.replace("l.href", "l.media='print';l.onload=function(){l.media=m};l.href");
+		if (preloadMode === false) return;
+		let noscriptFallback = false;
+		let updateLinkToPreload = false;
+		const noscriptLink = link.cloneNode(false);
+		if (preloadMode === "body") document.body.appendChild(link);
+		else if (preloadMode === "js" || preloadMode === "js-lazy") {
+			const script = document.createElement("script");
+			this.applyNonce(document, script);
+			script.setAttribute("data-href", href);
+			script.setAttribute("data-media", media || "all");
+			script.textContent = `${cssLoaderPreamble}$loadcss(document.currentScript.dataset.href,document.currentScript.dataset.media)`;
+			link.parentNode.insertBefore(script, link.nextSibling);
+			style.$$links.push(script);
+			cssLoaderPreamble = "";
+			noscriptFallback = true;
+			updateLinkToPreload = true;
+		} else if (preloadMode === "media-script") {
+			link.setAttribute("media", "print");
+			link.setAttribute(DEFERRED_MEDIA_ATTR, media || "all");
+			noscriptFallback = true;
+		} else if (preloadMode === "media") {
+			link.setAttribute("media", "print");
+			link.setAttribute("onload", `this.media='${media || "all"}'`);
+			noscriptFallback = true;
+		} else if (preloadMode === "swap-high") {
+			link.setAttribute("rel", "alternate stylesheet preload");
+			link.setAttribute("title", "styles");
+			link.setAttribute("as", "style");
+			link.setAttribute("onload", `this.title='';this.rel='stylesheet'`);
+			noscriptFallback = true;
+		} else if (preloadMode === "swap-low") {
+			link.setAttribute("rel", "alternate stylesheet");
+			link.setAttribute("title", "styles");
+			link.setAttribute("onload", `this.title='';this.rel='stylesheet'`);
+			noscriptFallback = true;
+		} else if (preloadMode === "swap") {
+			link.setAttribute("onload", "this.rel='stylesheet'");
+			updateLinkToPreload = true;
+			noscriptFallback = true;
+		} else {
+			const bodyLink = link.cloneNode(false);
+			bodyLink.removeAttribute("id");
+			document.body.appendChild(bodyLink);
+			style.$$links.push(bodyLink);
+			updateLinkToPreload = true;
+		}
+		if (this.options.noscriptFallback !== false && noscriptFallback && !href.includes("</noscript>")) {
+			const noscript = document.createElement("noscript");
+			noscriptLink.removeAttribute("id");
+			noscript.appendChild(noscriptLink);
+			link.parentNode.insertBefore(noscript, link.nextSibling);
+			style.$$links.push(noscript);
+		}
+		if (updateLinkToPreload) {
+			link.setAttribute("rel", "preload");
+			link.setAttribute("as", "style");
+		}
+	}
+	/**
+	* Inline the target stylesheet referred to by a <link rel="stylesheet"> (assuming it passes `options.filter`)
+	*/
+	async embedLinkedStylesheet(link, document) {
+		const sheet = await this.fetchStylesheet(link, document);
+		if (sheet) this.embedFetchedStylesheet(sheet, document);
+	}
+	/**
+	* Prune the source CSS files
+	*/
+	pruneSource(style, before, sheetInverse) {
+		const minSize = this.options.minimumExternalSize;
+		const name = style.$$name;
+		const shouldInline = minSize && sheetInverse.length < minSize;
+		if (shouldInline) this.logger.info?.(`\u001B[32mInlined all of ${name} (non-critical external stylesheet would have been ${sheetInverse.length}b, which was below the threshold of ${minSize})\u001B[39m`);
+		if (shouldInline || !sheetInverse) {
+			style.textContent = before;
+			if (style.$$links) for (const link of style.$$links) link.parentNode?.removeChild(link);
+		}
+		return !!shouldInline;
+	}
+	/**
+	* Parse the stylesheet within a <style> element, then reduce it to contain only rules used by the document.
+	*/
+	processStyle(style, document) {
+		if (style.$$reduce === false) {
+			if (style.$$name && style.textContent) style.textContent = rewriteCssUrls(style.textContent, style.$$name);
+			return;
+		}
+		const name = style.$$name ? style.$$name.replace(LEADING_SLASH_RE, "") : "inline CSS";
+		const options = this.options;
+		const beastiesContainers = document.beastiesContainers;
+		let keyframesMode = options.keyframes ?? "critical";
+		if (keyframesMode === true) keyframesMode = "all";
+		if (keyframesMode === false) keyframesMode = "none";
+		let sheet = style.textContent;
+		const before = sheet;
+		if (!sheet) return;
+		const ast = parseStylesheet(sheet, { safeParser: this.options.safeParser !== false });
+		const astInverse = options.pruneSource ? parseStylesheet(sheet, { safeParser: this.options.safeParser !== false }) : null;
+		let criticalFonts = "";
+		const unparseableSelectors = [];
+		const criticalKeyframeNames = /* @__PURE__ */ new Set();
+		let includeNext = false;
+		let includeAll = false;
+		let excludeNext = false;
+		let excludeAll = false;
+		let warnedCritters = false;
+		const shouldPreloadFonts = options.fonts === true || options.preloadFonts === true;
+		const shouldInlineFonts = options.fonts !== false && options.inlineFonts === true;
+		walkStyleRules(ast, markOnly((rule) => {
+			if (rule.type === "comment") {
+				const { command, deprecated, warning } = parseDirective(rule.text);
+				if (warning) this.logger.warn?.(warning);
+				if (deprecated && !warnedCritters) {
+					warnedCritters = true;
+					this.logger.warn?.(CRITTERS_DEPRECATION_WARNING);
+				}
+				if (command) switch (command) {
+					case "include":
+						includeNext = true;
+						break;
+					case "exclude":
+						excludeNext = true;
+						break;
+					case "include start":
+						includeAll = true;
+						break;
+					case "include end":
+						includeAll = false;
+						break;
+					case "exclude start":
+						excludeAll = true;
+						break;
+					case "exclude end": excludeAll = false;
+				}
+			}
+			if (rule.type === "rule") {
+				if (includeNext) {
+					includeNext = false;
+					return true;
+				}
+				if (excludeNext) {
+					excludeNext = false;
+					return false;
+				}
+				if (includeAll) return true;
+				if (excludeAll) return false;
+				rule.filterSelectors?.((sel) => {
+					if (options.allowRules.some((exp) => {
+						if (exp instanceof RegExp) return exp.test(sel);
+						return exp === sel;
+					})) return true;
+					if (isAlwaysCriticalSelector(sel)) return true;
+					sel = this.normalizeCssSelector(sel);
+					if (!sel) return false;
+					try {
+						return beastiesContainers.some((container) => container.exists(sel));
+					} catch (e) {
+						const message = e.message || String(e);
+						if (isUnevaluableSelectorError(message)) this.logger.debug?.(`Cannot statically evaluate selector, excluding it from critical CSS: ${sel} (${message})`);
+						else unparseableSelectors.push(`${sel} (${message})`);
+						return false;
+					}
+				});
+				if (!rule.selector) return false;
+				if (rule.nodes) for (const decl of rule.nodes) {
+					if (!("prop" in decl)) continue;
+					if (shouldInlineFonts && FONT_FAMILY_RE.test(decl.prop)) criticalFonts += ` ${decl.value}`;
+					if (decl.prop === "animation" || decl.prop === "animation-name") for (const name of decl.value.split(WHITESPACE_RE)) {
+						const nameTrimmed = name.trim();
+						if (nameTrimmed) criticalKeyframeNames.add(nameTrimmed);
+					}
+				}
+			}
+			if (rule.type === "atrule" && (rule.name === "font-face" || rule.name === "layer")) return;
+			return ("nodes" in rule && rule.nodes?.some((rule) => !rule.$$remove)) ?? true;
+		}));
+		if (unparseableSelectors.length !== 0) {
+			const single = unparseableSelectors.length === 1;
+			this.logger.warn?.(`Could not parse ${single ? "1 selector" : `${unparseableSelectors.length} selectors`} in ${style.$$name || "inline styles"}; ${single ? "its rule was" : "their rules were"} left out of the critical CSS but still ${single ? "applies" : "apply"} once the full stylesheet loads:\n  ${unparseableSelectors.join("\n  ")}`);
+		}
+		const preloadedFonts = this.getPreloadedFonts(document);
+		walkStyleRulesWithReverseMirror(ast, astInverse, (rule) => {
+			if (rule.$$remove === true) return false;
+			if ("selectors" in rule) applyMarkedSelectors(rule);
+			if (rule.type === "atrule" && rule.name === "keyframes") {
+				if (keyframesMode === "none") return false;
+				if (keyframesMode === "all") return true;
+				return criticalKeyframeNames.has(rule.params);
+			}
+			if (rule.type === "atrule" && rule.name === "font-face") {
+				let family, src;
+				if (rule.nodes) {
+					for (const decl of rule.nodes) {
+						if (!("prop" in decl)) continue;
+						if (decl.prop === "src") src = (decl.value.match(URL_RE) || [])[2];
+						else if (decl.prop === "font-family") family = decl.value;
+					}
+					if (src && shouldPreloadFonts) {
+						const href = style.$$name ? resolveCssUrl(src.trim(), style.$$name) : src.trim();
+						if (!preloadedFonts.has(href)) {
+							preloadedFonts.add(href);
+							const preload = document.createElement("link");
+							preload.setAttribute("rel", "preload");
+							preload.setAttribute("as", "font");
+							preload.setAttribute("crossorigin", "anonymous");
+							preload.setAttribute("href", href);
+							document.head.appendChild(preload);
+						}
+					}
+				}
+				if (!shouldInlineFonts || !family || !src || !criticalFonts.includes(family)) return false;
+			}
+		});
+		sheet = serializeStylesheet(ast, { compress: this.options.compress !== false });
+		if (style.$$name) sheet = rewriteCssUrls(sheet, style.$$name);
+		if (sheet.trim().length === 0) {
+			if (style.parentNode) style.remove();
+			return;
+		}
+		let afterText = "";
+		let styleInlinedCompletely = false;
+		if (options.pruneSource) {
+			const sheetInverse = serializeStylesheet(astInverse, { compress: this.options.compress !== false });
+			styleInlinedCompletely = this.pruneSource(style, style.$$name ? rewriteCssUrls(before, style.$$name) : before, sheetInverse);
+			if (styleInlinedCompletely) afterText = `, reducing non-inlined size ${sheetInverse.length / before.length * 100 | 0}% to ${formatSize(sheetInverse.length)}`;
+			const cssFilePath = _pathModule.resolve(this.options.path, name);
+			this.writeFile(cssFilePath, sheetInverse).then(() => this.logger.info?.(`${name} was successfully updated`)).catch((err) => this.logger.error?.(err));
+		}
+		if (!styleInlinedCompletely) style.textContent = sheet;
+		const percent = sheet.length / before.length * 100 | 0;
+		this.logger.info?.(`\u001B[32mInlined ${formatSize(sheet.length)} (${percent}% of original ${formatSize(before.length)}) of ${name}${afterText}.\u001B[39m`);
+	}
+	/**
+	* Font URLs already preloaded for a document, whether by beasties while
+	* processing an earlier stylesheet or by the document itself.
+	*/
+	getPreloadedFonts(document) {
+		let preloaded = this.#preloadedFonts.get(document);
+		if (!preloaded) {
+			preloaded = /* @__PURE__ */ new Set();
+			for (const link of document.querySelectorAll("link[rel=\"preload\"][as=\"font\"]")) {
+				const href = link.getAttribute("href");
+				if (href) preloaded.add(href);
+			}
+			this.#preloadedFonts.set(document, preloaded);
+		}
+		return preloaded;
+	}
+	normalizeCssSelector(sel) {
+		let normalizedSelector = this.#selectorCache.get(sel);
+		if (normalizedSelector !== void 0) return normalizedSelector;
+		normalizedSelector = normalizeCssSelector(sel);
+		this.#selectorCache.set(sel, normalizedSelector);
+		return normalizedSelector;
+	}
+};
 function formatSize(size) {
-  if (size <= 0) {
-    return "0 bytes";
-  }
-  const abbreviations = ["bytes", "kB", "MB", "GB"];
-  const index = Math.floor(Math.log(size) / Math.log(1024));
-  const roundedSize = size / 1024 ** index;
-  const fractionDigits = index === 0 ? 0 : 2;
-  return `${roundedSize.toFixed(fractionDigits)} ${abbreviations[index]}`;
+	if (size <= 0) return "0 bytes";
+	const abbreviations = [
+		"bytes",
+		"kB",
+		"MB",
+		"GB"
+	];
+	const index = Math.floor(Math.log(size) / Math.log(1024));
+	const roundedSize = size / 1024 ** index;
+	const fractionDigits = index === 0 ? 0 : 2;
+	return `${roundedSize.toFixed(fractionDigits)} ${abbreviations[index]}`;
 }
 
 export { Beasties as default };

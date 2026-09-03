@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "22.2.0-next.6+sha-f6cb128",
+  "version": "22.2.0-next.6+sha-55583c4",
   "description": "Angular server side rendering utilities",
   "type": "module",
   "keywords": [
@@ -44,7 +44,7 @@
     "@angular/platform-server": "22.2.0-next.4",
     "@angular/router": "22.2.0-next.4",
     "@schematics/angular": "workspace:*",
-    "beasties": "0.4.3"
+    "beasties": "0.5.1"
   },
   "sideEffects": false,
   "schematics": "./schematics/collection.json",

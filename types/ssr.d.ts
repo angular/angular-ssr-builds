@@ -885,53 +885,10 @@ declare function getOrCreateAngularServerApp(options?: Readonly<AngularServerApp
  */
 declare function destroyAngularServerApp(): void;
 
-/** Partial representation of an `HTMLElement`. */
-interface PartialHTMLElement {
-    getAttribute(name: string): string | null;
-    setAttribute(name: string, value: string): void;
-    hasAttribute(name: string): boolean;
-    removeAttribute(name: string): void;
-    appendChild(child: PartialHTMLElement): void;
-    insertBefore(newNode: PartialHTMLElement, referenceNode?: PartialHTMLElement): void;
-    remove(): void;
-    name: string;
-    textContent: string;
-    tagName: string | null;
-    children: PartialHTMLElement[];
-    next: PartialHTMLElement | null;
-    prev: PartialHTMLElement | null;
-}
-/** Partial representation of an HTML `Document`. */
-interface PartialDocument {
-    head: PartialHTMLElement;
-    createElement(tagName: string): PartialHTMLElement;
-    querySelector(selector: string): PartialHTMLElement | null;
-}
-interface BeastiesBase {
-    embedLinkedStylesheet(link: PartialHTMLElement, document: PartialDocument): Promise<unknown>;
-}
-declare class BeastiesBase extends Beasties {
-}
-declare class InlineCriticalCssProcessor extends BeastiesBase {
+declare class InlineCriticalCssProcessor extends Beasties {
     readFile: (path: string) => Promise<string>;
     readonly outputPath?: string | undefined;
-    private addedCspScriptsDocuments;
-    private documentNonces;
     constructor(readFile: (path: string) => Promise<string>, outputPath?: string | undefined);
-    /**
-     * Override of the Beasties `embedLinkedStylesheet` method
-     * that makes it work with Angular's CSP APIs.
-     */
-    embedLinkedStylesheet(link: PartialHTMLElement, document: PartialDocument): Promise<unknown>;
-    /**
-     * Finds the CSP nonce for a specific document.
-     */
-    private findCspNonce;
-    /**
-     * Inserts the `script` tag that swaps the critical CSS at runtime,
-     * if one hasn't been inserted into the document already.
-     */
-    private conditionallyInsertCspLoadingScript;
 }
 
 /**

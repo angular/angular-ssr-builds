@@ -6113,7 +6113,7 @@ function requireSafeParser () {
 	    for (nextStart = colon - 1; nextStart >= 0; nextStart--) {
 	      if (tokens[nextStart][0] === 'word') break
 	    }
-	    if (nextStart === 0 || nextStart < 0) return
+	    if (nextStart <= 0) return
 
 	    for (prevEnd = nextStart - 1; prevEnd >= 0; prevEnd--) {
 	      if (tokens[prevEnd][0] !== 'space') {

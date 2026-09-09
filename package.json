@@ -1,6 +1,6 @@
 {
   "name": "@angular/ssr",
-  "version": "22.2.0-next.6+sha-473abcd",
+  "version": "22.2.0-next.6+sha-062ac27",
   "description": "Angular server side rendering utilities",
   "type": "module",
   "keywords": [
@@ -22,7 +22,7 @@
     "save": "dependencies"
   },
   "dependencies": {
-    "beasties": "0.5.3",
+    "beasties": "0.5.4",
     "tslib": "^2.3.0"
   },
   "peerDependencies": {

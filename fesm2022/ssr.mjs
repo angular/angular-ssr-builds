@@ -450,6 +450,7 @@ async function* handleRoute(options) {
     const {
       metadata,
       currentRoutePath,
+      parentRoute,
       route,
       compiler,
       parentInjector,
@@ -469,7 +470,7 @@ async function* handleRoute(options) {
       appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata);
     }
     if (metadata.renderMode === RenderMode.Prerender) {
-      yield* handleSSGRoute(serverConfigRouteTree, typeof redirectTo === 'string' ? redirectTo : undefined, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
+      yield* handleSSGRoute(serverConfigRouteTree, typeof redirectTo === 'string' ? redirectTo : undefined, parentRoute, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
     } else if (redirectTo !== undefined) {
       if (metadata.status && !isValidRedirectResponseCode(metadata.status)) {
         yield {
@@ -478,7 +479,7 @@ async function* handleRoute(options) {
       } else if (typeof redirectTo === 'string') {
         yield {
           ...metadata,
-          redirectTo: resolveRedirectTo(metadata.route, redirectTo),
+          redirectTo: resolveRedirectTo(parentRoute, redirectTo),
           relativeRedirect: redirectTo[0] !== '/' ? true : undefined
         };
       } else {
@@ -617,7 +618,7 @@ function appendPreloadToMetadata(entryName, entryPointToBrowserMapping, metadata
   }
   metadata.preload = Array.from(combinedPreloads);
 }
-async function* handleSSGRoute(serverConfigRouteTree, redirectTo, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes) {
+async function* handleSSGRoute(serverConfigRouteTree, redirectTo, parentRoute, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes) {
   if (metadata.renderMode !== RenderMode.Prerender) {
     throw new Error(`'handleSSGRoute' was called for a route which rendering mode is not prerender.`);
   }
@@ -631,7 +632,7 @@ async function* handleSSGRoute(serverConfigRouteTree, redirectTo, metadata, pare
     delete meta['getPrerenderParams'];
   }
   if (redirectTo !== undefined) {
-    meta.redirectTo = resolveRedirectTo(currentRoutePath, redirectTo);
+    meta.redirectTo = resolveRedirectTo(parentRoute, redirectTo);
     meta.relativeRedirect = redirectTo[0] !== '/' ? true : undefined;
   }
   const isCatchAllRoute = CATCH_ALL_REGEXP.test(currentRoutePath);
@@ -668,7 +669,7 @@ async function* handleSSGRoute(serverConfigRouteTree, redirectTo, metadata, pare
         yield {
           ...meta,
           route: routeWithResolvedParams,
-          redirectTo: redirectTo === undefined ? undefined : resolveRedirectTo(routeWithResolvedParams, redirectTo)
+          redirectTo: redirectTo === undefined ? undefined : resolveRedirectTo(parentRoute.replace(URL_PARAMETER_GLOBAL_REGEXP, replacer), redirectTo)
         };
       }
     } catch (error) {
@@ -696,14 +697,12 @@ function handlePrerenderParamsReplacement(params, currentRoutePath) {
     return parameterName === '**' ? `/${value}` : value;
   };
 }
-function resolveRedirectTo(routePath, redirectTo) {
+function resolveRedirectTo(parentRoute, redirectTo) {
   if (redirectTo[0] === '/') {
     return redirectTo;
   }
-  const segments = routePath.replace(URL_PARAMETER_GLOBAL_REGEXP, '*').split('/');
-  segments.pop();
   const [path] = redirectTo.split(/[?#]/, 1);
-  return joinUrlParts(...segments, path);
+  return joinUrlParts(parentRoute.replace(URL_PARAMETER_GLOBAL_REGEXP, '*'), path);
 }
 function buildServerConfigRouteTree({
   routes,

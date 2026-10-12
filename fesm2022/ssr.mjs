@@ -478,7 +478,8 @@ async function* handleRoute(options) {
       } else if (typeof redirectTo === 'string') {
         yield {
           ...metadata,
-          redirectTo: resolveRedirectTo(metadata.route, redirectTo)
+          redirectTo: resolveRedirectTo(metadata.route, redirectTo),
+          relativeRedirect: redirectTo[0] !== '/' ? true : undefined
         };
       } else {
         yield metadata;
@@ -631,6 +632,7 @@ async function* handleSSGRoute(serverConfigRouteTree, redirectTo, metadata, pare
   }
   if (redirectTo !== undefined) {
     meta.redirectTo = resolveRedirectTo(currentRoutePath, redirectTo);
+    meta.relativeRedirect = redirectTo[0] !== '/' ? true : undefined;
   }
   const isCatchAllRoute = CATCH_ALL_REGEXP.test(currentRoutePath);
   if (isCatchAllRoute && !getPrerenderParams || !isCatchAllRoute && !URL_PARAMETER_REGEXP.test(currentRoutePath)) {
@@ -700,7 +702,8 @@ function resolveRedirectTo(routePath, redirectTo) {
   }
   const segments = routePath.replace(URL_PARAMETER_GLOBAL_REGEXP, '*').split('/');
   segments.pop();
-  return joinUrlParts(...segments, redirectTo);
+  const [path] = redirectTo.split(/[?#]/, 1);
+  return joinUrlParts(...segments, path);
 }
 function buildServerConfigRouteTree({
   routes,
@@ -995,12 +998,14 @@ class AngularServerApp {
     }
     const {
       redirectTo,
+      relativeRedirect,
       status,
       renderMode,
       headers
     } = matchedRoute;
     if (redirectTo !== undefined) {
-      return createRedirectResponse(joinUrlParts(request.headers.get('X-Forwarded-Prefix') ?? '', buildPathWithParams(redirectTo, url.pathname)), status, headers);
+      const location = joinUrlParts(request.headers.get('X-Forwarded-Prefix') ?? '', buildPathWithParams(redirectTo, url.pathname));
+      return createRedirectResponse(relativeRedirect ? location + url.search : location, status, headers);
     }
     if (renderMode === RenderMode.Prerender) {
       const response = await this.handleServe(request, matchedRoute);

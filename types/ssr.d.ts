@@ -343,6 +343,8 @@ interface RouteTreeNodeMetadata {
      * This defines where to redirect if this route is matched.
      */
     redirectTo?: string;
+    /** Indicates if `redirectTo` was defined as a relative path. */
+    relativeRedirect?: boolean;
     /**
      * The route path for this node.
      *

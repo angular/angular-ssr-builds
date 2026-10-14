@@ -466,56 +466,74 @@ async function* handleRoute(options) {
       children,
       ɵentryName
     } = route;
-    if (ɵentryName && loadComponent) {
+    if (ɵentryName && (loadComponent || loadChildren)) {
       appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata);
     }
+    const parentRoutes = new Map();
     if (metadata.renderMode === RenderMode.Prerender) {
-      yield* handleSSGRoute(serverConfigRouteTree, typeof redirectTo === 'string' ? redirectTo : undefined, parentRoute, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes);
+      for await (const result of handleSSGRoute(serverConfigRouteTree, typeof redirectTo === 'string' ? redirectTo : undefined, parentRoute, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes)) {
+        if ('error' in result) {
+          yield result;
+        } else {
+          parentRoutes.set(result.route, result);
+        }
+      }
     } else if (redirectTo !== undefined) {
       if (metadata.status && !isValidRedirectResponseCode(metadata.status)) {
         yield {
           error: `The '${metadata.status}' status code is not a valid redirect response code. ` + `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`
         };
       } else if (typeof redirectTo === 'string') {
-        yield {
+        parentRoutes.set(metadata.route, {
           ...metadata,
           redirectTo: resolveRedirectTo(parentRoute, redirectTo),
           relativeRedirect: redirectTo[0] !== '/' ? true : undefined
-        };
+        });
       } else {
-        yield metadata;
+        parentRoutes.set(metadata.route, metadata);
       }
     } else {
-      yield metadata;
+      parentRoutes.set(metadata.route, metadata);
     }
-    if (children?.length) {
-      yield* traverseRoutesConfig({
-        ...options,
-        routes: children,
-        parentRoute: currentRoutePath,
-        parentPreloads: metadata.preload
-      });
-    }
-    if (loadChildren) {
-      if (ɵentryName) {
-        appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata);
-      }
+    let childRoutes = children;
+    let childInjector = parentInjector;
+    if (!childRoutes?.length && loadChildren) {
       const routeInjector = route.providers ? createEnvironmentInjector(route.providers, parentInjector.get(EnvironmentInjector), `Route: ${route.path}`) : parentInjector;
       const loadedChildRoutes = await _loadChildren(route, compiler, routeInjector);
       if (loadedChildRoutes) {
-        const {
-          routes: childRoutes,
-          injector = routeInjector
-        } = loadedChildRoutes;
-        yield* traverseRoutesConfig({
-          ...options,
-          routes: childRoutes,
-          parentInjector: injector,
-          parentRoute: currentRoutePath,
-          parentPreloads: metadata.preload
-        });
+        childRoutes = loadedChildRoutes.routes;
+        childInjector = loadedChildRoutes.injector ?? routeInjector;
       }
     }
+    if (!childRoutes?.length) {
+      yield* parentRoutes.values();
+      return;
+    }
+    const childResults = [];
+    const overriddenParentRoutes = new Set();
+    const traverseChildRoutes = traverseRoutesConfig({
+      ...options,
+      routes: childRoutes,
+      parentInjector: childInjector,
+      parentRoute: currentRoutePath,
+      parentPreloads: metadata.preload
+    });
+    for await (const result of traverseChildRoutes) {
+      if ('error' in result) {
+        childResults.push(result);
+        continue;
+      }
+      if (parentRoutes.has(result.route)) {
+        if (!overriddenParentRoutes.has(result.route)) {
+          overriddenParentRoutes.add(result.route);
+          parentRoutes.set(result.route, result);
+        }
+      } else {
+        childResults.push(result);
+      }
+    }
+    yield* parentRoutes.values();
+    yield* childResults;
   } catch (error) {
     yield {
       error: `Error in handleRoute for '${options.currentRoutePath}': ${error.message}`
@@ -592,7 +610,7 @@ async function* traverseRoutesConfig(options) {
         renderMode: RenderMode.Prerender,
         ...matchedMetaData,
         preload: parentPreloads,
-        route: path === '' ? addTrailingSlash(currentRoutePath) : currentRoutePath,
+        route: currentRoutePath,
         presentInClientRouter: undefined
       },
       currentRoutePath,

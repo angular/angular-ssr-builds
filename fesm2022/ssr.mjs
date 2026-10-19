@@ -1,4 +1,4 @@
-import { normalizeTrustProxyHeaders, sanitizeRequestHeaders, validateRequest } from './_validation-chunk.mjs';
+import { getFirstHeaderValue, normalizeTrustProxyHeaders, sanitizeRequestHeaders, validateRequest } from './_validation-chunk.mjs';
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import { ɵConsole as _Console, ApplicationRef, REQUEST, makeEnvironmentProviders, provideEnvironmentInitializer, inject, InjectionToken, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, Compiler, createEnvironmentInjector, EnvironmentInjector, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
 import { platformServer, INITIAL_CONFIG, ɵSERVER_CONTEXT as _SERVER_CONTEXT, ɵrenderInternal as _renderInternal, provideServerRendering as provideServerRendering$1 } from '@angular/platform-server';
@@ -158,9 +158,9 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
       hasNavigationError = false;
       const requestPrefix = envInjector.get(APP_BASE_HREF, null, {
         optional: true
-      }) ?? envInjector.get(REQUEST, null, {
+      }) ?? getFirstHeaderValue(envInjector.get(REQUEST, null, {
         optional: true
-      })?.headers.get('X-Forwarded-Prefix');
+      })?.headers.get('X-Forwarded-Prefix'));
       const {
         pathname,
         search,
@@ -1021,7 +1021,7 @@ class AngularServerApp {
       headers
     } = matchedRoute;
     if (redirectTo !== undefined) {
-      const location = joinUrlParts(request.headers.get('X-Forwarded-Prefix') ?? '', buildPathWithParams(redirectTo, url.pathname));
+      const location = joinUrlParts(getFirstHeaderValue(request.headers.get('X-Forwarded-Prefix')) ?? '', buildPathWithParams(redirectTo, url.pathname));
       return createRedirectResponse(relativeRedirect ? location + url.search : location, status, headers);
     }
     if (renderMode === RenderMode.Prerender) {
@@ -1363,7 +1363,7 @@ class AngularAppEngine {
     if (preferredLocale) {
       const subPath = supportedLocales[preferredLocale];
       if (subPath !== undefined) {
-        const prefix = request.headers.get('X-Forwarded-Prefix') ?? '';
+        const prefix = getFirstHeaderValue(request.headers.get('X-Forwarded-Prefix')) ?? '';
         return createRedirectResponse(joinUrlParts(prefix, pathname, subPath), 302, {
           'Vary': 'Accept-Language'
         });

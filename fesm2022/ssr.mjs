@@ -348,7 +348,7 @@ function provideServerRendering(...args) {
     providers.push(...ɵproviders);
   }
   if (!hasServerRoutes && hasAppShell) {
-    throw new Error(`Configuration error: found 'withAppShell()' without 'withRoutes()' in the same call to 'provideServerRendering()'.` + `The 'withAppShell()' function requires 'withRoutes()' to be used.`);
+    throw new Error(`Configuration error: found 'withAppShell()' without 'withRoutes()' in the same call to 'provideServerRendering()'. ` + `The 'withAppShell()' function requires 'withRoutes()' to be used.`);
   }
   return makeEnvironmentProviders(providers);
 }

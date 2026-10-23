@@ -1,8 +1,8 @@
+import { DefaultUrlSerializer, ActivatedRoute, Router, ROUTES, ɵloadChildren as _loadChildren } from '@angular/router';
 import { getFirstHeaderValue, normalizeTrustProxyHeaders, sanitizeRequestHeaders, validateRequest } from './_validation-chunk.mjs';
 import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import { ɵConsole as _Console, ApplicationRef, REQUEST, makeEnvironmentProviders, provideEnvironmentInitializer, inject, InjectionToken, ɵENABLE_ROOT_COMPONENT_BOOTSTRAP as _ENABLE_ROOT_COMPONENT_BOOTSTRAP, Compiler, createEnvironmentInjector, EnvironmentInjector, runInInjectionContext, ɵresetCompiledComponents as _resetCompiledComponents, REQUEST_CONTEXT, RESPONSE_INIT, LOCALE_ID } from '@angular/core';
 import { platformServer, INITIAL_CONFIG, ɵSERVER_CONTEXT as _SERVER_CONTEXT, ɵrenderInternal as _renderInternal, provideServerRendering as provideServerRendering$1 } from '@angular/platform-server';
-import { ActivatedRoute, Router, ROUTES, ɵloadChildren as _loadChildren } from '@angular/router';
 import { createProcessor } from 'beasties/runtime';
 
 class ServerAssets {
@@ -95,43 +95,36 @@ function stripIndexHtmlFromURL(url) {
   }
   return url;
 }
-const POSITIONAL_PLACEHOLDER_REGEXP = /^\*(\d+)$/;
-function buildPathWithParams(toPath, fromPath) {
-  if (toPath[0] !== '/') {
-    throw new Error(`Invalid toPath: The string must start with a '/'. Received: '${toPath}'`);
+let urlSerializer;
+function buildUrlWithParams(toUrl, fromPath, fromSearch) {
+  if (toUrl[0] !== '/') {
+    throw new Error(`Invalid toUrl: The string must start with a '/'. Received: '${toUrl}'`);
   }
   if (fromPath[0] !== '/') {
     throw new Error(`Invalid fromPath: The string must start with a '/'. Received: '${fromPath}'`);
   }
-  const [path] = toPath.split(/[?#]/, 1);
-  if (!path.includes('/*')) {
-    return toPath;
-  }
-  const fromPathParts = fromPath.split('/');
-  const toPathParts = path.split('/');
-  const resolvedParts = toPathParts.map((part, index) => part === '*' ? fromPathParts[index] : part.replace(POSITIONAL_PLACEHOLDER_REGEXP, (_, position) => fromPathParts[position]));
-  return joinUrlParts(...resolvedParts) + toPath.slice(path.length);
-}
-function buildQueryWithParams(toUrl, fromParams) {
-  const [, path, query, fragment] = /^([^?#]*)\?([^#]*)(.*)$/.exec(toUrl) ?? [];
-  if (query === undefined) {
+  if (!toUrl.includes('/*') && (fromSearch === undefined || !toUrl.includes('=:'))) {
     return toUrl;
   }
-  const params = query.split('&');
-  const names = params.map(param => param.split('=', 1)[0]);
-  const resolvedQuery = params.map((param, index) => {
-    const name = names[index];
-    const value = param.slice(name.length + 1);
-    if (value[0] !== ':' || names.indexOf(name) !== names.lastIndexOf(name)) {
-      return param;
+  const [path] = toUrl.split(/[?#]/, 1);
+  let resolvedPath = path;
+  let suffix = toUrl.slice(path.length);
+  if (path.includes('/*')) {
+    const fromPathParts = fromPath.split('/');
+    resolvedPath = joinUrlParts(...path.split('/').map((part, index) => part[0] === '*' ? fromPathParts[part.length === 1 ? index : Number(part.slice(1))] ?? part : part));
+  }
+  if (fromSearch !== undefined && suffix[0] === '?' && suffix.includes('=:')) {
+    urlSerializer ??= new DefaultUrlSerializer();
+    const toTree = urlSerializer.parse(suffix);
+    const actualParams = fromSearch ? urlSerializer.parse(fromSearch).queryParams : {};
+    for (const [key, value] of Object.entries(toTree.queryParams)) {
+      if (typeof value === 'string' && value[0] === ':') {
+        toTree.queryParams[key] = actualParams[value.slice(1)];
+      }
     }
-    const sourceValues = fromParams.getAll(value.slice(1));
-    return (sourceValues.length ? sourceValues : ['undefined']).map(sourceValue => `${name}=${encodeQueryValue(sourceValue)}`).join('&');
-  }).join('&');
-  return `${path}?${resolvedQuery}${fragment}`;
-}
-function encodeQueryValue(value) {
-  return encodeURIComponent(value).replace(/%(40|3A|24|2C|3B)/g, match => decodeURIComponent(match));
+    suffix = urlSerializer.serialize(toTree).slice(1);
+  }
+  return resolvedPath + suffix;
 }
 const MATRIX_PARAMS_REGEX = /;[^/]+/g;
 function stripMatrixParams(pathname) {
@@ -494,29 +487,25 @@ async function* handleRoute(options) {
       appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata);
     }
     const parentRoutes = new Map();
+    if (typeof redirectTo === 'string') {
+      metadata.redirectTo = resolveRedirectTo(parentRoute, route, redirectTo, parameter => {
+        const routeSegments = joinUrlParts(baseHref, currentRoutePath).split('/');
+        return `*${routeSegments.lastIndexOf(parameter)}`;
+      });
+      metadata.relativeRedirect = redirectTo[0] !== '/' ? true : undefined;
+    }
     if (metadata.renderMode === RenderMode.Prerender) {
-      for await (const result of handleSSGRoute(serverConfigRouteTree, route, parentRoute, baseHref, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes)) {
+      for await (const result of handleSSGRoute(serverConfigRouteTree, route, parentRoute, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes)) {
         if ('error' in result) {
           yield result;
         } else {
           parentRoutes.set(result.route, result);
         }
       }
-    } else if (redirectTo !== undefined) {
-      if (metadata.status && !isValidRedirectResponseCode(metadata.status)) {
-        yield {
-          error: `The '${metadata.status}' status code is not a valid redirect response code. ` + `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`
-        };
-      } else if (typeof redirectTo === 'string') {
-        const routeSegments = joinUrlParts(baseHref, currentRoutePath).split('/');
-        parentRoutes.set(metadata.route, {
-          ...metadata,
-          redirectTo: resolveRedirectTo(parentRoute, replaceRedirectParams(route, redirectTo, parameter => `*${routeSegments.lastIndexOf(parameter)}`)),
-          relativeRedirect: redirectTo[0] !== '/' ? true : undefined
-        });
-      } else {
-        parentRoutes.set(metadata.route, metadata);
-      }
+    } else if (redirectTo !== undefined && metadata.status && !isValidRedirectResponseCode(metadata.status)) {
+      yield {
+        error: `The '${metadata.status}' status code is not a valid redirect response code. ` + `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`
+      };
     } else {
       parentRoutes.set(metadata.route, metadata);
     }
@@ -661,7 +650,7 @@ function appendPreloadToMetadata(entryName, entryPointToBrowserMapping, metadata
   }
   metadata.preload = Array.from(combinedPreloads);
 }
-async function* handleSSGRoute(serverConfigRouteTree, route, parentRoute, baseHref, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes) {
+async function* handleSSGRoute(serverConfigRouteTree, route, parentRoute, metadata, parentInjector, invokeGetPrerenderParams, includePrerenderFallbackRoutes) {
   if (metadata.renderMode !== RenderMode.Prerender) {
     throw new Error(`'handleSSGRoute' was called for a route which rendering mode is not prerender.`);
   }
@@ -673,12 +662,6 @@ async function* handleSSGRoute(serverConfigRouteTree, route, parentRoute, baseHr
   const getPrerenderParams = 'getPrerenderParams' in meta ? meta.getPrerenderParams : undefined;
   if ('getPrerenderParams' in meta) {
     delete meta['getPrerenderParams'];
-  }
-  const redirectTo = typeof route.redirectTo === 'string' ? route.redirectTo : undefined;
-  if (redirectTo !== undefined) {
-    const routeSegments = joinUrlParts(baseHref, currentRoutePath).split('/');
-    meta.redirectTo = resolveRedirectTo(parentRoute, replaceRedirectParams(route, redirectTo, parameter => `*${routeSegments.lastIndexOf(parameter)}`));
-    meta.relativeRedirect = redirectTo[0] !== '/' ? true : undefined;
   }
   const isCatchAllRoute = CATCH_ALL_REGEXP.test(currentRoutePath);
   if (isCatchAllRoute && !getPrerenderParams || !isCatchAllRoute && !URL_PARAMETER_REGEXP.test(currentRoutePath)) {
@@ -706,6 +689,7 @@ async function* handleSSGRoute(serverConfigRouteTree, route, parentRoute, baseHr
         });
       }
     }
+    const redirectTo = typeof route.redirectTo === 'string' ? route.redirectTo : undefined;
     const parameters = await runInInjectionContext(parentInjector, () => getPrerenderParams());
     try {
       for (const params of parameters) {
@@ -714,7 +698,7 @@ async function* handleSSGRoute(serverConfigRouteTree, route, parentRoute, baseHr
         yield {
           ...meta,
           route: routeWithResolvedParams,
-          redirectTo: redirectTo === undefined ? undefined : resolveRedirectTo(parentRoute.replace(URL_PARAMETER_GLOBAL_REGEXP, replacer), replaceRedirectParams(route, redirectTo, parameter => params[parameter.slice(1)]))
+          redirectTo: redirectTo === undefined ? undefined : resolveRedirectTo(parentRoute.replace(URL_PARAMETER_GLOBAL_REGEXP, replacer), route, redirectTo, parameter => params[parameter.slice(1)])
         };
       }
     } catch (error) {
@@ -742,29 +726,25 @@ function handlePrerenderParamsReplacement(params, currentRoutePath) {
     return parameterName === '**' ? `/${value}` : value;
   };
 }
-function resolveRedirectTo(parentRoute, redirectTo) {
-  if (redirectTo[0] === '/') {
+function resolveRedirectTo(parentRoute, route, redirectTo, resolveParam) {
+  if (redirectTo[0] === '/' && (route.matcher || !redirectTo.includes('/:'))) {
     return redirectTo;
   }
   const [path] = redirectTo.split(/[?#]/, 1);
-  return joinUrlParts(parentRoute.replace(URL_PARAMETER_GLOBAL_REGEXP, '*'), path);
-}
-function replaceRedirectParams(route, redirectTo, resolve) {
-  if (route.matcher) {
-    return redirectTo;
+  let resolvedPath = path;
+  if (!route.matcher && path.includes(':')) {
+    const routeSegments = route.path?.split('/') ?? [];
+    resolvedPath = path.split('/').map(segment => {
+      if (segment[0] !== ':') {
+        return segment;
+      }
+      if (!routeSegments.includes(segment)) {
+        throw new Error(`Cannot redirect to '${redirectTo}'. Cannot find '${segment}'.`);
+      }
+      return resolveParam(segment);
+    }).join('/');
   }
-  const routeSegments = route.path?.split('/') ?? [];
-  const [path] = redirectTo.split(/[?#]/, 1);
-  const resolvedPath = path.split('/').map(segment => {
-    if (segment[0] !== ':') {
-      return segment;
-    }
-    if (!routeSegments.includes(segment)) {
-      throw new Error(`Cannot redirect to '${redirectTo}'. Cannot find '${segment}'.`);
-    }
-    return resolve(segment);
-  }).join('/');
-  return resolvedPath + redirectTo.slice(path.length);
+  return redirectTo[0] === '/' ? resolvedPath + redirectTo.slice(path.length) : joinUrlParts(parentRoute.replace(URL_PARAMETER_GLOBAL_REGEXP, '*'), resolvedPath);
 }
 function buildServerConfigRouteTree({
   routes,
@@ -1066,8 +1046,8 @@ class AngularServerApp {
       headers
     } = matchedRoute;
     if (redirectTo !== undefined) {
-      const location = joinUrlParts(getFirstHeaderValue(request.headers.get('X-Forwarded-Prefix')) ?? '', buildPathWithParams(redirectTo, url.pathname));
-      return createRedirectResponse(relativeRedirect ? location + url.search : buildQueryWithParams(location, url.searchParams), status, headers);
+      const location = joinUrlParts(getFirstHeaderValue(request.headers.get('X-Forwarded-Prefix')) ?? '', buildUrlWithParams(redirectTo, url.pathname, relativeRedirect ? undefined : url.search));
+      return createRedirectResponse(relativeRedirect ? location + url.search : location, status, headers);
     }
     if (renderMode === RenderMode.Prerender) {
       const response = await this.handleServe(request, matchedRoute);

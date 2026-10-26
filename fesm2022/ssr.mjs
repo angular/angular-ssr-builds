@@ -55,6 +55,11 @@ function getAngularAppEngineManifest() {
   return angularAppEngineManifest;
 }
 
+const WILDCARD_SEGMENT = {
+  type: 'wildcard'
+};
+const EMPTY_QUERY_PARAMS = [];
+const POSITIONAL_WILDCARD_REGEX = /^\*\d+$/;
 function stripTrailingSlash(url) {
   return url.length > 1 && url.at(-1) === '/' ? url.slice(0, -1) : url;
 }
@@ -69,12 +74,27 @@ function addTrailingSlash(url) {
 }
 function joinUrlParts(...parts) {
   const normalizedParts = [];
-  for (const part of parts) {
+  let suffix = '';
+  let lastIndex = parts.length - 1;
+  while (lastIndex >= 0 && parts[lastIndex] === '') {
+    lastIndex--;
+  }
+  for (let i = 0; i <= lastIndex; i++) {
+    const part = parts[i];
     if (part === '') {
       continue;
     }
     let start = 0;
     let end = part.length;
+    if (i === lastIndex) {
+      const queryIndex = part.indexOf('?');
+      const hashIndex = part.indexOf('#');
+      const suffixIndex = queryIndex === -1 ? hashIndex : hashIndex === -1 ? queryIndex : Math.min(queryIndex, hashIndex);
+      if (suffixIndex !== -1) {
+        suffix = part.slice(suffixIndex);
+        end = suffixIndex;
+      }
+    }
     while (start < end && part[start] === '/') {
       start++;
     }
@@ -85,7 +105,7 @@ function joinUrlParts(...parts) {
       normalizedParts.push(part.slice(start, end));
     }
   }
-  return addLeadingSlash(normalizedParts.join('/'));
+  return addLeadingSlash(normalizedParts.join('/')) + suffix;
 }
 function stripIndexHtmlFromURL(url) {
   if (url.pathname.endsWith('/index.html')) {
@@ -96,6 +116,138 @@ function stripIndexHtmlFromURL(url) {
   return url;
 }
 let urlSerializer;
+let serializationTree;
+function parsePathSegment(segment) {
+  if (segment[0] === '*') {
+    if (segment.length === 1) {
+      return WILDCARD_SEGMENT;
+    }
+    if (POSITIONAL_WILDCARD_REGEX.test(segment)) {
+      return {
+        type: 'wildcard',
+        index: Number(segment.slice(1))
+      };
+    }
+  } else if (segment[0] === ':' && segment.length > 1) {
+    return {
+      type: 'param',
+      name: segment.slice(1)
+    };
+  }
+  return {
+    type: 'static',
+    value: segment
+  };
+}
+function parsePathSegments(path) {
+  const segments = [];
+  let start = 0;
+  const length = path.length;
+  while (start < length) {
+    while (start < length && path[start] === '/') {
+      start++;
+    }
+    if (start >= length) {
+      break;
+    }
+    let end = path.indexOf('/', start);
+    if (end === -1) {
+      end = length;
+    }
+    segments.push(parsePathSegment(path.slice(start, end)));
+    start = end + 1;
+  }
+  return segments;
+}
+function extractPathSegments(path) {
+  const segments = [];
+  let start = 0;
+  const length = path.length;
+  while (start < length) {
+    while (start < length && path[start] === '/') {
+      start++;
+    }
+    if (start >= length) {
+      break;
+    }
+    let end = path.indexOf('/', start);
+    if (end === -1) {
+      end = length;
+    }
+    segments.push(path.slice(start, end));
+    start = end + 1;
+  }
+  return segments;
+}
+function serializePathSegment(segment) {
+  switch (segment.type) {
+    case 'static':
+      return segment.value;
+    case 'param':
+      return `:${segment.name}`;
+    case 'wildcard':
+      return segment.index === undefined ? '*' : `*${segment.index}`;
+  }
+}
+function serializePathSegments(segments) {
+  let result = '';
+  for (const segment of segments) {
+    const value = serializePathSegment(segment);
+    if (value) {
+      result += '/' + value;
+    }
+  }
+  return result || '/';
+}
+function parseUrl(url) {
+  const queryIndex = url.indexOf('?');
+  const hashIndex = url.indexOf('#');
+  const suffixIndex = queryIndex === -1 ? hashIndex : hashIndex === -1 ? queryIndex : Math.min(queryIndex, hashIndex);
+  const path = suffixIndex === -1 ? url : url.slice(0, suffixIndex);
+  const rawSuffix = suffixIndex === -1 ? '' : url.slice(suffixIndex);
+  const segments = parsePathSegments(path);
+  const hasDynamicSegments = segments.some(segment => segment.type !== 'static');
+  if (rawSuffix[0] === '?' && rawSuffix.includes('=:')) {
+    urlSerializer ??= new DefaultUrlSerializer();
+    const tree = urlSerializer.parse(rawSuffix);
+    const queryParams = [];
+    let hasDynamicQueryParams = false;
+    for (const [name, value] of Object.entries(tree.queryParams)) {
+      if (typeof value === 'string' && value[0] === ':') {
+        queryParams.push({
+          type: 'param',
+          name,
+          param: value.slice(1)
+        });
+        hasDynamicQueryParams = true;
+      } else {
+        queryParams.push({
+          type: 'static',
+          name,
+          value
+        });
+      }
+    }
+    return {
+      isAbsolute: path[0] === '/',
+      segments,
+      queryParams,
+      fragment: tree.fragment,
+      rawSuffix,
+      hasDynamicSegments,
+      hasDynamicQueryParams
+    };
+  }
+  return {
+    isAbsolute: path[0] === '/',
+    segments,
+    queryParams: EMPTY_QUERY_PARAMS,
+    fragment: hashIndex === -1 ? null : decodeURIComponent(url.slice(hashIndex + 1)),
+    rawSuffix,
+    hasDynamicSegments,
+    hasDynamicQueryParams: false
+  };
+}
 function buildUrlWithParams(toUrl, fromPath, fromSearch) {
   if (toUrl[0] !== '/') {
     throw new Error(`Invalid toUrl: The string must start with a '/'. Received: '${toUrl}'`);
@@ -106,23 +258,39 @@ function buildUrlWithParams(toUrl, fromPath, fromSearch) {
   if (!toUrl.includes('/*') && (fromSearch === undefined || !toUrl.includes('=:'))) {
     return toUrl;
   }
-  const [path] = toUrl.split(/[?#]/, 1);
-  let resolvedPath = path;
-  let suffix = toUrl.slice(path.length);
-  if (path.includes('/*')) {
-    const fromPathParts = fromPath.split('/');
-    resolvedPath = joinUrlParts(...path.split('/').map((part, index) => part[0] === '*' ? fromPathParts[part.length === 1 ? index : Number(part.slice(1))] ?? part : part));
+  const parsed = parseUrl(toUrl);
+  if (!parsed.hasDynamicSegments && (fromSearch === undefined || !parsed.hasDynamicQueryParams)) {
+    return toUrl;
   }
-  if (fromSearch !== undefined && suffix[0] === '?' && suffix.includes('=:')) {
-    urlSerializer ??= new DefaultUrlSerializer();
-    const toTree = urlSerializer.parse(suffix);
-    const actualParams = fromSearch ? urlSerializer.parse(fromSearch).queryParams : {};
-    for (const [key, value] of Object.entries(toTree.queryParams)) {
-      if (typeof value === 'string' && value[0] === ':') {
-        toTree.queryParams[key] = actualParams[value.slice(1)];
+  let resolvedPath;
+  if (parsed.hasDynamicSegments) {
+    const fromSegments = extractPathSegments(fromPath);
+    let builtPath = '';
+    for (let i = 0; i < parsed.segments.length; i++) {
+      const segment = parsed.segments[i];
+      const value = segment.type === 'wildcard' ? fromSegments[segment.index ?? i] ?? serializePathSegment(segment) : serializePathSegment(segment);
+      if (value) {
+        builtPath += '/' + value;
       }
     }
-    suffix = urlSerializer.serialize(toTree).slice(1);
+    resolvedPath = builtPath || '/';
+  } else {
+    resolvedPath = serializePathSegments(parsed.segments);
+  }
+  let suffix = parsed.rawSuffix;
+  if (fromSearch !== undefined && parsed.hasDynamicQueryParams) {
+    urlSerializer ??= new DefaultUrlSerializer();
+    serializationTree ??= urlSerializer.parse('');
+    const actualParams = fromSearch ? urlSerializer.parse(fromSearch).queryParams : {};
+    const resolvedQueryParams = {};
+    for (const param of parsed.queryParams) {
+      resolvedQueryParams[param.name] = param.type === 'param' ? actualParams[param.param] : param.value;
+    }
+    serializationTree.queryParams = resolvedQueryParams;
+    serializationTree.fragment = parsed.fragment;
+    suffix = urlSerializer.serialize(serializationTree).slice(1);
+    serializationTree.queryParams = {};
+    serializationTree.fragment = null;
   }
   return resolvedPath + suffix;
 }
@@ -488,9 +656,18 @@ async function* handleRoute(options) {
     }
     const parentRoutes = new Map();
     if (typeof redirectTo === 'string') {
-      metadata.redirectTo = resolveRedirectTo(parentRoute, route, redirectTo, parameter => {
-        const routeSegments = joinUrlParts(baseHref, currentRoutePath).split('/');
-        return `*${routeSegments.lastIndexOf(parameter)}`;
+      const routeSegments = parsePathSegments(joinUrlParts(baseHref, currentRoutePath));
+      metadata.redirectTo = resolveRedirectTo(parentRoute, route, redirectTo, paramName => {
+        for (let i = routeSegments.length - 1; i >= 0; i--) {
+          const segment = routeSegments[i];
+          if (segment.type === 'param' && segment.name === paramName) {
+            return {
+              type: 'wildcard',
+              index: i
+            };
+          }
+        }
+        return WILDCARD_SEGMENT;
       });
       metadata.relativeRedirect = redirectTo[0] !== '/' ? true : undefined;
     }
@@ -698,7 +875,10 @@ async function* handleSSGRoute(serverConfigRouteTree, route, parentRoute, metada
         yield {
           ...meta,
           route: routeWithResolvedParams,
-          redirectTo: redirectTo === undefined ? undefined : resolveRedirectTo(parentRoute.replace(URL_PARAMETER_GLOBAL_REGEXP, replacer), route, redirectTo, parameter => params[parameter.slice(1)])
+          redirectTo: redirectTo === undefined ? undefined : resolveRedirectTo(parentRoute.replace(URL_PARAMETER_GLOBAL_REGEXP, replacer), route, redirectTo, paramName => ({
+            type: 'static',
+            value: params[paramName]
+          }))
         };
       }
     } catch (error) {
@@ -730,21 +910,25 @@ function resolveRedirectTo(parentRoute, route, redirectTo, resolveParam) {
   if (redirectTo[0] === '/' && (route.matcher || !redirectTo.includes('/:'))) {
     return redirectTo;
   }
-  const [path] = redirectTo.split(/[?#]/, 1);
-  let resolvedPath = path;
-  if (!route.matcher && path.includes(':')) {
-    const routeSegments = route.path?.split('/') ?? [];
-    resolvedPath = path.split('/').map(segment => {
-      if (segment[0] !== ':') {
+  const parsedRedirect = parseUrl(redirectTo);
+  let resolvedSegments = parsedRedirect.segments;
+  if (!route.matcher && parsedRedirect.hasDynamicSegments) {
+    const routeSegments = parsePathSegments(route.path ?? '');
+    resolvedSegments = resolvedSegments.map(segment => {
+      if (segment.type !== 'param') {
         return segment;
       }
-      if (!routeSegments.includes(segment)) {
-        throw new Error(`Cannot redirect to '${redirectTo}'. Cannot find '${segment}'.`);
+      if (!routeSegments.some(s => s.type === 'param' && s.name === segment.name)) {
+        throw new Error(`Cannot redirect to '${redirectTo}'. Cannot find ':${segment.name}'.`);
       }
-      return resolveParam(segment);
-    }).join('/');
+      return resolveParam(segment.name);
+    });
   }
-  return redirectTo[0] === '/' ? resolvedPath + redirectTo.slice(path.length) : joinUrlParts(parentRoute.replace(URL_PARAMETER_GLOBAL_REGEXP, '*'), resolvedPath);
+  if (parsedRedirect.isAbsolute) {
+    return serializePathSegments(resolvedSegments) + parsedRedirect.rawSuffix;
+  }
+  const parentSegments = parsePathSegments(parentRoute).map(segment => segment.type === 'param' ? WILDCARD_SEGMENT : segment);
+  return serializePathSegments([...parentSegments, ...resolvedSegments]);
 }
 function buildServerConfigRouteTree({
   routes,

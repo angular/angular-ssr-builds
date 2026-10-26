@@ -69,12 +69,27 @@ function addTrailingSlash(url) {
 }
 function joinUrlParts(...parts) {
   const normalizedParts = [];
-  for (const part of parts) {
+  let suffix = '';
+  let lastIndex = parts.length - 1;
+  while (lastIndex >= 0 && parts[lastIndex] === '') {
+    lastIndex--;
+  }
+  for (let i = 0; i <= lastIndex; i++) {
+    const part = parts[i];
     if (part === '') {
       continue;
     }
     let start = 0;
     let end = part.length;
+    if (i === lastIndex) {
+      const queryIndex = part.indexOf('?');
+      const hashIndex = part.indexOf('#');
+      const suffixIndex = queryIndex === -1 ? hashIndex : hashIndex === -1 ? queryIndex : Math.min(queryIndex, hashIndex);
+      if (suffixIndex !== -1) {
+        suffix = part.slice(suffixIndex);
+        end = suffixIndex;
+      }
+    }
     while (start < end && part[start] === '/') {
       start++;
     }
@@ -85,7 +100,7 @@ function joinUrlParts(...parts) {
       normalizedParts.push(part.slice(start, end));
     }
   }
-  return addLeadingSlash(normalizedParts.join('/'));
+  return addLeadingSlash(normalizedParts.join('/')) + suffix;
 }
 function stripIndexHtmlFromURL(url) {
   if (url.pathname.endsWith('/index.html')) {

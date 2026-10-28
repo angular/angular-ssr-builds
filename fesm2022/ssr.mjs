@@ -146,7 +146,12 @@ function stripMatrixParams(pathname) {
   return pathname.includes(';') ? pathname.replace(MATRIX_PARAMS_REGEX, '') : pathname;
 }
 
-async function renderAngular(html, bootstrap, url, platformProviders, serverContext) {
+async function renderAngular(html, bootstrap, url, platformProviders, serverContext, signal) {
+  if (signal?.aborted) {
+    return {
+      hasNavigationError: true
+    };
+  }
   const urlToRender = stripIndexHtmlFromURL(url);
   const platformRef = platformServer([{
     provide: INITIAL_CONFIG,
@@ -163,18 +168,45 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
   }, ...platformProviders]);
   let redirectTo;
   let hasNavigationError = true;
+  let renderTimeoutId;
+  let destroyPromise;
+  let rejectContent;
+  const destroy = () => {
+    rejectContent?.(new DOMException(`Request for: ${url} was aborted.${signal?.reason ? `\n${signal.reason}` : ''}`, 'AbortError'));
+    rejectContent = undefined;
+    if (!destroyPromise) {
+      clearTimeout(renderTimeoutId);
+      signal?.removeEventListener('abort', abortHandler);
+      destroyPromise = asyncDestroyPlatform(platformRef);
+    }
+    return destroyPromise;
+  };
+  const abortHandler = () => void destroy();
   try {
+    signal?.addEventListener('abort', abortHandler, {
+      once: true
+    });
     let applicationRef;
     if (isNgModule(bootstrap)) {
       const moduleRef = await platformRef.bootstrapModule(bootstrap);
+      if (platformRef.destroyed || signal?.aborted) {
+        return {
+          hasNavigationError: true
+        };
+      }
       applicationRef = moduleRef.injector.get(ApplicationRef);
     } else {
       applicationRef = await bootstrap({
         platformRef
       });
+      if (platformRef.destroyed || signal?.aborted) {
+        return {
+          hasNavigationError: true
+        };
+      }
     }
     await applicationRef.whenStable();
-    if (applicationRef.destroyed) {
+    if (applicationRef.destroyed || signal?.aborted) {
       return {
         hasNavigationError: true
       };
@@ -186,7 +218,6 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
     if (!routerIsProvided) {
       hasNavigationError = false;
     } else if (lastSuccessfulNavigation?.finalUrl) {
-      hasNavigationError = false;
       const requestPrefix = envInjector.get(APP_BASE_HREF, null, {
         optional: true
       }) ?? getFirstHeaderValue(envInjector.get(REQUEST, null, {
@@ -206,23 +237,29 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
       if (urlToRenderString !== finalUrl) {
         redirectTo = [pathname, search, hash].join('');
       }
+      hasNavigationError = false;
     }
     return {
-      destroy: () => void asyncDestroyPlatform(platformRef),
+      destroy,
       hasNavigationError,
       redirectTo,
       content: () => new Promise((resolve, reject) => {
-        setTimeout(() => {
-          _renderInternal(platformRef, applicationRef).then(resolve).catch(reject).finally(() => void asyncDestroyPlatform(platformRef));
+        rejectContent = reject;
+        renderTimeoutId = setTimeout(() => {
+          if (platformRef.destroyed || applicationRef.destroyed || signal?.aborted) {
+            void destroy();
+            return;
+          }
+          _renderInternal(platformRef, applicationRef).then(resolve).catch(reject).finally(() => {
+            rejectContent = undefined;
+            void destroy();
+          });
         }, 0);
       })
     };
-  } catch (error) {
-    await asyncDestroyPlatform(platformRef);
-    throw error;
   } finally {
     if (hasNavigationError || redirectTo) {
-      void asyncDestroyPlatform(platformRef);
+      void destroy();
     }
   }
 }
@@ -266,11 +303,11 @@ function promiseWithAbort(promise, signal, errorMessagePrefix) {
     };
     if (signal.aborted) {
       abortHandler();
-      return;
+    } else {
+      signal.addEventListener('abort', abortHandler, {
+        once: true
+      });
     }
-    signal.addEventListener('abort', abortHandler, {
-      once: true
-    });
     promise.then(resolve).catch(reject).finally(() => {
       signal.removeEventListener('abort', abortHandler);
     });
@@ -1171,7 +1208,7 @@ class AngularServerApp {
     this.boostrap ??= await bootstrap();
     let html = await assets.getIndexServerHtml().text();
     html = await this.runTransformsOnHtml(html, url, preload);
-    const result = await renderAngular(html, this.boostrap, url, platformProviders, SERVER_CONTEXT_VALUE[renderMode]);
+    const result = await renderAngular(html, this.boostrap, url, platformProviders, SERVER_CONTEXT_VALUE[renderMode], request.signal);
     if (result.hasNavigationError) {
       return null;
     }
@@ -1191,13 +1228,11 @@ class AngularServerApp {
           controller.enqueue(this.textEncoder.encode(renderedHtml));
           controller.close();
         } catch (error) {
-          result.destroy();
+          await result.destroy();
           controller.error(error);
         }
       },
-      cancel: () => {
-        result.destroy();
-      }
+      cancel: () => result.destroy()
     });
     return new Response(stream, responseInit);
   }

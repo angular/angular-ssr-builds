@@ -666,6 +666,7 @@ const MODULE_PRELOAD_MAX = 10;
 const CATCH_ALL_REGEXP = /\/(\*\*)$/;
 const URL_PARAMETER_REGEXP = /(?<!\\):([^/]+)/;
 const URL_PARAMETER_GLOBAL_REGEXP = new RegExp(URL_PARAMETER_REGEXP, 'g');
+const INVALID_PATH_SEGMENT_CHARS_REGEXP = /[/\\?#;*%\p{Control}]/u;
 async function* handleRoute(options) {
   try {
     const {
@@ -940,8 +941,21 @@ function handlePrerenderParamsReplacement(params, currentRoutePath) {
     if (typeof value !== 'string') {
       throw new Error(`The 'getPrerenderParams' function defined for the '${stripLeadingSlash(currentRoutePath)}' route ` + `returned a non-string value for parameter '${parameterName}'. ` + `Please make sure the 'getPrerenderParams' function returns values for all parameters ` + 'specified in this route.');
     }
+    const segments = parameterName === '**' ? value ? value.split('/') : [] : [value];
+    if (!segments.every(isPathSegment)) {
+      throw new Error(`The 'getPrerenderParams' function defined for the '${stripLeadingSlash(currentRoutePath)}' route ` + `returned an invalid value '${value}' for parameter '${parameterName}'. ` + `Please make sure the value is a valid URL path${parameterName === '**' ? '' : ' segment'} ` + 'without dot segments or reserved characters.');
+    }
     return parameterName === '**' ? `/${value}` : value;
   };
+}
+function isPathSegment(segment) {
+  let decoded;
+  try {
+    decoded = decodeURIComponent(segment);
+  } catch {
+    return false;
+  }
+  return decoded.length > 0 && decoded !== '.' && decoded !== '..' && decoded[0] !== ':' && !INVALID_PATH_SEGMENT_CHARS_REGEXP.test(decoded);
 }
 function resolveRedirectTo(parentRoute, route, redirectTo, resolveParam) {
   if (redirectTo[0] === '/' && (route.matcher || !redirectTo.includes('/:'))) {

@@ -323,12 +323,15 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
   let hasNavigationError = true;
   let renderTimeoutId;
   let destroyPromise;
+  let contentPromise;
   let rejectContent;
+  const createAbortError = () => new DOMException(`Request for: ${url} was aborted.${signal?.reason ? `\n${signal.reason}` : ''}`, 'AbortError');
   const destroy = () => {
-    rejectContent?.(new DOMException(`Request for: ${url} was aborted.${signal?.reason ? `\n${signal.reason}` : ''}`, 'AbortError'));
-    rejectContent = undefined;
     if (!destroyPromise) {
       clearTimeout(renderTimeoutId);
+      rejectContent?.(createAbortError());
+      rejectContent = undefined;
+      contentPromise = undefined;
       signal?.removeEventListener('abort', abortHandler);
       destroyPromise = asyncDestroyPlatform(platformRef);
     }
@@ -342,7 +345,7 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
     let applicationRef;
     if (isNgModule(bootstrap)) {
       const moduleRef = await platformRef.bootstrapModule(bootstrap);
-      if (platformRef.destroyed || signal?.aborted) {
+      if (platformRef.destroyed || moduleRef.injector.destroyed || signal?.aborted) {
         return {
           hasNavigationError: true
         };
@@ -352,14 +355,14 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
       applicationRef = await bootstrap({
         platformRef
       });
-      if (platformRef.destroyed || signal?.aborted) {
+      if (platformRef.destroyed || applicationRef.destroyed || signal?.aborted) {
         return {
           hasNavigationError: true
         };
       }
     }
     await applicationRef.whenStable();
-    if (applicationRef.destroyed || signal?.aborted) {
+    if (platformRef.destroyed || applicationRef.destroyed || signal?.aborted) {
       return {
         hasNavigationError: true
       };
@@ -396,19 +399,32 @@ async function renderAngular(html, bootstrap, url, platformProviders, serverCont
       destroy,
       hasNavigationError,
       redirectTo,
-      content: () => new Promise((resolve, reject) => {
-        rejectContent = reject;
-        renderTimeoutId = setTimeout(() => {
-          if (platformRef.destroyed || applicationRef.destroyed || signal?.aborted) {
-            void destroy();
-            return;
-          }
-          _renderInternal(platformRef, applicationRef).then(resolve).catch(reject).finally(() => {
-            rejectContent = undefined;
-            void destroy();
-          });
-        }, 0);
-      })
+      content: () => {
+        if (destroyPromise || platformRef.destroyed || applicationRef.destroyed || signal?.aborted) {
+          void destroy();
+          return Promise.reject(createAbortError());
+        }
+        return contentPromise ??= new Promise((resolve, reject) => {
+          rejectContent = reject;
+          renderTimeoutId = setTimeout(() => {
+            if (destroyPromise || platformRef.destroyed || applicationRef.destroyed || signal?.aborted) {
+              rejectContent = undefined;
+              void destroy();
+              reject(createAbortError());
+              return;
+            }
+            _renderInternal(platformRef, applicationRef).then(renderedHtml => {
+              rejectContent = undefined;
+              void destroy();
+              resolve(renderedHtml);
+            }, error => {
+              rejectContent = undefined;
+              void destroy();
+              reject(error);
+            });
+          }, 0);
+        });
+      }
     };
   } finally {
     if (hasNavigationError || redirectTo) {
@@ -425,10 +441,13 @@ function asyncDestroyPlatform(platformRef) {
   }
   return new Promise(resolve => {
     setTimeout(() => {
-      if (!platformRef.destroyed) {
-        platformRef.destroy();
+      try {
+        if (!platformRef.destroyed) {
+          platformRef.destroy();
+        }
+      } finally {
+        resolve();
       }
-      resolve();
     }, 0);
   });
 }
@@ -1338,6 +1357,9 @@ class AngularServerApp {
     });
   }
   async handleRendering(request, matchedRoute, requestContext) {
+    if (request.signal.aborted) {
+      return null;
+    }
     const {
       renderMode,
       headers,
@@ -1379,6 +1401,9 @@ class AngularServerApp {
       });
     } else if (renderMode === RenderMode.Client) {
       let html = await this.assets.getServerAsset('index.csr.html').text();
+      if (request.signal.aborted) {
+        return null;
+      }
       html = await this.runTransformsOnHtml(html, url, preload);
       return new Response(html, responseInit);
     }
@@ -1389,10 +1414,19 @@ class AngularServerApp {
       });
     }
     this.boostrap ??= await bootstrap();
+    if (request.signal.aborted) {
+      return null;
+    }
     let html = await assets.getIndexServerHtml().text();
+    if (request.signal.aborted) {
+      return null;
+    }
     html = await this.runTransformsOnHtml(html, url, preload);
+    if (request.signal.aborted) {
+      return null;
+    }
     const result = await renderAngular(html, this.boostrap, url, platformProviders, SERVER_CONTEXT_VALUE[renderMode], request.signal);
-    if (result.hasNavigationError) {
+    if (result.hasNavigationError || request.signal.aborted) {
       return null;
     }
     if (result.redirectTo) {
@@ -1400,6 +1434,9 @@ class AngularServerApp {
     }
     if (renderMode === RenderMode.Prerender) {
       const renderedHtml = await result.content();
+      if (request.signal.aborted) {
+        return null;
+      }
       const finalHtml = this.inlineCriticalCss(renderedHtml);
       return new Response(finalHtml, responseInit);
     }
@@ -1407,6 +1444,9 @@ class AngularServerApp {
       start: async controller => {
         try {
           let renderedHtml = await result.content();
+          if (request.signal.aborted) {
+            throw new DOMException(`Request for: ${request.url} was aborted.${request.signal.reason ? `\n${request.signal.reason}` : ''}`, 'AbortError');
+          }
           renderedHtml = this.inlineCriticalCss(renderedHtml);
           controller.enqueue(this.textEncoder.encode(renderedHtml));
           controller.close();

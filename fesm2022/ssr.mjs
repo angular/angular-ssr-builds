@@ -445,6 +445,8 @@ function asyncDestroyPlatform(platformRef) {
         if (!platformRef.destroyed) {
           platformRef.destroy();
         }
+      } catch (error) {
+        console.error('An error occurred while destroying the platform.', error);
       } finally {
         resolve();
       }
